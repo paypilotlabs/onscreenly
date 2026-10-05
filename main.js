@@ -578,7 +578,6 @@ async function pollSlides() {
   });
   slideStableCount = decision.stableCount;
   if (!decision.emit) {
-    if (slideLastHash && decision.distance != null && decision.distance <= cfg.threshold) slideLastHash = slideLastHash;
     return;
   }
   slideLastHash = newHash;
@@ -1192,7 +1191,6 @@ ipcMain.handle('profile:pickDocument', async () => {
     return { canceled: false, error: (e && e.message) || String(e) };
   }
 });
-ipcMain.on('app:quit', () => app.quit());
 ipcMain.handle('applink:state', () => appLinkConsentState());
 ipcMain.handle('applink:revoke', (_e, callerId) => {
   // Forgetting a caller also clears its separate slide-caption consent decision,

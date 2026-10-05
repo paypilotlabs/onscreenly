@@ -1,3 +1,4 @@
+// @ts-check
 // Screenshot via native screencapture on macOS, falling back to desktopCapturer (main process).
 // The first call can trigger the system permission prompt for the app.
 const { desktopCapturer, screen, nativeImage } = require('electron');

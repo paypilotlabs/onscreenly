@@ -1,3 +1,4 @@
+// @ts-check
 // What Iris is allowed to know about onscreenly.
 //
 // Split out from applink.js so it can be tested without Electron, and because

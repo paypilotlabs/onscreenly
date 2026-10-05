@@ -1,3 +1,4 @@
+// @ts-check
 // Configurable global shortcuts. Kept dependency-free so it is unit-testable.
 // Accelerator strings follow Electron's format, e.g. 'CommandOrControl+Return'.
 

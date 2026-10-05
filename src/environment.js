@@ -1,3 +1,4 @@
+// @ts-check
 // A present canonical variable wins, including an explicit empty string or "0".
 // Return the raw value so each existing feature keeps its own flag semantics.
 function readEnvironment(name, environment = process.env) {

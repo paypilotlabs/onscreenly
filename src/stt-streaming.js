@@ -6,7 +6,6 @@
 // with sub-200ms latency, interim results, and automatic reconnection.
 
 const { looksLikeHallucination, transcribeGemini, buildVocabPrompt } = require('./stt');
-const { pcmToWav } = require('./wav');
 const { GEMINI_TRANSCRIBE_LIVE_MODEL } = require('./llm');
 
 // ============================================================================

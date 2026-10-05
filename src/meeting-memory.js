@@ -1,3 +1,4 @@
+// @ts-check
 // Meeting memory — wires the meeting store (meetings.js) and notes (notes.js)
 // into the live transcript so onscreenly remembers what was said:
 //   • every transcript turn is persisted as it lands (survives a crash/restart)

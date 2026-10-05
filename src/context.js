@@ -1,8 +1,8 @@
+// @ts-check
 // Context engine — builds prompt-ready context from raw state.
 // Separates raw capture (audio buffers, screen URL) from normalized context
 // (rolling transcript window, profile, memory) from LLM prompt construction.
 
-const { MODES } = require('./prompts');
 
 // Build the normalized context object. Pure, so it is unit-testable.
 // state = { transcript: [{channel, text, ts}], userText, settings, memory }

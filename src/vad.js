@@ -1,3 +1,4 @@
+// @ts-check
 // Voice Activity Detection (VAD) — Adaptive energy-based VAD with speech state machine.
 // This is a lightweight VAD that runs in the main process on the PCM buffers.
 // It provides much better segmentation than a simple RMS gate by tracking
@@ -39,7 +40,6 @@ class AdaptiveVAD {
 
   // Process a chunk of Int16 PCM audio
   processChunk(pcmBuffer) {
-    const samples = pcmBuffer.length / 2;
     let offset = 0;
 
     while (offset + this.frameSize * 2 <= pcmBuffer.length) {

@@ -1,3 +1,4 @@
+// @ts-check
 // interview-context.js
 // Builds context-aware, category-specific system prompt blocks for every
 // direction an interview can take. Reads the live transcript to detect which

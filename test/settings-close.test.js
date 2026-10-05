@@ -17,7 +17,7 @@ test('renderer defines closeSettings once', () => {
 });
 
 test('closeSettings awaits saveSettings before hiding the modal', () => {
-  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n  \}/);
+  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(match, 'could not find async closeSettings body');
   const body = match[1];
   assert.match(body, /await saveSettings\(\)/);

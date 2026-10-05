@@ -1,3 +1,4 @@
+// @ts-check
 // Durable, atomic JSON file persistence for onscreenly's settings store.
 //
 // Why this exists as its own module: the previous store wrote the settings

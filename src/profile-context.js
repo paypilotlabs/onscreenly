@@ -1,3 +1,4 @@
+// @ts-check
 // Builds the optional, user-owned background reference shared by every LLM provider.
 
 const MAX_RESUME_CONTEXT_CHARS = 12000;

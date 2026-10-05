@@ -1,3 +1,4 @@
+// @ts-check
 // Simple JSON-file settings store (avoids native modules so `npm install` stays clean).
 //
 // The durable-write mechanics (atomic temp+rename, .bak snapshot, corruption

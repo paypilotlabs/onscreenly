@@ -55,7 +55,7 @@
 
   const messages = $('#messages');
 
-  function esc(s) { return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
   // minimal, safe markdown: fenced code, bullets, inline code, bold, paragraphs
   function renderMarkdown(text) {
@@ -1286,35 +1286,6 @@
     btn.title = 'Fast: ' + (fast || 'fast model') + ' · Smart: ' + (smart || 'smart model') + ' (higher quality, ~2× slower)';
   }
 
-  // ---- microphone permission banner --------------------------------------
-  function showMicPermissionBanner() {
-    let banner = document.getElementById('mic-perm-banner');
-    if (banner) { banner.classList.add('show'); return; }
-    banner = document.createElement('div');
-    banner.id = 'mic-perm-banner';
-    banner.className = 'show';
-    banner.innerHTML =
-      '<div class="mic-perm-text">' +
-        '<strong>🎙️ Microphone access required</strong><br>' +
-        'Onscreenly needs microphone permission to hear you during calls. Grant access in System Settings, then restart Onscreenly.' +
-      '</div>' +
-      '<div class="mic-perm-actions"></div>';
-    const actions = banner.querySelector('.mic-perm-actions');
-    if (onscreenly.platform === 'darwin') {
-      const openBtn = document.createElement('button');
-      openBtn.textContent = 'Open Microphone Settings';
-      openBtn.addEventListener('click', () => onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'));
-      actions.appendChild(openBtn);
-    }
-    const dismissBtn = document.createElement('button');
-    dismissBtn.textContent = 'Dismiss';
-    dismissBtn.className = 'dismiss';
-    dismissBtn.addEventListener('click', () => banner.classList.remove('show'));
-    actions.appendChild(dismissBtn);
-    const panel = document.getElementById('panel');
-    panel.insertBefore(banner, document.getElementById('action-row'));
-  }
-
   // ---- settings ----------------------------------------------------------
   const scrim = $('#settings-scrim');
   function openSettings() {
@@ -1547,7 +1518,6 @@
   function statusText() {
     const k = settings.apiKeys;
     const labels = { publik: 'publik API', cerebras: 'Cerebras', openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', deepgram: 'Deepgram', custom: 'Custom', ollama: 'Ollama', groq: 'Groq', minimax: 'MiniMax', deepseek: 'DeepSeek', azure: 'Azure AI Foundry' };
-    const has = Object.keys(labels).filter((p) => k[p]).map((p) => labels[p]);
     const publikPart = settings.provider === 'publik' && publikState
       ? ` · ${publikState.connected ? (publikState.balanceLabel ? `balance ${publikState.balanceLabel}` : 'connected') : 'not set up'}`
       : '';
@@ -1971,7 +1941,6 @@
       publikCard: true
     };
   }
-  function esc(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
   let obDialog = false; // true while the publik card is shown alone, after onboarding
   function showPublikDisclosure() {
     if (!publikState || !publikState.available) return;

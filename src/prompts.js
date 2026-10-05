@@ -1,3 +1,4 @@
+// @ts-check
 // prompts.js — Feature definitions with interview-category-aware system prompts.
 // ctx = { transcript, userText }
 // System prompt receives the interview context block prepended by main.js,

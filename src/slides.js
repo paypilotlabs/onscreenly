@@ -1,3 +1,4 @@
+// @ts-check
 // Slides — auto slide tracking for meetings. Pure + testable.
 // No Electron imports here: main.js supplies { width, height, data (RGBA Buffer) }
 // from a small desktopCapturer thumbnail, plus full-res dataURLs for the VLM.

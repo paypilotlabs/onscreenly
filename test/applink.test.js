@@ -6,7 +6,7 @@ const test = require('node:test');
 const Module = require('node:module');
 
 const { describeState, consentCopy } = require('../src/applink-state');
-const { AppLinkServer, AppLinkClient, ERROR_CODES } = require('../vendor/app-link');
+const { AppLinkServer, AppLinkClient } = require('../vendor/app-link');
 
 const originalModuleLoad = Module._load;
 

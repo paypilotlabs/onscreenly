@@ -20,7 +20,6 @@
 // not extract or run the code (anchors moved, parse error, etc).
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 const onscreenlyDir = process.argv[2];
 if (!onscreenlyDir) {
@@ -67,7 +66,7 @@ const handlerCode = lines.slice(handlerStart, handlerEnd).join('\n');
 
 // ---- minimal stub environment -------------------------------------------
 let getUserMediaCalls = 0;
-let micPcmMessages = 0;
+let _micPcmMessages = 0;
 const trackLog = [];
 
 class FakeTrack {
@@ -127,7 +126,7 @@ const registered = {};
 const onscreenlyStub = {
   platform: 'win32',
   log: (_msg) => {},
-  micPcm: (_buf) => { micPcmMessages++; },
+  micPcm: (_buf) => { _micPcmMessages++; },
   on: (channel, cb) => { registered[channel] = cb; },
 };
 

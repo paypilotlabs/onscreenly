@@ -1,3 +1,4 @@
+// @ts-check
 // Wrap raw Int16LE mono PCM in a WAV container so STT APIs accept it as a file.
 function pcmToWav(pcm, sampleRate = 16000, channels = 1) {
   const dataSize = pcm.length;

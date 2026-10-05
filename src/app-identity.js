@@ -1,3 +1,4 @@
+// @ts-check
 // Resolve identity before any settings store or Electron session is opened.
 // Reuse a legacy profile in place: never copy, merge, rename, or delete its data.
 const fs = require('fs');

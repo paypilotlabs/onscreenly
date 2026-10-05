@@ -1,3 +1,4 @@
+// @ts-check
 // Meeting history + memory — local JSON-file persistence.
 // Each meeting: { id, title, startedAt, endedAt, channels, transcript,
 //   summary, actionItems, followUp, notes, context }
@@ -5,7 +6,6 @@
 // never the full transcript of every meeting.
 
 const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
 function loadMeetingsFile(file) {
