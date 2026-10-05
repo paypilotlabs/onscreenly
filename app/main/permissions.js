@@ -102,7 +102,7 @@ function createPermissionsWindow() {
       preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   });
   permWin.loadFile(rendererPage('permissions.html'));
