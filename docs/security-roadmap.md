@@ -15,7 +15,7 @@ This is a prioritized implementation and policy backlog, dated **2026-10-05**. I
 | Runtime downloads | SHA-256 checks for model/runtime downloads; bounded model downloads and size/SHA-256-verified imports; no runtime-code download at app launch. | Revalidate executable caches/overrides and use immutable source archives/provenance for macOS runtime preparation. |
 | Packaging | Explicit file inclusion, `publish: null`, opt-in Mac signing/notarization. | Protected release approvals and verification of the actual signed/notarized artifact before upload. |
 
-Source anchors: `main.js`, `preload.js`, `renderer/renderer.js`, `renderer/permissions.html`, `src/settings-store-core.js`, `src/store.js`, `src/meetings.js`, `src/applink.js`, `src/whisper-runtime.js`, `src/whisper-model-manager.js`, and `scripts/prepare-whisper-runtime.js`.
+Source anchors: `app/main/`, `preload.js`, `renderer/renderer.js`, `renderer/permissions.html`, `src/storage/settings-store-core.js`, `src/storage/store.js`, `src/meetings/meetings.js`, `src/integrations/applink.js`, `src/whisper/whisper-runtime.js`, `src/whisper/whisper-model-manager.js`, and `scripts/prepare-whisper-runtime.js`.
 
 ## Priority 1: protect data and privileged operations
 

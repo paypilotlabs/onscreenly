@@ -1,6 +1,6 @@
 // Structured meeting notes — turns a transcript into summary / key points /
 // decisions / action items / follow-up. Pure + deterministic parts are
-// unit-testable; the LLM call lives in main.js.
+// unit-testable; the LLM call lives in the main process.
 
 // Build the user turn that asks the model to write structured notes.
 function buildNotesPrompt(transcript) {

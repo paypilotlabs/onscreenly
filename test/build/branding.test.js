@@ -82,7 +82,9 @@ test('the renamed AudioWorklet is registered under the name used by both audio c
 test('visible entry points and retired setup scripts do not impersonate another product', () => {
   assert.match(read('renderer/index.html'), /<title>Onscreenly<\/title>/);
   assert.match(read('renderer/permissions.html'), /<title>Onscreenly/);
-  assert.doesNotMatch(read('main.js'), /set(?:Title|Name)\(['"]Microsoft/);
+  for (const name of fs.readdirSync(path.join(__dirname, '..', '..', 'app', 'main'))) {
+    assert.doesNotMatch(read(`app/main/${name}`), /set(?:Title|Name)\(['"]Microsoft/);
+  }
   for (const name of ['rename-electron', 'apply-icon', 'build-icon']) {
     const source = read(`scripts/${name}.js`);
     assert.doesNotMatch(source, /writeFile|copyFile|unlink|resedit|Microsoft Corporation/);

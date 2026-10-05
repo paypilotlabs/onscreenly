@@ -1,8 +1,8 @@
 /* onscreenly — glassmorphism overlay. Tokens reconstructed from the Cluely screenshot. */
 
 :root {
-  --main-w: 700px;                       /* matches MAIN_W in main.js */
-  --side-w: 300px;                       /* matches SIDE_W in main.js */
+  --main-w: 700px;                       /* matches MAIN_W in app/main/window.js */
+  --side-w: 300px;                       /* matches SIDE_W in app/main/window.js */
   --bg: #2b013d;
   --panel-bg: #3f3642;
   --accent: #3C83F5;

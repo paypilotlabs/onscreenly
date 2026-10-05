@@ -89,7 +89,7 @@ async function requestConsent(request, deps) {
 }
 
 /**
- * @param {object} deps  Live references from main.js — not a snapshot, so
+ * @param {object} deps  Live references from the main process — not a snapshot, so
  *   `get_state` reflects the moment it is asked rather than the moment onscreenly
  *   started.
  */

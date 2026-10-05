@@ -2268,7 +2268,7 @@
   }
   // Show the card: inside onboarding it becomes the next step; afterwards it
   // is a dialog of its own (also reached from the "never a silent starter"
-  // gate in main.js runFeature).
+  // gate in app/main/llm-runner.js runFeature).
   function showPublikCard() {
     if (!publikState || !publikState.card) return;
     const existing = OB_STEPS.findIndex((st) => st.publikCard);

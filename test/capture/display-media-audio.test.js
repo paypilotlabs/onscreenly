@@ -7,7 +7,7 @@ const path = require('node:path');
 // WebFrameMain, 'loopback', or 'loopbackWithMute' — and NOTHING else. Its
 // native binding throws synchronously on any other value:
 //   TypeError: audio must be a WebFrameMain, "loopback" or "loopbackWithMute"
-// main.js used to pass the boolean `true` on Windows, so that throw rejected
+// The main process used to pass the boolean `true` on Windows, so that throw rejected
 // the handler's promise chain, getDisplayMedia() surfaced it to the renderer
 // as AbortError "Error starting capture", and onscreenly told every Windows user
 // "Meeting audio could not be started. Grant screen/audio access to onscreenly and
@@ -18,11 +18,11 @@ const path = require('node:path');
 // one-time callback, so a chain that can call it twice earns Electron's
 // "One-time callback was called more than once" warning.
 
-const MAIN_JS = fs.readFileSync(path.join(__dirname, '..', '..', 'main.js'), 'utf8');
+const MAIN_JS = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'main', 'media.js'), 'utf8');
 
 function displayMediaHandlerSource() {
   const start = MAIN_JS.indexOf('setDisplayMediaRequestHandler');
-  assert.notEqual(start, -1, 'main.js no longer registers a setDisplayMediaRequestHandler');
+  assert.notEqual(start, -1, 'app/main/media.js no longer registers a setDisplayMediaRequestHandler');
   const end = MAIN_JS.indexOf('useSystemPicker', start);
   assert.notEqual(end, -1, 'could not find the end of the setDisplayMediaRequestHandler block');
   return MAIN_JS.slice(start, end);

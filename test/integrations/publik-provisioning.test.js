@@ -1,6 +1,6 @@
 // Provisioning end to end against a local fake gateway: the real provision()
 // and fetchWallet() over Node's global fetch, driven by the same
-// provisionInstall() flow main.js runs, with an in-memory settings store.
+// provisionInstall() flow the main process runs, with an in-memory settings store.
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const http = require('node:http');

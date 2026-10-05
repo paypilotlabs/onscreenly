@@ -1,7 +1,7 @@
 // @ts-check
 // prompts.js — Feature definitions with interview-category-aware system prompts.
 // ctx = { transcript, userText }
-// System prompt receives the interview context block prepended by main.js,
+// System prompt receives the interview context block prepended by app/main/llm-runner.js,
 // then optionally the user's AI rules appended at the end.
 
 const { appendAiRules } = require('../context/profile-context');

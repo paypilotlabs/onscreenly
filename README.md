@@ -158,7 +158,13 @@ The dependency audit on **2026-10-05** reported **eight high-severity vulnerable
 
 ## Project layout and provenance
 
-- `main.js`: Electron lifecycle, IPC, capture orchestration, and AI actions.
+- `app/main/`: the Electron main process, one module per concern:
+  - `index.js`: identity bootstrap, launch and lifecycle.
+  - `window.js`: the overlay window, screen-share protection, dragging.
+  - `capture.js`, `whisper.js`, `slides.js`: listening, local Whisper, slide tracking.
+  - `llm-runner.js`: runs an AI feature and streams the answer.
+  - `publik-controller.js`, `permissions.js`, `media.js`, `shortcuts.js`, `ipc.js`: Publik, OS permissions, media handlers, shortcuts, shared IPC.
+  - `session.js`, `platform.js`: shared live state and platform facts.
 - `preload.js`: limited renderer API bridge.
 - `renderer/`: existing HTML/CSS/JavaScript overlay, permissions, onboarding, and audio processing.
 - `src/`, grouped by area:

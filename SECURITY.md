@@ -14,7 +14,7 @@ A monitored security contact, response targets, and supported-release window hav
 
 This policy covers first-party source, packaging, and repository automation:
 
-- `main.js`, `preload.js`, and `renderer/`: privileged operations, renderer isolation, IPC, permissions, capture, and rendering.
+- `app/main/`, `preload.js`, and `renderer/`: privileged operations, renderer isolation, IPC, permissions, capture, and rendering.
 - `src/`: provider requests, settings and history, document parsing, local transcription, app-link integration, and compatibility paths.
 - `vendor/app-link/`: the integration boundary and its use by Onscreenly, including locally reachable callers.
 - `scripts/`, build resources, dependency manifests, and active `.github/workflows/`: downloaded/executed code, packaged contents, and release integrity.

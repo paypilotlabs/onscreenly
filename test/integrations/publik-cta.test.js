@@ -1,7 +1,7 @@
 // CONTRACT §12 (founder, 2026-09-19): the plan CTA inside the app, right
 // after publik API is set up. The card, the settings button and the
 // low-starter banner are pure views in src/publik.js; these tests drive them
-// through the same provisionInstall() flow main.js runs, with the fake store
+// through the same provisionInstall() flow the main process runs, with the fake store
 // the provisioning tests use, so what is asserted is what the renderer paints.
 const assert = require('node:assert/strict');
 const test = require('node:test');
@@ -98,8 +98,8 @@ function fetchReturning(status, body) {
     json: async () => body
   });
 }
-// What main.js publikState() derives from the store — the redacted view the
-// renderer gets. Mirrors main.js field for field, minus the key.
+// What app/main/publik-controller.js publikState() derives from the store — the redacted view the
+// renderer gets. Mirrors it field for field, minus the key.
 function viewOf(store) {
   const s = store.getSettings();
   const p = s.publik;
@@ -385,7 +385,11 @@ test('copy rule: the CTA copy says "publik API", dollars, never "credits", never
   assert.match(js, /action\.kind === 'card'/);
   const preload = fs.readFileSync(path.join(__dirname, '..', '..', 'preload.js'), 'utf8');
   assert.match(preload, /publikCardSeen: \(\) => ipcRenderer\.invoke\('publik:card-seen'\)/);
-  const main = fs.readFileSync(path.join(__dirname, '..', '..', 'main.js'), 'utf8');
+  const mainDir = path.join(__dirname, '..', '..', 'app', 'main');
+  const main = fs
+    .readdirSync(mainDir)
+    .map((f) => fs.readFileSync(path.join(mainDir, f), 'utf8'))
+    .join('\n');
   assert.match(main, /ipcMain\.handle\('publik:card-seen'/);
   assert.match(main, /publik\.resolveOpenTarget\(url, s\.publik\.claimUrl\)/);
   assert.match(main, /!settings\.publik\.cardShown/, 'runFeature gates the starter on the card having been shown');

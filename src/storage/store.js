@@ -188,7 +188,7 @@ function save() {
   }
 }
 
-// Called by main.js at launch, before the window exists. publik becomes the
+// Called by the main process at launch, before the window exists. publik becomes the
 // selected provider only where nothing works today: a build that carries an
 // app token, a settings file that has never been switched automatically, and
 // no key typed into the currently selected provider. A user who has ever

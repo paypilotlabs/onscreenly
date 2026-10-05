@@ -11,7 +11,7 @@ test('defines an explicit Windows x64 package target', () => {
 });
 
 test('ships every runtime directory in packaged builds', () => {
-  assert.ok(builder.files.includes('main.js'));
+  assert.ok(builder.files.includes('app/**/*'));
   assert.ok(builder.files.includes('preload.js'));
   assert.ok(builder.files.includes('src/**/*'));
   assert.ok(builder.files.includes('renderer/**/*'));

@@ -1,6 +1,6 @@
 // @ts-check
 // Slides — auto slide tracking for meetings. Pure + testable.
-// No Electron imports here: main.js supplies { width, height, data (RGBA Buffer) }
+// No Electron imports here: app/main/slides.js supplies { width, height, data (RGBA Buffer) }
 // from a small desktopCapturer thumbnail, plus full-res dataURLs for the VLM.
 // Memory-only by design (forward-only, no disk writes).
 
