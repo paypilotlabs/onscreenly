@@ -1,5 +1,6 @@
 // Local Whisper: model management and the on-device transcriber.
-const { app, dialog, ipcMain } = require('electron');
+const { app, dialog } = require('electron');
+const { handle } = require('./ipc-guard');
 const { WhisperModelManager } = require('../../src/whisper/whisper-model-manager');
 const { requireWhisperModel } = require('../../src/whisper/whisper-model-catalog');
 const { locateWhisperRuntime } = require('../../src/whisper/whisper-runtime');
@@ -116,8 +117,8 @@ function shutdownWhisper() {
 }
 
 function registerWhisperIpc() {
-  ipcMain.handle('whisper:models', () => getWhisperOverview());
-  ipcMain.handle('whisper:model-download', async (_event, modelId) => {
+  handle('whisper:models', () => getWhisperOverview());
+  handle('whisper:model-download', async (_event, modelId) => {
     if (!whisperModelManager) throw new Error('The local Whisper model manager is not ready.');
     const result = await whisperModelManager.download(modelId, (progress) =>
       send('whisper:download-progress', progress)
@@ -125,11 +126,11 @@ function registerWhisperIpc() {
     send('whisper:models-changed', { modelId });
     return result;
   });
-  ipcMain.handle('whisper:model-cancel', (_event, modelId) => {
+  handle('whisper:model-cancel', (_event, modelId) => {
     if (!whisperModelManager) return false;
     return whisperModelManager.cancelDownload(modelId);
   });
-  ipcMain.handle('whisper:model-delete', async (_event, modelId) => {
+  handle('whisper:model-delete', async (_event, modelId) => {
     requireWhisperModel(modelId);
     if (activeWhisperModelId === modelId) {
       throw new Error('Stop listening before deleting the active model.');
@@ -138,7 +139,7 @@ function registerWhisperIpc() {
     send('whisper:models-changed', { modelId });
     return result;
   });
-  ipcMain.handle('whisper:model-import', async (_event, modelId) => {
+  handle('whisper:model-import', async (_event, modelId) => {
     if (!whisperModelManager) throw new Error('The local Whisper model manager is not ready.');
     requireWhisperModel(modelId);
     if (activeWhisperModelId === modelId) {

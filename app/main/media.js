@@ -1,7 +1,8 @@
 // Media permission handlers for the renderer's getUserMedia / getDisplayMedia.
 const { desktopCapturer, session: electronSession } = require('electron');
 const store = require('../../src/storage/store');
-const { isMac } = require('./platform');
+const { isMac, RENDERER_DIR } = require('./platform');
+const { isTrustedPageUrl } = require('./ipc-policy');
 
 function installMediaHandlers() {
   const allowMedia = (permission) =>
@@ -10,8 +11,15 @@ function installMediaHandlers() {
     permission === 'audioCapture' ||
     permission === 'display-capture' ||
     permission === 'screen';
-  electronSession.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowMedia(permission)));
-  electronSession.defaultSession.setPermissionCheckHandler((_wc, permission) => allowMedia(permission));
+  // Media access is only for Onscreenly's own pages, never for other content.
+  const fromOwnPage = (wc, details) =>
+    isTrustedPageUrl((details && details.requestingUrl) || (wc && !wc.isDestroyed() ? wc.getURL() : ''), RENDERER_DIR);
+  electronSession.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) =>
+    cb(allowMedia(permission) && fromOwnPage(wc, details))
+  );
+  electronSession.defaultSession.setPermissionCheckHandler(
+    (wc, permission, _origin, details) => allowMedia(permission) && fromOwnPage(wc, details)
+  );
 
   // System-audio loopback for getDisplayMedia: hand back a screen source with 'loopback'
   // audio so the renderer can capture what's playing (Zoom/Meet) using Onscreenly's own grant.

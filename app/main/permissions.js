@@ -1,5 +1,6 @@
 // OS permission checks and the permission gate window.
-const { BrowserWindow, desktopCapturer, ipcMain, screen, systemPreferences } = require('electron');
+const { BrowserWindow, desktopCapturer, screen, systemPreferences } = require('electron');
+const { handle, on } = require('./ipc-guard');
 const { PRELOAD_PATH, rendererPage } = require('./platform');
 
 let permWin = null;
@@ -111,9 +112,9 @@ function createPermissionsWindow() {
 
 // onGranted runs once both permissions are granted and the user clicks Continue.
 function registerPermissionsIpc({ onGranted }) {
-  ipcMain.handle('permissions:check', () => getPermissionStatus());
-  ipcMain.handle('permissions:request', () => requestPermissions());
-  ipcMain.on('permissions:continue', async () => {
+  handle('permissions:check', () => getPermissionStatus());
+  handle('permissions:request', () => requestPermissions());
+  on('permissions:continue', async () => {
     const status = await getPermissionStatus();
     if (status.mic === 'granted' && status.screen === 'granted') {
       if (permWin) {

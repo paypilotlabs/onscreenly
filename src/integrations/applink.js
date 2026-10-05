@@ -48,8 +48,11 @@ function askInWindow(win, copy, scope) {
       win.removeListener('closed', onClosed);
       resolve(allowed);
     };
-    const onResponse = (_event, payload) => {
-      if (payload && payload.id === id) settle(!!payload.allowed);
+    // Only the window that was asked can answer: a consent grant decides who
+    // may read your screen activity.
+    const onResponse = (event, payload) => {
+      if (win.isDestroyed() || event.sender !== win.webContents) return;
+      if (payload && payload.id === id) settle(payload.allowed === true);
     };
     const onClosed = () => settle(false);
     const timer = setTimeout(() => settle(false), CONSENT_TIMEOUT_MS);

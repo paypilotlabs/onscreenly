@@ -2,7 +2,8 @@
 // Contract: ~/publik-api-research/CONTRACT.md. The key is minted only after
 // the disclosure is accepted (publik:accept-disclosure); the balance line is
 // fed by the x-publik-* headers on every answer and reconciled from GET /wallet.
-const { app, ipcMain, shell } = require('electron');
+const { app, shell } = require('electron');
+const { handle, on } = require('./ipc-guard');
 const os = require('os');
 const store = require('../../src/storage/store');
 const publik = require('../../src/integrations/publik');
@@ -171,8 +172,8 @@ function publikHandleErrorAction(action) {
 }
 
 function registerPublikIpc() {
-  ipcMain.handle('publik:state', () => publikState());
-  ipcMain.handle('publik:accept-disclosure', async () => {
+  handle('publik:state', () => publikState());
+  handle('publik:accept-disclosure', async () => {
     // Consent precedes mint: this is the only path that calls POST /installs
     // for a fresh install. It also selects publik if the user had moved away.
     if (!publikBuild.available) return publikState();
@@ -180,15 +181,15 @@ function registerPublikIpc() {
     store.setSettings({ provider: publik.PUBLIK_PROVIDER });
     return publikProvision();
   });
-  ipcMain.handle('publik:reconnect', async () => {
+  handle('publik:reconnect', async () => {
     const s = store.getSettings();
     if (!s.publik.disclosureAccepted) return publikState();
     if (s.apiKeys.publik && !s.publik.revoked) return publikRefreshWallet();
     store.setPublik({ revoked: true });
     return publikProvision();
   });
-  ipcMain.handle('publik:refresh', () => publikRefreshWallet());
-  ipcMain.handle('publik:disconnect', async () => {
+  handle('publik:refresh', () => publikRefreshWallet());
+  handle('publik:disconnect', async () => {
     const s = store.getSettings();
     if (s.apiKeys.publik) {
       try {
@@ -212,7 +213,7 @@ function registerPublikIpc() {
   // "Later" or the primary button on the first-run card: the card was shown for
   // this starter grant. Touches publik.cardShown only — the key stays in place
   // and the balance is kept (§12.1).
-  ipcMain.handle('publik:card-seen', () => {
+  handle('publik:card-seen', () => {
     try {
       publik.markCardSeen(store);
     } catch (e) {
@@ -230,7 +231,7 @@ function registerPublikIpc() {
   // The only path a gateway-supplied URL can take out of the app: publikhq.com
   // only. A link off that origin is dropped (the stored claim link stands in
   // when it is safe); nothing else is ever handed to the system browser.
-  ipcMain.on('publik:open', (_e, url) => {
+  on('publik:open', (_e, url) => {
     const s = store.getSettings();
     const target = publik.resolveOpenTarget(url, s.publik.claimUrl);
     if (!target) {

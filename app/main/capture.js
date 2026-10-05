@@ -4,7 +4,8 @@
 // Mic + system audio are both captured in the RENDERER (getUserMedia for the mic,
 // getDisplayMedia loopback for system audio) so they run inside Onscreenly's own process
 // and use Onscreenly's own Screen-Recording grant — no separate helper binary to authorize.
-const { ipcMain } = require('electron');
+const { handle, on } = require('./ipc-guard');
+const { isValidPcmChunk } = require('./ipc-policy');
 const store = require('../../src/storage/store');
 const { createSTT } = require('../../src/stt/stt');
 const { rms16 } = require('../../src/stt/wav');
@@ -335,7 +336,7 @@ async function setCapturing(active) {
 }
 
 function registerCaptureIpc() {
-  ipcMain.handle('capture:toggle', () => {
+  handle('capture:toggle', () => {
     const targetState = !desiredCaptureState;
     desiredCaptureState = targetState;
     const localWhisperTranscriber = whisper.getTranscriber();
@@ -345,12 +346,12 @@ function registerCaptureIpc() {
     captureTransition = captureTransition.catch(() => state.capturing).then(() => setCapturing(targetState));
     return captureTransition;
   });
-  ipcMain.handle('capture:state', () => ({ active: state.capturing }));
-  ipcMain.on('mic:pcm', (_e, arrayBuffer) => {
-    if (state.capturing) routeAudio('you', arrayBuffer);
+  handle('capture:state', () => ({ active: state.capturing }));
+  on('mic:pcm', (_e, arrayBuffer) => {
+    if (state.capturing && isValidPcmChunk(arrayBuffer)) routeAudio('you', arrayBuffer);
   });
-  ipcMain.on('system:pcm', (_e, arrayBuffer) => {
-    if (state.capturing) routeAudio('them', arrayBuffer);
+  on('system:pcm', (_e, arrayBuffer) => {
+    if (state.capturing && isValidPcmChunk(arrayBuffer)) routeAudio('them', arrayBuffer);
   });
 }
 

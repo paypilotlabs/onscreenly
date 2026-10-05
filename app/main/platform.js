@@ -9,7 +9,8 @@ const isLinux = process.platform === 'linux';
 // The app root holds preload.js and renderer/; this file lives in app/main/.
 const ROOT = path.join(__dirname, '..', '..');
 const PRELOAD_PATH = path.join(ROOT, 'preload.js');
-const rendererPage = (name) => path.join(ROOT, 'renderer', name);
+const RENDERER_DIR = path.join(ROOT, 'renderer');
+const rendererPage = (name) => path.join(RENDERER_DIR, name);
 
 // -------- Windows version helpers --------
 // WDA_EXCLUDEFROMCAPTURE (setContentProtection) requires Windows 10 build 19041+.
@@ -50,6 +51,7 @@ module.exports = {
   isWindows,
   isLinux,
   PRELOAD_PATH,
+  RENDERER_DIR,
   rendererPage,
   WIN_BUILD,
   WIN_SUPPORTS_CONTENT_PROTECTION,

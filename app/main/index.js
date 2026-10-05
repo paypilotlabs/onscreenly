@@ -42,6 +42,15 @@ const { registerAppIpc } = require('./ipc');
 // regression, not a hypothetical.
 let appLaunched = false;
 
+// Onscreenly's pages never navigate, open windows or embed webviews. Refusing
+// all three means injected content cannot replace a page that holds the
+// preload bridge, or open one.
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.on('will-navigate', (event) => event.preventDefault());
+  contents.on('will-attach-webview', (event) => event.preventDefault());
+});
+
 registerAppIpc();
 registerPublikIpc();
 registerCaptureIpc();
