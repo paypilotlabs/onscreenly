@@ -34,7 +34,10 @@ module.exports = [
   },
   {
     files: ['renderer/js/**/*.js'],
-    languageOptions: { sourceType: 'module', globals: { ...globals.browser } }
+    languageOptions: { sourceType: 'module', globals: { ...globals.browser } },
+    // Shared values live on the imported `state` object; a local binding with
+    // the same name would silently capture reads and writes meant for it.
+    rules: { 'no-shadow': ['error', { builtinGlobals: false }] }
   },
   {
     files: ['renderer/*-processor.js'],

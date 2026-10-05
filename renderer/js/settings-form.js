@@ -65,13 +65,13 @@ function fillSettings() {
 async function fillAppLinkCallers() {
   const host = $('#applink-callers');
   if (!host || !onscreenly.appLinkState) return;
-  let state;
+  let consent;
   try {
-    state = await onscreenly.appLinkState();
+    consent = await onscreenly.appLinkState();
   } catch (_) {
     return;
   }
-  const callers = Object.entries((state && state.callers) || {});
+  const callers = Object.entries((consent && consent.callers) || {});
   if (!callers.length) {
     host.innerHTML = '<div class="s-caller-empty">Nothing has asked yet.</div>';
     return;

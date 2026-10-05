@@ -122,10 +122,10 @@ export function init() {
     renderPublikBlock();
   });
   $('#publik-byo').addEventListener('click', selectByoProvider);
-  onscreenly.on('publik:state', (state) => {
-    state.publikState = state;
+  onscreenly.on('publik:state', (next) => {
+    state.publikState = next;
     renderPublikBlock();
-    maybeShowLowStarter(state);
+    maybeShowLowStarter(next);
   });
 }
 
