@@ -43,7 +43,7 @@ Screen-share protection is **best effort, not a guarantee**. The app requests El
 
 See [Electron's content-protection documentation](https://www.electronjs.org/docs/latest/api/browser-window#winsetcontentprotectionenable-macos-windows). Check the actual share from another participant's view in the meeting application and OS version you use. No Zoom, Teams, or Meet capture mode is promised to hide Onscreenly universally.
 
-- **macOS:** microphone and Screen Recording permission are required for the corresponding features. System-audio loopback targets macOS 14.4+ and uses a screen-capture session; enabling meeting audio can display macOS's recording/sharing indicator.
+- **macOS:** requires macOS 13 or later (Electron 44). Microphone and Screen Recording permission are required for the corresponding features. System-audio loopback targets macOS 14.4+ and uses a screen-capture session; enabling meeting audio can display macOS's recording/sharing indicator.
 - **Windows:** microphone access depends on Windows privacy settings. Meeting audio uses loopback capture. Native window exclusion requires a supported local console session.
 - **Linux:** package targets exist for x64 and arm64; audio capture, window behavior, and global shortcuts depend on the desktop environment. Screen-share invisibility is not supported.
 
@@ -60,7 +60,7 @@ npm ci
 npm start
 ```
 
-`npm ci` installs the normal Electron development runtime. The former Windows executable-renaming and Edge-icon scripts are retired; they no longer modify files. If an old checkout modified your Electron installation, a fresh `npm ci` restores it.
+`npm ci` installs the Electron package; Electron 42 and later download the runtime binary the first time `npm start` runs, so the first launch needs network access. The former Windows executable-renaming and Edge-icon scripts are retired; they no longer modify files. If an old checkout modified your Electron installation, a fresh `npm ci` restores it.
 
 On first launch:
 

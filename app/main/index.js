@@ -28,22 +28,10 @@ const { registerShortcuts } = require('./shortcuts');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
 
-// macOS system-audio loopback (the "them" channel via getDisplayMedia) does not
-// start on Electron 31–38 unless these Chromium features are enabled; without
-// them getDisplayMedia rejects with "Error starting capture" and meeting audio
-// silently never works. Electron 39+ wires this up itself, where this is a
-// harmless no-op. Must run before app is ready.
-if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
-}
-
-// Linux Wayland / Ozone native rendering configuration. Without this, Electron
-// falls back to XWayland even on a native Wayland session; 'auto' picks Wayland
-// when available and X11 otherwise. Harmless no-op on X11-only sessions.
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform,WaylandWindowDecorations');
-  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-}
+// No Chromium switches are needed on Electron 44. macOS system-audio loopback
+// uses Core Audio taps by default since Electron 39 (it needs
+// NSAudioCaptureUsageDescription, set in electron-builder.cjs), and Linux runs
+// natively on Wayland since Electron 38 (--ozone-platform defaults to auto).
 
 // Windows never blocks startup on an unresolved permission (see app.whenReady()
 // below), so launchApp() can already have run once by the time the user grants
