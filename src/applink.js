@@ -83,7 +83,7 @@ async function requestConsent(request, deps) {
     defaultId: 0, // Return dismisses with a no.
     cancelId: 0,
     message: copy.message,
-    detail: copy.detail,
+    detail: copy.detail
   });
   return response === 1;
 }
@@ -106,8 +106,8 @@ function startAppLink(deps) {
     diagnosticsProvider: () => ({
       electron: process.versions.electron,
       chrome: process.versions.chrome,
-      userDataPath: app.getPath('userData'),
-    }),
+      userDataPath: app.getPath('userData')
+    })
   });
 
   // Both directions are recorded, because an action that changes what the
@@ -122,10 +122,10 @@ function startAppLink(deps) {
       link.record({
         level: 'info',
         event: 'applink_set_capturing',
-        msg: `${caller.name} ${active ? 'started' : 'stopped'} listening`,
+        msg: `${caller.name} ${active ? 'started' : 'stopped'} listening`
       });
       return { capturing: active };
-    },
+    }
   });
 
   // Forward-only slide access: captions leave only via this consented action,
@@ -155,7 +155,7 @@ function startAppLink(deps) {
         link.record({
           level: 'info',
           event: 'applink_slides_consent',
-          msg: `${caller.name} was ${decision === 'granted' ? 'granted' : 'denied'} slide-caption access`,
+          msg: `${caller.name} was ${decision === 'granted' ? 'granted' : 'denied'} slide-caption access`
         });
       }
       if (decision !== 'granted') {
@@ -167,10 +167,10 @@ function startAppLink(deps) {
       link.record({
         level: 'info',
         event: 'applink_get_slides',
-        msg: `${caller.name} read ${slides.length} slide captions`,
+        msg: `${caller.name} read ${slides.length} slide captions`
       });
       return { count: slides.length, slides };
-    },
+    }
   });
 
   link.start().catch((error) => {
@@ -215,5 +215,5 @@ module.exports = {
   appLinkConsentState,
   revokeAppLinkCaller,
   describeState,
-  requestConsent,
+  requestConsent
 };

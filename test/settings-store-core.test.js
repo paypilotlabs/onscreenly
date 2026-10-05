@@ -55,7 +55,10 @@ if (process.platform !== 'win32') {
     fs.writeFileSync(file, '{}', { mode: 0o644 });
     const fileStore = createFileStore(() => dir, 'onscreenly-data.json');
     const originalRename = fs.renameSync;
-    fs.renameSync = (from, to) => { if (to === file) throw Object.assign(new Error('EPERM'), { code: 'EPERM' }); return originalRename(from, to); };
+    fs.renameSync = (from, to) => {
+      if (to === file) throw Object.assign(new Error('EPERM'), { code: 'EPERM' });
+      return originalRename(from, to);
+    };
     try {
       fileStore.persist({ apiKeys: { openai: 'sk-x' } });
     } finally {

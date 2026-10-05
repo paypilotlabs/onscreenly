@@ -10,15 +10,28 @@ const SETTINGS_FILE = 'onscreenly-data.json';
 const LEGACY_SETTINGS_FILE = 'cue-data.json';
 
 function isFile(candidate) {
-  try { return fs.statSync(candidate).isFile(); } catch (_) { return false; }
+  try {
+    return fs.statSync(candidate).isFile();
+  } catch (_) {
+    return false;
+  }
 }
 
 function hasProfileArtifacts(directory) {
-  const files = [SETTINGS_FILE, SETTINGS_FILE + '.bak', LEGACY_SETTINGS_FILE,
-    LEGACY_SETTINGS_FILE + '.bak', 'meetings.json', 'meetings.json.bak'];
+  const files = [
+    SETTINGS_FILE,
+    SETTINGS_FILE + '.bak',
+    LEGACY_SETTINGS_FILE,
+    LEGACY_SETTINGS_FILE + '.bak',
+    'meetings.json',
+    'meetings.json.bak'
+  ];
   if (files.some((name) => isFile(path.join(directory, name)))) return true;
-  try { return fs.statSync(path.join(directory, 'whisper-models')).isDirectory(); }
-  catch (_) { return false; }
+  try {
+    return fs.statSync(path.join(directory, 'whisper-models')).isDirectory();
+  } catch (_) {
+    return false;
+  }
 }
 
 function resolveProfileDirectory({ appData, currentUserData, currentName, commandLineUserData }) {
@@ -50,7 +63,7 @@ function bootstrapIdentity(app) {
     appData: app.getPath('appData'),
     currentUserData: app.getPath('userData'),
     currentName: app.getName(),
-    commandLineUserData: app.commandLine.getSwitchValue('user-data-dir'),
+    commandLineUserData: app.commandLine.getSwitchValue('user-data-dir')
   });
   fs.mkdirSync(directory, { recursive: true });
   app.setName(PRODUCT_NAME);
@@ -58,5 +71,13 @@ function bootstrapIdentity(app) {
   return directory;
 }
 
-module.exports = { PRODUCT_NAME, APP_ID, SETTINGS_FILE, LEGACY_SETTINGS_FILE,
-  hasProfileArtifacts, resolveProfileDirectory, resolveSettingsFilename, bootstrapIdentity };
+module.exports = {
+  PRODUCT_NAME,
+  APP_ID,
+  SETTINGS_FILE,
+  LEGACY_SETTINGS_FILE,
+  hasProfileArtifacts,
+  resolveProfileDirectory,
+  resolveSettingsFilename,
+  bootstrapIdentity
+};

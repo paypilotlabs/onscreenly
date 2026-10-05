@@ -31,9 +31,7 @@
     const ic = btn.querySelector('.ic');
     const label = btn.querySelector('.tb-stop-label');
     btn.classList.toggle('active', active);
-    if (ic) ic.innerHTML = active
-      ? icon('square', { size: 14 })
-      : icon('play', { size: 14, filled: false });
+    if (ic) ic.innerHTML = active ? icon('square', { size: 14 }) : icon('play', { size: 14, filled: false });
     if (label) label.textContent = active ? 'End session' : 'Start session';
     const title = active ? 'End session' : 'Start session';
     btn.title = title;
@@ -48,40 +46,88 @@
   let publikState = null;
   let whisperOverview = null;
   let busy = false;
-  let aiEl = null;       // current streaming <div class="ai-text">
+  let aiEl = null; // current streaming <div class="ai-text">
   let caretEl = null;
   let responseCount = 0;
   const MAX_RESPONSES = 20;
 
   const messages = $('#messages');
 
-  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function esc(s) {
+    return String(s ?? '').replace(
+      /[&<>"']/g,
+      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+    );
+  }
 
   // minimal, safe markdown: fenced code, bullets, inline code, bold, paragraphs
   function renderMarkdown(text) {
     const lines = text.split('\n');
-    let html = '', inCode = false, inList = false, buf = [];
-    const flushP = () => { if (buf.length) { html += '<p>' + inline(buf.join(' ')) + '</p>'; buf = []; } };
-    const inline = (s) => esc(s)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    let html = '',
+      inCode = false,
+      inList = false,
+      buf = [];
+    const flushP = () => {
+      if (buf.length) {
+        html += '<p>' + inline(buf.join(' ')) + '</p>';
+        buf = [];
+      }
+    };
+    const inline = (s) =>
+      esc(s)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     for (const raw of lines) {
       const line = raw;
       if (/^```/.test(line.trim())) {
-        if (!inCode) { flushP(); if (inList) { html += '</ul>'; inList = false; } html += '<pre><code>'; inCode = true; }
-        else { html += '</code></pre>'; inCode = false; }
+        if (!inCode) {
+          flushP();
+          if (inList) {
+            html += '</ul>';
+            inList = false;
+          }
+          html += '<pre><code>';
+          inCode = true;
+        } else {
+          html += '</code></pre>';
+          inCode = false;
+        }
         continue;
       }
-      if (inCode) { html += esc(line) + '\n'; continue; }
-      if (/^\s*[-*]\s+/.test(line)) { flushP(); if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</li>'; continue; }
-      if (line.trim() === '') { flushP(); if (inList) { html += '</ul>'; inList = false; } continue; }
+      if (inCode) {
+        html += esc(line) + '\n';
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        flushP();
+        if (!inList) {
+          html += '<ul>';
+          inList = true;
+        }
+        html += '<li>' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</li>';
+        continue;
+      }
+      if (line.trim() === '') {
+        flushP();
+        if (inList) {
+          html += '</ul>';
+          inList = false;
+        }
+        continue;
+      }
       buf.push(line.trim());
     }
-    flushP(); if (inList) html += '</ul>'; if (inCode) html += '</code></pre>';
+    flushP();
+    if (inList) html += '</ul>';
+    if (inCode) html += '</code></pre>';
     return html;
   }
 
-  function clearMessages() { messages.innerHTML = ''; aiEl = null; caretEl = null; }
+  function clearMessages() {
+    messages.innerHTML = '';
+    aiEl = null;
+    caretEl = null;
+  }
 
   function addUserBubble(text) {
     const b = document.createElement('div');
@@ -118,7 +164,8 @@
     if (!aiEl) return;
     const raw = aiEl.dataset.raw || '';
     aiEl.innerHTML = renderMarkdown(raw);
-    aiEl = null; caretEl = null;
+    aiEl = null;
+    caretEl = null;
   }
 
   let busyFailsafe = null;
@@ -128,7 +175,11 @@
     clearTimeout(busyFailsafe);
     // Failsafe: main has a 25s stream watchdog that always sends llm:done/llm:error, but if a
     // terminal event is ever lost the whole UI stays frozen — self-clear after a generous window.
-    if (v) busyFailsafe = setTimeout(() => { busy = false; $('#send-btn').classList.toggle('busy', false); }, 40000);
+    if (v)
+      busyFailsafe = setTimeout(() => {
+        busy = false;
+        $('#send-btn').classList.toggle('busy', false);
+      }, 40000);
   }
 
   // ---- transcript helpers ------------------------------------------------
@@ -221,14 +272,20 @@
       /what.{1,30}(biggest|greatest|most|hardest|proudest)/i,
       /have you ever/i
     ];
-    if (behavioralPatterns.some(p => p.test(trimmed))) return true;
+    if (behavioralPatterns.some((p) => p.test(trimmed))) return true;
 
     // Medium confidence: question starters with substantial content
-    const questionStarters = /^(what|how|why|when|where|who|which|tell|describe|explain|can|could|would|should|have|did|do|is|are|was|were)/i;
+    const questionStarters =
+      /^(what|how|why|when|where|who|which|tell|describe|explain|can|could|would|should|have|did|do|is|are|was|were)/i;
     if (questionStarters.test(trimmed) && trimmed.length > 25) return true;
 
     // Medium confidence: ends with common question endings
-    if (/(about that|for us|to us|with you|for you|about it|to share|you handle|you approach|your experience|your background)\s*$/i.test(trimmed)) return true;
+    if (
+      /(about that|for us|to us|with you|for you|about it|to share|you handle|you approach|your experience|your background)\s*$/i.test(
+        trimmed
+      )
+    )
+      return true;
 
     return false;
   }
@@ -471,13 +528,22 @@
     syncPlaceholder();
     updateSendButtonState(); // FIX #9: Update send button on input change
   });
-  input.addEventListener('focus', () => { composer.classList.add('focused'); placeholder.classList.add('hidden'); });
-  input.addEventListener('blur', () => { composer.classList.remove('focused'); syncPlaceholder(); });
+  input.addEventListener('focus', () => {
+    composer.classList.add('focused');
+    placeholder.classList.add('hidden');
+  });
+  input.addEventListener('blur', () => {
+    composer.classList.remove('focused');
+    syncPlaceholder();
+  });
   $('#input-area').addEventListener('click', () => input.focus());
 
   function send() {
     const text = input.value.trim();
-    if (!text) { runMode('assist', ''); return; }
+    if (!text) {
+      runMode('assist', '');
+      return;
+    }
     const wasFromSTT = inputFromSTT;
 
     // Save to history before clearing (in case user wants to redo)
@@ -512,7 +578,10 @@
       hardClearSTTFill(true); // FIX #10: Show undo hint
       return;
     }
-    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      e.preventDefault();
+      send();
+    }
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       runMode(e.shiftKey ? 'assist' : 'say', '');
@@ -577,12 +646,19 @@
     if (!Number.isFinite(n)) return 1;
     return Math.min(1, Math.max(OPACITY_MIN, Math.round(n * 100) / 100));
   }
-  function opacityToPercent(value) { return Math.round(clampOpacity(value) * 100); }
+  function opacityToPercent(value) {
+    return Math.round(clampOpacity(value) * 100);
+  }
   function persistOpacitySoon() {
     clearTimeout(persistOpacitySoon.timer);
     persistOpacitySoon.timer = setTimeout(() => {
       if (!settings) return;
-      onscreenly.settingsSet({ opacity: settings.opacity }).then((next) => { if (next) settings = next; }).catch(() => {});
+      onscreenly
+        .settingsSet({ opacity: settings.opacity })
+        .then((next) => {
+          if (next) settings = next;
+        })
+        .catch(() => {});
     }, 400);
   }
   function applyOpacity(value, persist) {
@@ -632,7 +708,11 @@
     if (turningOn) {
       // startSystemAudio may fail (user cancels, no permission) — that's OK,
       // mic will still work and capture will toggle regardless
-      try { await startSystemAudio(); } catch (_) { /* handled inside startSystemAudio */ }
+      try {
+        await startSystemAudio();
+      } catch (_) {
+        /* handled inside startSystemAudio */
+      }
     }
     const active = await onscreenly.captureToggle();
     if (turningOn && !active) stopSystemAudio();
@@ -646,7 +726,10 @@
     clearTranscriptBtn.addEventListener('click', async () => {
       await onscreenly.clearTranscript();
       // Also clear the floating interim bar
-      if (interimEl) { interimEl.textContent = ''; interimEl.classList.remove('show'); }
+      if (interimEl) {
+        interimEl.textContent = '';
+        interimEl.classList.remove('show');
+      }
       transcriptInterimEl = null;
       clearTranscriptSidebar();
       // Only a question auto-filled from the transcript goes; anything the user typed stays.
@@ -656,7 +739,9 @@
   }
 
   // ---- capture: mic (renderer side) — uses AudioWorklet (modern, off-main-thread) ----
-  let audioCtx = null, micStream = null, micWorklet = null;
+  let audioCtx = null,
+    micStream = null,
+    micWorklet = null;
   // Generation counter: startMic() awaits getUserMedia, so a second call (or a
   // stopMic()) can land mid-flight. Each start bumps the generation and bails
   // if it is no longer current, otherwise two capture pipelines end up feeding
@@ -691,10 +776,14 @@
       if (!track) {
         micStream.getTracks().forEach((t) => t.stop());
         micStream = null;
-        showStatus('No microphone audio track was available. Check Windows Sound settings for a working default input device, then try again.');
+        showStatus(
+          'No microphone audio track was available. Check Windows Sound settings for a working default input device, then try again.'
+        );
         return;
       }
-      onscreenly.log('mic stream started: track=' + (track.label || '(no label — permission may be stale)') + ' muted=' + track.muted);
+      onscreenly.log(
+        'mic stream started: track=' + (track.label || '(no label — permission may be stale)') + ' muted=' + track.muted
+      );
       audioCtx = new AudioContext({ sampleRate: 16000 });
 
       // Use AudioWorklet for low-latency, off-main-thread processing
@@ -713,12 +802,18 @@
         onscreenly.log('AudioWorklet failed, falling back to ScriptProcessor: ' + workletErr.message);
         const micNode = audioCtx.createMediaStreamSource(micStream);
         const micProc = audioCtx.createScriptProcessor(4096, 1, 1);
-        const sink = audioCtx.createGain(); sink.gain.value = 0;
-        micNode.connect(micProc); micProc.connect(sink); sink.connect(audioCtx.destination);
+        const sink = audioCtx.createGain();
+        sink.gain.value = 0;
+        micNode.connect(micProc);
+        micProc.connect(sink);
+        sink.connect(audioCtx.destination);
         micProc.onaudioprocess = (e) => {
           const f = e.inputBuffer.getChannelData(0);
           const out = new Int16Array(f.length);
-          for (let i = 0; i < f.length; i++) { const s = Math.max(-1, Math.min(1, f[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+          for (let i = 0; i < f.length; i++) {
+            const s = Math.max(-1, Math.min(1, f[i]));
+            out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+          }
           onscreenly.micPcm(out.buffer);
         };
         micWorklet = { _legacy: true, proc: micProc, node: micNode, sink };
@@ -732,13 +827,19 @@
       // Distinguishing "no device" from "denied" from "in use elsewhere"
       // turns one generic dead end into three different next actions.
       if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-        showStatus('No microphone was found. Plug one in, or pick a default input device in your OS sound settings, then try again.');
+        showStatus(
+          'No microphone was found. Plug one in, or pick a default input device in your OS sound settings, then try again.'
+        );
       } else if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
-        showStatus(isWindows
-          ? 'Microphone permission was denied. Settings → Privacy & security → Microphone → allow Onscreenly, then try again.'
-          : 'Microphone permission was denied. System Settings → Privacy & Security → Microphone → allow Onscreenly, then try again.');
+        showStatus(
+          isWindows
+            ? 'Microphone permission was denied. Settings → Privacy & security → Microphone → allow Onscreenly, then try again.'
+            : 'Microphone permission was denied. System Settings → Privacy & Security → Microphone → allow Onscreenly, then try again.'
+        );
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-        showStatus('The microphone could not be started — another application may be using it exclusively. Close other apps using the mic and try again.');
+        showStatus(
+          'The microphone could not be started — another application may be using it exclusively. Close other apps using the mic and try again.'
+        );
       } else {
         showStatus('Microphone capture could not be started. Check your mic permissions and try again.');
       }
@@ -748,19 +849,30 @@
     micGen++; // invalidate any startMic() still waiting on getUserMedia
     if (micWorklet) {
       if (micWorklet._legacy) {
-        micWorklet.proc.disconnect(); micWorklet.proc.onaudioprocess = null;
-        micWorklet.node.disconnect(); micWorklet.sink.disconnect();
+        micWorklet.proc.disconnect();
+        micWorklet.proc.onaudioprocess = null;
+        micWorklet.node.disconnect();
+        micWorklet.sink.disconnect();
       } else {
         micWorklet.disconnect();
       }
       micWorklet = null;
     }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
-    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    if (audioCtx) {
+      audioCtx.close();
+      audioCtx = null;
+    }
+    if (micStream) {
+      micStream.getTracks().forEach((t) => t.stop());
+      micStream = null;
+    }
   }
 
   // ---- capture: system/meeting audio (getDisplayMedia loopback, in Onscreenly's process) ----
-  let sysStream = null, sysCtx = null, sysWorklet = null, sysStarting = false;
+  let sysStream = null,
+    sysCtx = null,
+    sysWorklet = null,
+    sysStarting = false;
   async function startSystemAudio() {
     // Called both from the stop-btn click (fresh user gesture for getDisplayMedia) and from the
     // capture:state handler. getDisplayMedia is async, so `if (sysStream) return` alone loses the
@@ -771,7 +883,9 @@
     // call. Default to staying invisible; the user opts in in Settings > Audio.
     if (isMac && !(settings && settings.meetingAudio)) {
       onscreenly.log('system audio: meeting audio is off on macOS -- no display-capture session opened');
-      showStatus('Meeting audio is off. macOS shows a screen-recording indicator whenever an app captures system audio; turn Meeting audio on in Settings \u203a Audio if you want the other side transcribed.');
+      showStatus(
+        'Meeting audio is off. macOS shows a screen-recording indicator whenever an app captures system audio; turn Meeting audio on in Settings \u203a Audio if you want the other side transcribed.'
+      );
       return;
     }
     sysStarting = true;
@@ -788,9 +902,11 @@
       if (!tracks.length) {
         onscreenly.log('system audio: no loopback track on this platform');
         stream.getTracks().forEach((t) => t.stop());
-        showStatus(onscreenly.platform === 'win32'
-          ? 'No system-audio loopback track detected. Make sure "Share audio" is checked in the screen share dialog, and that your audio device is not in exclusive mode.'
-          : 'No system-audio loopback track detected. Meeting audio needs macOS 14.4+ — your screen and microphone still work.');
+        showStatus(
+          onscreenly.platform === 'win32'
+            ? 'No system-audio loopback track detected. Make sure "Share audio" is checked in the screen share dialog, and that your audio device is not in exclusive mode.'
+            : 'No system-audio loopback track detected. Meeting audio needs macOS 14.4+ — your screen and microphone still work.'
+        );
         return;
       }
       sysStream = stream;
@@ -811,12 +927,18 @@
         onscreenly.log('system audio AudioWorklet failed, using ScriptProcessor: ' + workletErr.message);
         const sysNode = sysCtx.createMediaStreamSource(new MediaStream(tracks));
         const sysProc = sysCtx.createScriptProcessor(4096, 1, 1);
-        const sink = sysCtx.createGain(); sink.gain.value = 0;
-        sysNode.connect(sysProc); sysProc.connect(sink); sink.connect(sysCtx.destination);
+        const sink = sysCtx.createGain();
+        sink.gain.value = 0;
+        sysNode.connect(sysProc);
+        sysProc.connect(sink);
+        sink.connect(sysCtx.destination);
         sysProc.onaudioprocess = (e) => {
           const f = e.inputBuffer.getChannelData(0);
           const out = new Int16Array(f.length);
-          for (let i = 0; i < f.length; i++) { const s = Math.max(-1, Math.min(1, f[i])); out[i] = s < 0 ? s * 0x8000 : s * 0x7fff; }
+          for (let i = 0; i < f.length; i++) {
+            const s = Math.max(-1, Math.min(1, f[i]));
+            out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+          }
           onscreenly.systemPcm(out.buffer);
         };
         sysWorklet = { _legacy: true, proc: sysProc, node: sysNode, sink };
@@ -832,15 +954,23 @@
   function stopSystemAudio() {
     if (sysWorklet) {
       if (sysWorklet._legacy) {
-        sysWorklet.proc.disconnect(); sysWorklet.proc.onaudioprocess = null;
-        sysWorklet.node.disconnect(); sysWorklet.sink.disconnect();
+        sysWorklet.proc.disconnect();
+        sysWorklet.proc.onaudioprocess = null;
+        sysWorklet.node.disconnect();
+        sysWorklet.sink.disconnect();
       } else {
         sysWorklet.disconnect();
       }
       sysWorklet = null;
     }
-    if (sysCtx) { sysCtx.close(); sysCtx = null; }
-    if (sysStream) { sysStream.getTracks().forEach((t) => t.stop()); sysStream = null; }
+    if (sysCtx) {
+      sysCtx.close();
+      sysCtx = null;
+    }
+    if (sysStream) {
+      sysStream.getTracks().forEach((t) => t.stop());
+      sysStream = null;
+    }
   }
 
   // ---- STT / VAD status helpers ------------------------------------------
@@ -851,9 +981,9 @@
     dot.classList.remove('off', 'idle', 'speaking', 'transcribing');
     dot.classList.add(dotState);
     const labels = {
-      off:          'Not listening',
-      idle:         'Listening — silence detected',
-      speaking:     'Speech detected',
+      off: 'Not listening',
+      idle: 'Listening — silence detected',
+      speaking: 'Speech detected',
       transcribing: 'Transcribing…'
     };
     dot.title = labels[dotState] || '';
@@ -983,7 +1113,10 @@
       tsSidebarInterimEl.querySelector('.ts-text').textContent = text;
     } else {
       // Remove interim row
-      if (tsSidebarInterimEl) { tsSidebarInterimEl.remove(); tsSidebarInterimEl = null; }
+      if (tsSidebarInterimEl) {
+        tsSidebarInterimEl.remove();
+        tsSidebarInterimEl = null;
+      }
 
       const existingRow = tsLastRow[channel];
       const useExisting = existingRow && existingRow.isConnected;
@@ -1015,7 +1148,9 @@
 
       // Reset silence timer
       clearTimeout(tsRowTimer[channel]);
-      tsRowTimer[channel] = setTimeout(() => { tsLastRow[channel] = null; }, TS_SENTENCE_GAP_MS);
+      tsRowTimer[channel] = setTimeout(() => {
+        tsLastRow[channel] = null;
+      }, TS_SENTENCE_GAP_MS);
 
       // When THIS channel speaks, reset the OTHER channel's row
       const other = channel === 'you' ? 'them' : 'you';
@@ -1028,10 +1163,13 @@
 
   function clearTranscriptSidebar() {
     const list = document.getElementById('ts-list');
-    if (list) list.innerHTML = '<div class="ts-placeholder">Conversation history will appear here when listening.</div>';
+    if (list)
+      list.innerHTML = '<div class="ts-placeholder">Conversation history will appear here when listening.</div>';
     tsSidebarInterimEl = null;
-    tsLastRow.you = null; tsLastRow.them = null;
-    clearTimeout(tsRowTimer.you); clearTimeout(tsRowTimer.them);
+    tsLastRow.you = null;
+    tsLastRow.them = null;
+    clearTimeout(tsRowTimer.you);
+    clearTimeout(tsRowTimer.them);
   }
 
   // ---- events from main --------------------------------------------------
@@ -1114,7 +1252,10 @@
   onscreenly.on('stt:final', ({ channel, text }) => {
     setLiveDotState('idle');
     // Clear interim when we get a final
-    if (interimEl) { interimEl.textContent = ''; interimEl.classList.remove('show'); }
+    if (interimEl) {
+      interimEl.textContent = '';
+      interimEl.classList.remove('show');
+    }
     clearTranscriptInterim();
     clearInputInterim(); // FIX #12: Clear interim text from input area
     // sidebar: the final turn is added via the 'transcript' event below
@@ -1196,13 +1337,21 @@
     setBusy(true);
   });
   onscreenly.on('llm:token', ({ text }) => appendToken(text));
-  onscreenly.on('llm:done', () => { finalizeAi(); setBusy(false); });
+  onscreenly.on('llm:done', () => {
+    finalizeAi();
+    setBusy(false);
+  });
   onscreenly.on('llm:error', ({ message, action }) => {
     if (!aiEl) startAi(true);
-    aiEl.dataset.raw = message; finalizeAi(); setBusy(false);
+    aiEl.dataset.raw = message;
+    finalizeAi();
+    setBusy(false);
     // publik errors carry one action: the renderer's markdown emits no anchors,
     // so a link needs a real button (same pattern as the mic banner).
-    if (action && action.kind === 'card') { showPublikCard(); return; }
+    if (action && action.kind === 'card') {
+      showPublikCard();
+      return;
+    }
     if (action && action.kind) showStatus(message, publikActionButton(action));
   });
   onscreenly.on('transcript', ({ channel, text }) => {
@@ -1259,7 +1408,6 @@
 
   // ---- prep status & smart tooltip helpers -------------------------------
 
-
   // ---- AI rules: live char counter + soft cap ---------------------------
   function updateAiRulesCounter() {
     const el = document.getElementById('ai-rules');
@@ -1283,7 +1431,8 @@
     const same = fast.toLowerCase() === smart.toLowerCase();
     btn.classList.toggle('hidden', same);
     if (same) return;
-    btn.title = 'Fast: ' + (fast || 'fast model') + ' · Smart: ' + (smart || 'smart model') + ' (higher quality, ~2× slower)';
+    btn.title =
+      'Fast: ' + (fast || 'fast model') + ' · Smart: ' + (smart || 'smart model') + ' (higher quality, ~2× slower)';
   }
 
   // ---- settings ----------------------------------------------------------
@@ -1309,16 +1458,20 @@
   }
   $('#more-btn').addEventListener('click', openSettings);
   $('#tb-settings-btn').addEventListener('click', openSettings);
-  $('#s-close').addEventListener('click', () => { void closeSettings(); });
-  scrim.addEventListener('click', (e) => { if (e.target === scrim) void closeSettings(); });
+  $('#s-close').addEventListener('click', () => {
+    void closeSettings();
+  });
+  scrim.addEventListener('click', (e) => {
+    if (e.target === scrim) void closeSettings();
+  });
 
   // Tab switching
   document.querySelectorAll('.s-tab').forEach((tab) => {
     tab.addEventListener('click', async () => {
       if (tab.classList.contains('on')) return;
       if (!(await saveSettings())) return;
-      document.querySelectorAll('.s-tab').forEach(t => t.classList.remove('on'));
-      document.querySelectorAll('.s-tab-pane').forEach(p => p.classList.add('hidden'));
+      document.querySelectorAll('.s-tab').forEach((t) => t.classList.remove('on'));
+      document.querySelectorAll('.s-tab-pane').forEach((p) => p.classList.add('hidden'));
       tab.classList.add('on');
       const pane = document.querySelector(`.s-tab-pane[data-pane="${tab.dataset.tab}"]`);
       if (pane) pane.classList.remove('hidden');
@@ -1348,7 +1501,11 @@
       btn.addEventListener('click', () => onscreenly.publikOpen(action.url));
     } else if (action.kind === 'reconnect') {
       btn.textContent = action.label || 'Reconnect';
-      btn.addEventListener('click', async () => { btn.disabled = true; publikState = await onscreenly.publikReconnect(); renderPublikBlock(); });
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        publikState = await onscreenly.publikReconnect();
+        renderPublikBlock();
+      });
     } else if (action.kind === 'disclosure') {
       btn.textContent = 'Set up publik API';
       btn.addEventListener('click', () => showPublikDisclosure());
@@ -1365,7 +1522,10 @@
   // link, once per key while it sits below the 20% line — not on every push.
   let lowStarterNoticedFor = null;
   function maybeShowLowStarter(p) {
-    if (!p || !p.lowStarter) { lowStarterNoticedFor = null; return; }
+    if (!p || !p.lowStarter) {
+      lowStarterNoticedFor = null;
+      return;
+    }
     if (lowStarterNoticedFor === p.keyId) return;
     lowStarterNoticedFor = p.keyId;
     showStatus(p.lowStarter.message, publikActionButton(p.lowStarter.action));
@@ -1388,15 +1548,18 @@
     note.classList.remove('warn');
     let line;
     if (p.connected && p.revoked) {
-      line = 'publik API key was revoked. Reconnect to set this computer up again.'; note.classList.add('warn');
+      line = 'publik API key was revoked. Reconnect to set this computer up again.';
+      note.classList.add('warn');
     } else if (p.connected) {
       line = `Connected · key ${p.keyId} · ${p.line || 'Ready'}`;
     } else if (p.disconnected) {
-      line = 'publik API is disconnected. This computer was removed from your publik account.'; note.classList.add('warn');
+      line = 'publik API is disconnected. This computer was removed from your publik account.';
+      note.classList.add('warn');
     } else if (!p.disclosureAccepted) {
       line = 'Not set up yet — no key needed to set it up.';
     } else if (p.lastError) {
-      line = p.lastError; note.classList.add('warn');
+      line = p.lastError;
+      note.classList.add('warn');
     } else {
       line = 'Connecting…';
     }
@@ -1420,17 +1583,41 @@
     if (settings.provider === 'publik') $('#s-status').textContent = statusText();
   }
   $('#publik-setup').addEventListener('click', () => showPublikDisclosure());
-  $('#publik-link').addEventListener('click', () => { const cta = publikState && publikState.settingsCta; if (cta) onscreenly.publikOpen(cta.url); });
-  $('#publik-add-credit').addEventListener('click', () => onscreenly.publikOpen(publikState && publikState.addCreditUrl));
-  $('#publik-pricing').addEventListener('click', () => onscreenly.publikOpen(publikState ? publikState.links.pricing : ''));
-  $('#publik-reconnect').addEventListener('click', async () => { $('#publik-reconnect').disabled = true; try { publikState = await onscreenly.publikReconnect(); } finally { $('#publik-reconnect').disabled = false; } renderPublikBlock(); });
-  $('#publik-disconnect').addEventListener('click', async () => { publikState = await onscreenly.publikDisconnect(); renderPublikBlock(); });
+  $('#publik-link').addEventListener('click', () => {
+    const cta = publikState && publikState.settingsCta;
+    if (cta) onscreenly.publikOpen(cta.url);
+  });
+  $('#publik-add-credit').addEventListener('click', () =>
+    onscreenly.publikOpen(publikState && publikState.addCreditUrl)
+  );
+  $('#publik-pricing').addEventListener('click', () =>
+    onscreenly.publikOpen(publikState ? publikState.links.pricing : '')
+  );
+  $('#publik-reconnect').addEventListener('click', async () => {
+    $('#publik-reconnect').disabled = true;
+    try {
+      publikState = await onscreenly.publikReconnect();
+    } finally {
+      $('#publik-reconnect').disabled = false;
+    }
+    renderPublikBlock();
+  });
+  $('#publik-disconnect').addEventListener('click', async () => {
+    publikState = await onscreenly.publikDisconnect();
+    renderPublikBlock();
+  });
   $('#publik-byo').addEventListener('click', selectByoProvider);
-  onscreenly.on('publik:state', (state) => { publikState = state; renderPublikBlock(); maybeShowLowStarter(state); });
+  onscreenly.on('publik:state', (state) => {
+    publikState = state;
+    renderPublikBlock();
+    maybeShowLowStarter(state);
+  });
 
   function fillSettings() {
     // Keys tab
-    document.querySelectorAll('#provider-seg button').forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
+    document
+      .querySelectorAll('#provider-seg button')
+      .forEach((b) => b.classList.toggle('on', b.dataset.provider === settings.provider));
     $('#key-cerebras').value = settings.apiKeys.cerebras || '';
     $('#key-openai').value = settings.apiKeys.openai || '';
     $('#key-anthropic').value = settings.apiKeys.anthropic || '';
@@ -1443,11 +1630,14 @@
     $('#key-ollama').value = settings.apiKeys.ollama || '';
     $('#key-minimax').value = settings.apiKeys.minimax || '';
     $('#key-deepseek').value = settings.apiKeys.deepseek || '';
-    document.querySelectorAll('#minimax-region-seg button').forEach((b) => b.classList.toggle('on', b.dataset.region === (settings.minimaxRegion || 'global_en')));
+    document
+      .querySelectorAll('#minimax-region-seg button')
+      .forEach((b) => b.classList.toggle('on', b.dataset.region === (settings.minimaxRegion || 'global_en')));
     $('#key-azure').value = settings.apiKeys.azure || '';
     $('#azure-endpoint').value = settings.azureEndpoint || '';
     const m = settings.models[settings.provider] || { fast: '', smart: '' };
-    $('#model-fast').value = m.fast; $('#model-smart').value = m.smart;
+    $('#model-fast').value = m.fast;
+    $('#model-smart').value = m.smart;
     fillAppLinkCallers();
     $('#s-status').textContent = statusText();
     // Transcription tab
@@ -1485,7 +1675,11 @@
     const host = $('#applink-callers');
     if (!host || !onscreenly.appLinkState) return;
     let state;
-    try { state = await onscreenly.appLinkState(); } catch (_) { return; }
+    try {
+      state = await onscreenly.appLinkState();
+    } catch (_) {
+      return;
+    }
     const callers = Object.entries((state && state.callers) || {});
     if (!callers.length) {
       host.innerHTML = '<div class="s-caller-empty">Nothing has asked yet.</div>';
@@ -1517,51 +1711,74 @@
 
   function statusText() {
     const k = settings.apiKeys;
-    const labels = { publik: 'publik API', cerebras: 'Cerebras', openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', deepgram: 'Deepgram', custom: 'Custom', ollama: 'Ollama', groq: 'Groq', minimax: 'MiniMax', deepseek: 'DeepSeek', azure: 'Azure AI Foundry' };
-    const publikPart = settings.provider === 'publik' && publikState
-      ? ` · ${publikState.connected ? (publikState.balanceLabel ? `balance ${publikState.balanceLabel}` : 'connected') : 'not set up'}`
-      : '';
+    const labels = {
+      publik: 'publik API',
+      cerebras: 'Cerebras',
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      gemini: 'Gemini',
+      deepgram: 'Deepgram',
+      custom: 'Custom',
+      ollama: 'Ollama',
+      groq: 'Groq',
+      minimax: 'MiniMax',
+      deepseek: 'DeepSeek',
+      azure: 'Azure AI Foundry'
+    };
+    const publikPart =
+      settings.provider === 'publik' && publikState
+        ? ` · ${publikState.connected ? (publikState.balanceLabel ? `balance ${publikState.balanceLabel}` : 'connected') : 'not set up'}`
+        : '';
     // 'auto' walks the same fallback chain src/stt.js builds; an explicit choice
     // is reported as-is so the status line matches what will actually be used.
     const selectedSttProvider = settings.sttProvider || 'auto';
-    const automaticStt = k.openai ? 'OpenAI Realtime' : (k.groq ? 'Groq Whisper' : 'none');
+    const automaticStt = k.openai ? 'OpenAI Realtime' : k.groq ? 'Groq Whisper' : 'none';
     const stt = selectedSttProvider === 'auto' ? automaticStt : selectedSttProvider;
     return `${labels[settings.provider] || settings.provider}${publikPart} · STT: ${stt}`;
   }
 
-  document.querySelectorAll('#provider-seg button').forEach((b) => b.addEventListener('click', () => {
-    settings.provider = b.dataset.provider;
-    document.querySelectorAll('#provider-seg button').forEach((x) => x.classList.toggle('on', x === b));
-    updateCustomProviderFields();
-    const m = settings.models[settings.provider] || { fast: '', smart: '' };
-    $('#model-fast').value = m.fast; $('#model-smart').value = m.smart;
-    $('#s-status').textContent = statusText();
-    updateSmartTooltip();
-  }));
-  document.querySelectorAll('#minimax-region-seg button').forEach((b) => b.addEventListener('click', () => {
-    settings.minimaxRegion = b.dataset.region;
-    document.querySelectorAll('#minimax-region-seg button').forEach((x) => x.classList.toggle('on', x === b));
-  }));
-  document.querySelectorAll('#meeting-audio-seg button').forEach((button) => button.addEventListener('click', () => {
-    settings.meetingAudio = button.dataset.meetingAudio === 'on';
-    document.querySelectorAll('#meeting-audio-seg button').forEach((candidate) => {
-      candidate.classList.toggle('on', candidate === button);
-    });
-  }));
+  document.querySelectorAll('#provider-seg button').forEach((b) =>
+    b.addEventListener('click', () => {
+      settings.provider = b.dataset.provider;
+      document.querySelectorAll('#provider-seg button').forEach((x) => x.classList.toggle('on', x === b));
+      updateCustomProviderFields();
+      const m = settings.models[settings.provider] || { fast: '', smart: '' };
+      $('#model-fast').value = m.fast;
+      $('#model-smart').value = m.smart;
+      $('#s-status').textContent = statusText();
+      updateSmartTooltip();
+    })
+  );
+  document.querySelectorAll('#minimax-region-seg button').forEach((b) =>
+    b.addEventListener('click', () => {
+      settings.minimaxRegion = b.dataset.region;
+      document.querySelectorAll('#minimax-region-seg button').forEach((x) => x.classList.toggle('on', x === b));
+    })
+  );
+  document.querySelectorAll('#meeting-audio-seg button').forEach((button) =>
+    button.addEventListener('click', () => {
+      settings.meetingAudio = button.dataset.meetingAudio === 'on';
+      document.querySelectorAll('#meeting-audio-seg button').forEach((candidate) => {
+        candidate.classList.toggle('on', candidate === button);
+      });
+    })
+  );
 
-  document.querySelectorAll('#stt-provider-seg button').forEach((button) => button.addEventListener('click', () => {
-    settings.sttProvider = button.dataset.sttProvider;
-    document.querySelectorAll('#stt-provider-seg button').forEach((candidate) => {
-      candidate.classList.toggle('on', candidate === button);
-    });
-    $('#s-status').textContent = statusText();
-  }));
+  document.querySelectorAll('#stt-provider-seg button').forEach((button) =>
+    button.addEventListener('click', () => {
+      settings.sttProvider = button.dataset.sttProvider;
+      document.querySelectorAll('#stt-provider-seg button').forEach((candidate) => {
+        candidate.classList.toggle('on', candidate === button);
+      });
+      $('#s-status').textContent = statusText();
+    })
+  );
 
   function formatBytes(bytes) {
     if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
     const units = ['B', 'KB', 'MB', 'GB'];
     const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-    const value = bytes / (1024 ** unitIndex);
+    const value = bytes / 1024 ** unitIndex;
     return `${value >= 10 || unitIndex < 2 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
   }
 
@@ -1575,10 +1792,10 @@
     if (!model) return;
     const language = model.englishOnly ? 'English only' : 'Multilingual';
     const recommendation = model.recommended ? ' · recommended default' : '';
-    const partial = model.partialBytes > 0 && !model.installed
-      ? ` · ${formatBytes(model.partialBytes)} ready to resume`
-      : '';
-    $('#whisper-model-detail').textContent = `${formatBytes(model.bytes)} · ${language} · ${model.quantization} · ${model.hardwareTier}${recommendation}${partial}`;
+    const partial =
+      model.partialBytes > 0 && !model.installed ? ` · ${formatBytes(model.partialBytes)} ready to resume` : '';
+    $('#whisper-model-detail').textContent =
+      `${formatBytes(model.bytes)} · ${language} · ${model.quantization} · ${model.hardwareTier}${recommendation}${partial}`;
 
     const progressWrap = $('#whisper-progress-wrap');
     const progressPercent = model.bytes > 0 ? Math.floor((model.partialBytes / model.bytes) * 100) : 0;
@@ -1586,7 +1803,7 @@
     $('#whisper-progress').value = progressPercent;
     $('#whisper-progress-label').textContent = `${progressPercent}%`;
     $('#whisper-download').disabled = model.installed || model.downloading;
-    $('#whisper-download').textContent = model.installed ? 'Installed' : (model.partialBytes ? 'Resume' : 'Download');
+    $('#whisper-download').textContent = model.installed ? 'Installed' : model.partialBytes ? 'Resume' : 'Download';
     $('#whisper-cancel').classList.toggle('hidden', !model.downloading);
     $('#whisper-import').disabled = model.downloading;
     $('#whisper-delete').disabled = (model.installedBytes === 0 && model.partialBytes === 0) || model.downloading;
@@ -1671,7 +1888,8 @@
 
   $('#whisper-delete').addEventListener('click', async () => {
     const model = getSelectedWhisperModel();
-    if (!model || !window.confirm(`Delete the ${model.id} model (${formatBytes(model.bytes)}) from this computer?`)) return;
+    if (!model || !window.confirm(`Delete the ${model.id} model (${formatBytes(model.bytes)}) from this computer?`))
+      return;
     try {
       await onscreenly.whisperModelDelete(model.id);
       $('#whisper-status').textContent = `${model.id} deleted.`;
@@ -1692,7 +1910,8 @@
       $('#whisper-progress-wrap').classList.remove('hidden');
       $('#whisper-progress').value = progress.percent;
       $('#whisper-progress-label').textContent = `${progress.percent}%`;
-      $('#whisper-model-detail').textContent = `${formatBytes(progress.receivedBytes)} of ${formatBytes(progress.totalBytes)}`;
+      $('#whisper-model-detail').textContent =
+        `${formatBytes(progress.receivedBytes)} of ${formatBytes(progress.totalBytes)}`;
     }
   });
   onscreenly.on('whisper:models-changed', () => refreshWhisperModels());
@@ -1764,32 +1983,49 @@
     addUserBubble('What should I say?');
     const ai = document.createElement('div');
     ai.className = 'ai-text';
-    ai.textContent = '“A discounted cash flow model values a company by projecting future free cash flows and discounting them to present value using the weighted average cost of capital.”';
+    ai.textContent =
+      '“A discounted cash flow model values a company by projecting future free cash flows and discounting them to present value using the weighted average cost of capital.”';
     messages.appendChild(ai);
   }
 
   // ---- global keys -------------------------------------------------------
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !scrim.classList.contains('hidden')) void closeSettings();
-    if ((e.metaKey || e.ctrlKey) && e.key === ',') { e.preventDefault(); openSettings(); }
+    if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+      e.preventDefault();
+      openSettings();
+    }
   });
 
   // Safety net for the same class of bug: html/body are overflow:hidden, so any
   // stray programmatic scroll of the document is invisible to the user and
   // unrecoverable by mouse. Snap it back so the toolbar cannot be stranded.
-  window.addEventListener('scroll', () => {
-    if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
-  }, { passive: true });
+  window.addEventListener(
+    'scroll',
+    () => {
+      if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+    },
+    { passive: true }
+  );
 
   // ---- click-through: only the UI blocks the mouse; empty gaps pass to your screen ----
   let ignoring = null;
   let draggingWindow = false;
-  function setIgnore(v) { if (v !== ignoring) { ignoring = v; onscreenly.setIgnoreMouse(v); } }
+  function setIgnore(v) {
+    if (v !== ignoring) {
+      ignoring = v;
+      onscreenly.setIgnoreMouse(v);
+    }
+  }
   document.addEventListener('mousemove', (e) => {
     // The window trails the cursor while dragging; going click-through then would drop the release.
     if (draggingWindow) return;
     const el = document.elementFromPoint(e.clientX, e.clientY);
-    const overUI = !!(el && el.closest && el.closest('#toolbar, #panel-wrap, #transcript-sidebar, #settings-scrim, #onboard-scrim, #consent-scrim'));
+    const overUI = !!(
+      el &&
+      el.closest &&
+      el.closest('#toolbar, #panel-wrap, #transcript-sidebar, #settings-scrim, #onboard-scrim, #consent-scrim')
+    );
     setIgnore(!overUI);
   });
   setIgnore(true); // start fully click-through; hovering the panel re-enables it
@@ -1845,9 +2081,14 @@
   $('#cs-deny').addEventListener('click', () => answerConsent(false));
   // Anything other than a deliberate Allow is a no, including Escape and
   // clicking away.
-  consentScrim.addEventListener('click', (e) => { if (e.target === consentScrim) answerConsent(false); });
+  consentScrim.addEventListener('click', (e) => {
+    if (e.target === consentScrim) answerConsent(false);
+  });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && pendingConsentId) { e.preventDefault(); answerConsent(false); }
+    if (e.key === 'Escape' && pendingConsentId) {
+      e.preventDefault();
+      answerConsent(false);
+    }
   });
 
   // ---- onboarding / first-run tutorial -----------------------------------
@@ -1858,15 +2099,32 @@
   const permissionButtons = isWindows
     ? [
         { label: 'Open Microphone settings', action: () => onscreenly.openPane('ms-settings:privacy-microphone') },
-        { label: 'Open Screen recording settings', action: () => onscreenly.openPane('ms-settings:privacy-screenrecorder') }
+        {
+          label: 'Open Screen recording settings',
+          action: () => onscreenly.openPane('ms-settings:privacy-screenrecorder')
+        }
       ]
     : [
-        { label: 'Open Microphone settings', action: () => onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone') },
-        { label: 'Open Screen Recording settings', action: () => onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture') }
+        {
+          label: 'Open Microphone settings',
+          action: () =>
+            onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone')
+        },
+        {
+          label: 'Open Screen Recording settings',
+          action: () =>
+            onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+        }
       ];
-  const assistShortcut = isWindows ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">↵</span>' : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span>';
-  const sayShortcut = isWindows ? '<span class="kbd">Ctrl</span> <span class="kbd">↵</span>' : '<span class="kbd">⌘</span> <span class="kbd">↵</span>';
-  const quitShortcut = isWindows ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">X</span>' : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">X</span>';
+  const assistShortcut = isWindows
+    ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">↵</span>'
+    : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span>';
+  const sayShortcut = isWindows
+    ? '<span class="kbd">Ctrl</span> <span class="kbd">↵</span>'
+    : '<span class="kbd">⌘</span> <span class="kbd">↵</span>';
+  const quitShortcut = isWindows
+    ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">X</span>'
+    : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">X</span>';
   const OB_STEPS = [
     {
       icon: '👋',
@@ -1876,19 +2134,36 @@
     {
       icon: '🔐',
       title: 'Allow Onscreenly to see & hear',
-      body: permissionHelp + '<ul><li><strong>Microphone</strong> – to hear you</li><li><strong>Screen recording</strong> – to see your screen and hear your meeting</li></ul>',
+      body:
+        permissionHelp +
+        '<ul><li><strong>Microphone</strong> – to hear you</li><li><strong>Screen recording</strong> – to see your screen and hear your meeting</li></ul>',
       buttons: permissionButtons
     },
     {
       icon: '⚙️',
       title: 'Connect an AI provider',
       body: 'Onscreenly uses API keys for <span class="hl">Cerebras API</span> and options to enable real-time transcription via a local or hosted transcription model.',
-      buttons: [{ label: 'Configure Onscreenly settings', action: () => { finishOnboard(); openSettings(); } }]
+      buttons: [
+        {
+          label: 'Configure Onscreenly settings',
+          action: () => {
+            finishOnboard();
+            openSettings();
+          }
+        }
+      ]
     },
     {
       icon: '✨',
       title: 'You’re all set',
-      body: 'How to use Onscreenly:<ul><li>' + sayShortcut + ' — <strong>What should I say?</strong> from the conversation</li><li>' + assistShortcut + ' — <strong>Smart assist</strong> with whatever\'s on screen or being said</li><li>Click <strong>Start session</strong> in the top bar to start listening to a meeting</li><li>Type a question and press <span class="kbd">↵</span></li></ul>Reopen this guide anytime by clicking the <strong>help</strong> icon in the top bar. Quit with ' + quitShortcut + '.'
+      body:
+        'How to use Onscreenly:<ul><li>' +
+        sayShortcut +
+        ' — <strong>What should I say?</strong> from the conversation</li><li>' +
+        assistShortcut +
+        ' — <strong>Smart assist</strong> with whatever\'s on screen or being said</li><li>Click <strong>Start session</strong> in the top bar to start listening to a meeting</li><li>Type a question and press <span class="kbd">↵</span></li></ul>Reopen this guide anytime by clicking the <strong>help</strong> icon in the top bar. Quit with ' +
+        quitShortcut +
+        '.'
     }
   ];
   // First-run disclosure (R21 §4.3): two disclosures — cost and data path —
@@ -1899,18 +2174,43 @@
     return {
       icon: '🪙',
       title: c.title,
-      body: () => `${esc(c.intro)}<br><br><strong>Cost.</strong> ${esc(c.cost)}<br><br><strong>Where your prompts go.</strong> ${esc(c.dataPath)}` +
+      body: () =>
+        `${esc(c.intro)}<br><br><strong>Cost.</strong> ${esc(c.cost)}<br><br><strong>Where your prompts go.</strong> ${esc(c.dataPath)}` +
         `<span class="ob-fine">${esc(c.terms)} <a id="ob-publik-terms">publik API terms</a></span>`,
       buttons: [
-        { label: c.accept, action: async () => {
-          const btns = $('#ob-buttons').querySelectorAll('button'); btns.forEach((b) => { b.disabled = true; });
-          publikState = await onscreenly.publikAcceptDisclosure(); settings.provider = 'publik'; renderPublikBlock();
-          // CONTRACT §12.1: the card comes right after POST /installs succeeds,
-          // with the real balance on it. Nothing is spent before it is seen.
-          if (publikState.card) { showPublikCard(); return; }
-          if (obDialog) { hideOnboardDialog(); } else { obIndex++; renderOnboard(); }
-        } },
-        { label: c.decline, action: () => { if (obDialog) hideOnboardDialog(); else finishOnboard(); openSettings(); selectByoProvider(); } }
+        {
+          label: c.accept,
+          action: async () => {
+            const btns = $('#ob-buttons').querySelectorAll('button');
+            btns.forEach((b) => {
+              b.disabled = true;
+            });
+            publikState = await onscreenly.publikAcceptDisclosure();
+            settings.provider = 'publik';
+            renderPublikBlock();
+            // CONTRACT §12.1: the card comes right after POST /installs succeeds,
+            // with the real balance on it. Nothing is spent before it is seen.
+            if (publikState.card) {
+              showPublikCard();
+              return;
+            }
+            if (obDialog) {
+              hideOnboardDialog();
+            } else {
+              obIndex++;
+              renderOnboard();
+            }
+          }
+        },
+        {
+          label: c.decline,
+          action: () => {
+            if (obDialog) hideOnboardDialog();
+            else finishOnboard();
+            openSettings();
+            selectByoProvider();
+          }
+        }
       ]
     };
   }
@@ -1922,21 +2222,34 @@
   function publikCardStep() {
     const card = publikState.card;
     const done = async () => {
-      publikState = await onscreenly.publikCardSeen(); renderPublikBlock();
+      publikState = await onscreenly.publikCardSeen();
+      renderPublikBlock();
       const idx = OB_STEPS.findIndex((st) => st.publikCard);
       if (idx >= 0) OB_STEPS.splice(idx, 1);
-      if (obDialog) { hideOnboardDialog(); return; }
-      if (obIndex >= OB_STEPS.length) finishOnboard(); else renderOnboard();
+      if (obDialog) {
+        hideOnboardDialog();
+        return;
+      }
+      if (obIndex >= OB_STEPS.length) finishOnboard();
+      else renderOnboard();
     };
     const buttons = [];
     if (card.primary) {
-      buttons.push({ label: card.primary.label, primary: true, action: async () => { onscreenly.publikOpen(card.primary.url); await done(); } });
+      buttons.push({
+        label: card.primary.label,
+        primary: true,
+        action: async () => {
+          onscreenly.publikOpen(card.primary.url);
+          await done();
+        }
+      });
     }
     buttons.push({ label: card.secondary.label, action: done });
     return {
       icon: '✅',
       title: card.title,
-      body: () => `<div class="publik-card-balance">${esc(card.balance)}</div><div class="publik-card-why">${esc(card.why)}</div>`,
+      body: () =>
+        `<div class="publik-card-balance">${esc(card.balance)}</div><div class="publik-card-why">${esc(card.why)}</div>`,
       buttons,
       publikCard: true
     };
@@ -1948,8 +2261,10 @@
     if (idx < 0) return;
     obDialog = true;
     $('#onboard').classList.add('dialog');
-    obIndex = idx; renderOnboard();
-    obScrim.classList.remove('hidden'); setIgnore(false);
+    obIndex = idx;
+    renderOnboard();
+    obScrim.classList.remove('hidden');
+    setIgnore(false);
   }
   // Show the card: inside onboarding it becomes the next step; afterwards it
   // is a dialog of its own (also reached from the "never a silent starter"
@@ -1962,16 +2277,23 @@
     if (inOnboarding) {
       const idx = OB_STEPS.findIndex((st) => st.publik);
       OB_STEPS.splice(idx + 1, 0, publikCardStep());
-      obIndex = idx + 1; renderOnboard();
+      obIndex = idx + 1;
+      renderOnboard();
       return;
     }
     OB_STEPS.push(publikCardStep());
     obDialog = true;
     $('#onboard').classList.add('dialog');
-    obIndex = OB_STEPS.length - 1; renderOnboard();
-    obScrim.classList.remove('hidden'); setIgnore(false);
+    obIndex = OB_STEPS.length - 1;
+    renderOnboard();
+    obScrim.classList.remove('hidden');
+    setIgnore(false);
   }
-  function hideOnboardDialog() { obDialog = false; $('#onboard').classList.remove('dialog'); obScrim.classList.add('hidden'); }
+  function hideOnboardDialog() {
+    obDialog = false;
+    $('#onboard').classList.remove('dialog');
+    obScrim.classList.add('hidden');
+  }
 
   let obIndex = 0;
   function renderOnboard() {
@@ -1981,25 +2303,61 @@
     $('#ob-body').innerHTML = typeof step.body === 'function' ? step.body() : step.body;
     const termsLink = $('#ob-publik-terms');
     if (termsLink) termsLink.addEventListener('click', () => onscreenly.publikOpen(publikState.links.terms));
-    const btns = $('#ob-buttons'); btns.innerHTML = '';
-    (step.buttons || []).forEach((b) => { const el = document.createElement('button'); el.textContent = b.label; if (b.primary) el.classList.add('ob-cta'); el.addEventListener('click', b.action); btns.appendChild(el); });
+    const btns = $('#ob-buttons');
+    btns.innerHTML = '';
+    (step.buttons || []).forEach((b) => {
+      const el = document.createElement('button');
+      el.textContent = b.label;
+      if (b.primary) el.classList.add('ob-cta');
+      el.addEventListener('click', b.action);
+      btns.appendChild(el);
+    });
     // The publik card has its own two buttons and no Next/Skip: leaving it any
     // other way would spend the starter without the card being acknowledged.
     $('#onboard').classList.toggle('card', !!step.publikCard);
-    const dots = $('#ob-dots'); dots.innerHTML = '';
-    OB_STEPS.forEach((_, i) => { const d = document.createElement('span'); if (i === obIndex) d.className = 'on'; dots.appendChild(d); });
+    const dots = $('#ob-dots');
+    dots.innerHTML = '';
+    OB_STEPS.forEach((_, i) => {
+      const d = document.createElement('span');
+      if (i === obIndex) d.className = 'on';
+      dots.appendChild(d);
+    });
     $('#ob-back').style.visibility = obIndex === 0 ? 'hidden' : 'visible';
     $('#ob-next').textContent = obIndex === OB_STEPS.length - 1 ? 'Done' : 'Next';
     $('#ob-skip').style.visibility = obIndex === OB_STEPS.length - 1 ? 'hidden' : 'visible';
   }
-  function showOnboard() { obDialog = false; $('#onboard').classList.remove('dialog'); obIndex = 0; renderOnboard(); obScrim.classList.remove('hidden'); setIgnore(false); }
-  async function finishOnboard() {
-    if (obDialog) { hideOnboardDialog(); return; }
-    obScrim.classList.add('hidden');
-    if (settings && !settings.onboarded) { settings.onboarded = true; await onscreenly.settingsSet({ onboarded: true }); }
+  function showOnboard() {
+    obDialog = false;
+    $('#onboard').classList.remove('dialog');
+    obIndex = 0;
+    renderOnboard();
+    obScrim.classList.remove('hidden');
+    setIgnore(false);
   }
-  $('#ob-next').addEventListener('click', () => { if (obIndex === OB_STEPS.length - 1) finishOnboard(); else { obIndex++; renderOnboard(); } });
-  $('#ob-back').addEventListener('click', () => { if (obIndex > 0) { obIndex--; renderOnboard(); } });
+  async function finishOnboard() {
+    if (obDialog) {
+      hideOnboardDialog();
+      return;
+    }
+    obScrim.classList.add('hidden');
+    if (settings && !settings.onboarded) {
+      settings.onboarded = true;
+      await onscreenly.settingsSet({ onboarded: true });
+    }
+  }
+  $('#ob-next').addEventListener('click', () => {
+    if (obIndex === OB_STEPS.length - 1) finishOnboard();
+    else {
+      obIndex++;
+      renderOnboard();
+    }
+  });
+  $('#ob-back').addEventListener('click', () => {
+    if (obIndex > 0) {
+      obIndex--;
+      renderOnboard();
+    }
+  });
   $('#ob-skip').addEventListener('click', finishOnboard);
   $('#logo-btn').addEventListener('click', showOnboard);
 
@@ -2020,12 +2378,14 @@
     if (assistHintEl) assistHintEl.textContent = isWindows ? 'Ctrl+Shift+↵' : '⌘⇧↵';
     const sayBtn = document.querySelector('.act[data-mode="say"]');
     const assistBtn = document.querySelector('.act[data-mode="assist"]');
-    if (sayBtn) sayBtn.title = isWindows
-      ? 'Suggests what to say next based on the conversation (Ctrl+Enter)'
-      : 'Suggests what to say next based on the conversation (⌘↵)';
-    if (assistBtn) assistBtn.title = isWindows
-      ? 'Scans your screen and conversation to decide what you need (Ctrl+Shift+Enter)'
-      : 'Scans your screen and conversation to decide what you need (⌘⇧↵)';
+    if (sayBtn)
+      sayBtn.title = isWindows
+        ? 'Suggests what to say next based on the conversation (Ctrl+Enter)'
+        : 'Suggests what to say next based on the conversation (⌘↵)';
+    if (assistBtn)
+      assistBtn.title = isWindows
+        ? 'Scans your screen and conversation to decide what you need (Ctrl+Shift+Enter)'
+        : 'Scans your screen and conversation to decide what you need (⌘⇧↵)';
 
     // R6: smart tooltip
     updateSmartTooltip();
@@ -2037,7 +2397,8 @@
       // Windows 10: update the onboarding screen recording button to be more helpful
       const ob = OB_STEPS[1];
       ob.buttons = ob.buttons.filter((b) => !b.label.toLowerCase().includes('screen'));
-      ob.body = 'Onscreenly needs microphone permission to hear you. Click the button below to open Windows microphone settings and allow onscreenly.<br><br><strong>Screen capture works automatically on Windows 10</strong> — no additional permission needed.<ul><li><strong>Microphone</strong> — to hear you</li><li><strong>Screen recording</strong> — works automatically on Windows 10</li></ul>';
+      ob.body =
+        'Onscreenly needs microphone permission to hear you. Click the button below to open Windows microphone settings and allow onscreenly.<br><br><strong>Screen capture works automatically on Windows 10</strong> — no additional permission needed.<ul><li><strong>Microphone</strong> — to hear you</li><li><strong>Screen recording</strong> — works automatically on Windows 10</li></ul>';
     }
 
     smartBtn.classList.toggle('on', !!settings.smart);
@@ -2047,7 +2408,8 @@
 
     // Fix placeholder shortcut hint to match platform
     if (isWindows) {
-      placeholder.innerHTML = 'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist';
+      placeholder.innerHTML =
+        'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist';
     }
 
     applyOpacity(settings.opacity, false);

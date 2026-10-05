@@ -2,9 +2,18 @@
 // no audio API — we transcribe with whatever audio-capable key is available, and
 // fall back across providers. Returns { text, provider } or { text:'', error }.
 const { pcmToWav } = require('./wav');
-const { formatProviderErrorMessage, isQuotaError, isRateLimitError, isNotFoundError, resolveGeminiModel, CURRENT_GEMINI_DEFAULT, GEMINI_TRANSCRIBE_MODEL } = require('./llm');
+const {
+  formatProviderErrorMessage,
+  isQuotaError,
+  isRateLimitError,
+  isNotFoundError,
+  resolveGeminiModel,
+  CURRENT_GEMINI_DEFAULT,
+  GEMINI_TRANSCRIBE_MODEL
+} = require('./llm');
 
-const BASE_VOCAB = 'CI/CD, Docker, Kubernetes, Terraform, Jenkins, AWS, Azure, GCP, ' +
+const BASE_VOCAB =
+  'CI/CD, Docker, Kubernetes, Terraform, Jenkins, AWS, Azure, GCP, ' +
   'CodeCommit, CodePipeline, CodeBuild, CodeDeploy, DevOps, SRE, microservices, deployment, ' +
   'pipeline, container, orchestration, Ansible, Prometheus, Grafana, Helm, EKS, ECS, Lambda, ' +
   'S3, EC2, IAM, GitHub Actions, GitLab, Kafka, PostgreSQL, Redis, MongoDB, REST API, gRPC';
@@ -13,10 +22,22 @@ function looksLikeHallucination(raw) {
   const trimmed = (raw || '').trim();
   if (!trimmed) return true;
   if (/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\s]+$/u.test(trimmed)) return true;
-  const t = trimmed.replace(/[.,!?…]+$/g, '').trim().toLowerCase();
+  const t = trimmed
+    .replace(/[.,!?…]+$/g, '')
+    .trim()
+    .toLowerCase();
   const artifacts = new Set([
-    'thank you', 'thank you very much', 'thank you for watching', 'thanks for watching',
-    'please subscribe', 'like and subscribe', 'bye-bye', 'bye bye', 'bye', 'you', 'okay'
+    'thank you',
+    'thank you very much',
+    'thank you for watching',
+    'thanks for watching',
+    'please subscribe',
+    'like and subscribe',
+    'bye-bye',
+    'bye bye',
+    'bye',
+    'you',
+    'okay'
   ]);
   return artifacts.has(t);
 }
@@ -49,12 +70,13 @@ async function transcribeOpenAI(apiKey, wav, model, baseURL, prompt) {
 // which the SDK's res.text getter ignores (it only concatenates `text` parts),
 // so read both shapes off the raw candidate. Silence comes back as no parts.
 function extractGeminiTranscript(res) {
-  const parts = (res && res.candidates && res.candidates[0] && res.candidates[0].content &&
-    res.candidates[0].content.parts) || [];
+  const parts =
+    (res && res.candidates && res.candidates[0] && res.candidates[0].content && res.candidates[0].content.parts) || [];
   let out = '';
   for (const part of parts) {
     if (!part || part.thought) continue;
-    if (part.audioTranscription && typeof part.audioTranscription.text === 'string') out += part.audioTranscription.text;
+    if (part.audioTranscription && typeof part.audioTranscription.text === 'string')
+      out += part.audioTranscription.text;
     else if (typeof part.text === 'string') out += part.text;
   }
   return out.trim();
@@ -90,10 +112,17 @@ async function transcribeGeminiWith(ai, wav, now = Date.now()) {
   }
   const res = await ai.models.generateContent({
     model: CURRENT_GEMINI_DEFAULT,
-    contents: [{ role: 'user', parts: [
-      { text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.' },
-      audio
-    ] }]
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          {
+            text: 'Transcribe this audio verbatim. Return only the spoken words with no commentary. If there is no clear speech, return an empty response.'
+          },
+          audio
+        ]
+      }
+    ]
   });
   return extractGeminiTranscript(res);
 }
@@ -112,11 +141,19 @@ function createSTT(settings) {
   // that id back to the user instead of a hardcoded one they never picked.
   if ((selectedProvider === 'auto' || selectedProvider === 'openai') && keys.openai) {
     const model = settings.sttModel || 'whisper-1';
-    chain.push({ p: 'openai', m: model, fn: (wav) => transcribeOpenAI(keys.openai, wav, model, undefined, vocabPrompt) });
+    chain.push({
+      p: 'openai',
+      m: model,
+      fn: (wav) => transcribeOpenAI(keys.openai, wav, model, undefined, vocabPrompt)
+    });
   }
   if ((selectedProvider === 'auto' || selectedProvider === 'groq') && keys.groq) {
     const model = 'whisper-large-v3-turbo';
-    chain.push({ p: 'groq', m: model, fn: (wav) => transcribeOpenAI(keys.groq, wav, model, 'https://api.groq.com/openai/v1', vocabPrompt) });
+    chain.push({
+      p: 'groq',
+      m: model,
+      fn: (wav) => transcribeOpenAI(keys.groq, wav, model, 'https://api.groq.com/openai/v1', vocabPrompt)
+    });
   }
   if ((selectedProvider === 'auto' || selectedProvider === 'gemini') && keys.gemini) {
     // transcribeGemini always tries the dedicated GEMINI_TRANSCRIBE_MODEL first
@@ -132,9 +169,18 @@ function createSTT(settings) {
   // the audio-transcription API at all, so this only fires on an explicit
   // choice, and only once both the URL and the key it needs are actually set.
   if (selectedProvider === 'custom' && keys.custom && settings.baseUrl) {
-    chain.push({ p: 'custom', fn: (wav) => transcribeOpenAI(keys.custom, wav, settings.sttModel, settings.baseUrl, vocabPrompt) });
+    chain.push({
+      p: 'custom',
+      fn: (wav) => transcribeOpenAI(keys.custom, wav, settings.sttModel, settings.baseUrl, vocabPrompt)
+    });
   }
-  if (keys.openai && chain.length > 1) chain.unshift(chain.splice(chain.findIndex((c) => c.p === 'openai'), 1)[0]);
+  if (keys.openai && chain.length > 1)
+    chain.unshift(
+      chain.splice(
+        chain.findIndex((c) => c.p === 'openai'),
+        1
+      )[0]
+    );
 
   let disabledUntil = 0;
   let lastProvider = null;
@@ -146,7 +192,14 @@ function createSTT(settings) {
     async transcribe(pcm) {
       if (!chain.length || !pcm || pcm.length < 3200) return { text: '' };
       const now = Date.now();
-      if (disabledUntil && now < disabledUntil) return { text: '', error: { provider: lastProvider, message: `Temporary ${lastProvider || 'provider'} quota or rate-limit; waiting 30s before retrying.` } };
+      if (disabledUntil && now < disabledUntil)
+        return {
+          text: '',
+          error: {
+            provider: lastProvider,
+            message: `Temporary ${lastProvider || 'provider'} quota or rate-limit; waiting 30s before retrying.`
+          }
+        };
       const wav = pcmToWav(pcm, 16000, 1);
       let lastErr = null;
       for (const c of chain) {
@@ -179,4 +232,11 @@ function createSTT(settings) {
   };
 }
 
-module.exports = { createSTT, looksLikeHallucination, buildVocabPrompt, transcribeGemini, transcribeGeminiWith, extractGeminiTranscript };
+module.exports = {
+  createSTT,
+  looksLikeHallucination,
+  buildVocabPrompt,
+  transcribeGemini,
+  transcribeGeminiWith,
+  extractGeminiTranscript
+};

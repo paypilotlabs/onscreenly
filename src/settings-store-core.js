@@ -48,7 +48,11 @@ function createFileStore(resolveUserDataDir, label) {
   }
 
   function chmodQuiet(target) {
-    try { fs.chmodSync(target, FILE_MODE); } catch (_) { /* e.g. unsupported on this fs */ }
+    try {
+      fs.chmodSync(target, FILE_MODE);
+    } catch (_) {
+      /* e.g. unsupported on this fs */
+    }
   }
 
   /**
@@ -91,7 +95,9 @@ function createFileStore(resolveUserDataDir, label) {
     try {
       if (fs.existsSync(mainPath())) fs.copyFileSync(mainPath(), bakPath());
       chmodQuiet(bakPath());
-    } catch (_) { /* backup is best-effort; never block the save */ }
+    } catch (_) {
+      /* backup is best-effort; never block the save */
+    }
     try {
       fs.renameSync(tmpPath(), mainPath());
     } catch (_) {
@@ -99,7 +105,9 @@ function createFileStore(resolveUserDataDir, label) {
       // making rename fail with EPERM. An in-place write still beats losing
       // the user's keys over a transient lock.
       fs.writeFileSync(mainPath(), json, { mode: FILE_MODE });
-      try { fs.unlinkSync(tmpPath()); } catch (_) {}
+      try {
+        fs.unlinkSync(tmpPath());
+      } catch (_) {}
     }
     // writeFileSync's mode option only applies when the file is created; a
     // pre-existing tmp/main file (from a previous run, or on the in-place

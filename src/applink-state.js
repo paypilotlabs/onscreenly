@@ -45,7 +45,7 @@ function describeState({ state, transcript, settings, sttDisabled, shortcuts, wi
     // the user presses the key, nothing happens, and Onscreenly never knew.
     shortcuts: shortcuts || {},
 
-    windowAlive: !!windowAlive,
+    windowAlive: !!windowAlive
   };
 }
 
@@ -70,20 +70,22 @@ function consentCopy(request) {
 
   return {
     trusted,
-    message: slides ? `${who} wants to read Onscreenly’s captured slide captions.`
-      : action ? `${who} wants to control onscreenly.`
-      : `${who} wants to see what Onscreenly is doing.`,
+    message: slides
+      ? `${who} wants to read Onscreenly’s captured slide captions.`
+      : action
+        ? `${who} wants to control onscreenly.`
+        : `${who} wants to see what Onscreenly is doing.`,
     detail:
       (slides
         ? 'Onscreenly automatically captions slides shown on your screen during a meeting. This would let the caller read those captions — never a screenshot or the screen itself, and never your transcript, résumé or API keys. '
         : action
-        ? 'It would be able to start and stop listening. '
-        : 'It would be able to read Onscreenly’s status, recent warnings and errors — never your transcript, your résumé or your API keys. ') +
+          ? 'It would be able to start and stop listening. '
+          : 'It would be able to read Onscreenly’s status, recent warnings and errors — never your transcript, your résumé or your API keys. ') +
       (trusted
         ? 'Its code signature has been verified.'
         : 'Onscreenly cannot verify what this program really is; anything running under your account could make the same claim.') +
       '\n\nYou can change this later in Onscreenly’s settings.',
-    allowLabel: action ? 'Allow control' : 'Allow',
+    allowLabel: action ? 'Allow control' : 'Allow'
   };
 }
 

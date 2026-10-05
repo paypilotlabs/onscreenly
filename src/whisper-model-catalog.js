@@ -61,9 +61,7 @@ function getHardwareTier(family) {
 }
 
 function buildArtifact([id, bytes, sha256]) {
-  const repository = id === 'small.en-tdrz'
-    ? TINYDIARIZE_MODEL_REPOSITORY
-    : STANDARD_MODEL_REPOSITORY;
+  const repository = id === 'small.en-tdrz' ? TINYDIARIZE_MODEL_REPOSITORY : STANDARD_MODEL_REPOSITORY;
   const filename = `ggml-${id}.bin`;
   const family = getFamily(id);
 

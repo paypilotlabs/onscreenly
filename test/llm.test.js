@@ -6,7 +6,7 @@ const { OPTIONAL_API_KEY_PLACEHOLDER } = require('../src/openai-compatible');
 let capturedClientOptions = null;
 let capturedCompletionRequest = null;
 let fakeResponseHeaders = null; // when set, create() returns an APIPromise-like with withResponse()
-let fakeCreateError = null;     // when set, create() rejects with it (the SDK's APIError shape)
+let fakeCreateError = null; // when set, create() rejects with it (the SDK's APIError shape)
 const originalModuleLoad = Module._load;
 
 Module._load = function loadWithOpenAIStub(request, parent, isMain) {
@@ -23,7 +23,10 @@ Module._load = function loadWithOpenAIStub(request, parent, isMain) {
               if (!fakeResponseHeaders) return Promise.resolve(data);
               const headers = fakeResponseHeaders;
               const p = Promise.resolve(data);
-              p.withResponse = async () => ({ data, response: { headers: { get: (k) => (k in headers ? headers[k] : null) } } });
+              p.withResponse = async () => ({
+                data,
+                response: { headers: { get: (k) => (k in headers ? headers[k] : null) } }
+              });
               return p;
             }
           }
@@ -34,7 +37,15 @@ Module._load = function loadWithOpenAIStub(request, parent, isMain) {
   return originalModuleLoad.call(this, request, parent, isMain);
 };
 
-const { createLLM, formatProviderErrorMessage, isQuotaError, geminiGenerationConfig, CURRENT_GEMINI_DEFAULT, PUBLIK_PROVIDER, isRateLimitError } = require('../src/llm');
+const {
+  createLLM,
+  formatProviderErrorMessage,
+  isQuotaError,
+  geminiGenerationConfig,
+  CURRENT_GEMINI_DEFAULT,
+  PUBLIK_PROVIDER,
+  isRateLimitError
+} = require('../src/llm');
 
 test.after(() => {
   Module._load = originalModuleLoad;
@@ -110,9 +121,11 @@ test('reports incomplete Custom endpoint settings without making a request', () 
 });
 
 test('requires a model for the Custom provider', () => {
-  const llm = createLLM(createCustomSettings({
-    models: { custom: { fast: '', smart: '' } }
-  }));
+  const llm = createLLM(
+    createCustomSettings({
+      models: { custom: { fast: '', smart: '' } }
+    })
+  );
 
   assert.equal(llm.ready, false);
   assert.match(llm.configurationError, /Set a Fast or Smart model/);
@@ -123,12 +136,15 @@ test('requires a model for the Custom provider', () => {
 // gateway selection rather than any new transport.
 
 function minimaxSettings(overrides) {
-  return Object.assign({
-    provider: 'minimax',
-    smart: true,
-    apiKeys: { minimax: 'test-key' },
-    models: { minimax: { fast: 'MiniMax-M2.7', smart: 'MiniMax-M3' } }
-  }, overrides || {});
+  return Object.assign(
+    {
+      provider: 'minimax',
+      smart: true,
+      apiKeys: { minimax: 'test-key' },
+      models: { minimax: { fast: 'MiniMax-M2.7', smart: 'MiniMax-M3' } }
+    },
+    overrides || {}
+  );
 }
 
 test('selects the MiniMax model for the active tier and reports readiness', () => {
@@ -157,12 +173,15 @@ test('routes MiniMax to the China endpoint when that region is selected', async 
 });
 
 function cerebrasSettings(overrides) {
-  return Object.assign({
-    provider: 'cerebras',
-    smart: true,
-    apiKeys: { cerebras: 'csk-test' },
-    models: { cerebras: { fast: 'qwen-3.8-27b', smart: 'qwen-3.8-27b' } }
-  }, overrides || {});
+  return Object.assign(
+    {
+      provider: 'cerebras',
+      smart: true,
+      apiKeys: { cerebras: 'csk-test' },
+      models: { cerebras: { fast: 'qwen-3.8-27b', smart: 'qwen-3.8-27b' } }
+    },
+    overrides || {}
+  );
 }
 
 test('selects the Cerebras model for the active tier and reports readiness', () => {
@@ -188,12 +207,15 @@ test('routes Cerebras to https://api.cerebras.ai/v1', async () => {
 // the model/readiness plumbing and the baseURL used to reach it.
 
 function deepseekSettings(overrides) {
-  return Object.assign({
-    provider: 'deepseek',
-    smart: true,
-    apiKeys: { deepseek: 'test-key' },
-    models: { deepseek: { fast: 'deepseek-flash', smart: 'deepseek-v4-pro' } }
-  }, overrides || {});
+  return Object.assign(
+    {
+      provider: 'deepseek',
+      smart: true,
+      apiKeys: { deepseek: 'test-key' },
+      models: { deepseek: { fast: 'deepseek-flash', smart: 'deepseek-v4-pro' } }
+    },
+    overrides || {}
+  );
 }
 
 test('selects the DeepSeek model for the active tier and reports readiness', () => {
@@ -209,16 +231,20 @@ test('selects the DeepSeek model for the active tier and reports readiness', () 
 // deepseek-chat/deepseek-reasoner were retired 2026-07-24 and now 404; a
 // settings file saved before this fix can still have one persisted on disk.
 test('self-heals a settings file saved with the retired deepseek-chat/deepseek-reasoner aliases', () => {
-  const fast = createLLM(deepseekSettings({
-    smart: false,
-    models: { deepseek: { fast: 'deepseek-chat', smart: 'deepseek-reasoner' } }
-  }));
+  const fast = createLLM(
+    deepseekSettings({
+      smart: false,
+      models: { deepseek: { fast: 'deepseek-chat', smart: 'deepseek-reasoner' } }
+    })
+  );
   assert.equal(fast.model, 'deepseek-flash');
 
-  const smart = createLLM(deepseekSettings({
-    smart: true,
-    models: { deepseek: { fast: 'deepseek-chat', smart: 'deepseek-reasoner' } }
-  }));
+  const smart = createLLM(
+    deepseekSettings({
+      smart: true,
+      models: { deepseek: { fast: 'deepseek-chat', smart: 'deepseek-reasoner' } }
+    })
+  );
   assert.equal(smart.model, 'deepseek-v4-pro');
 });
 
@@ -337,7 +363,10 @@ test('isQuotaError: agrees with formatProviderErrorMessage on what counts as quo
 function anthropicRateLimitError() {
   // Shape matches @anthropic-ai/sdk's RateLimitError: status 429, with
   // error.error holding the parsed {type:'error', error:{type:'rate_limit_error', ...}} envelope.
-  const body = { type: 'error', error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your per-minute rate limit.' } };
+  const body = {
+    type: 'error',
+    error: { type: 'rate_limit_error', message: 'Number of request tokens has exceeded your per-minute rate limit.' }
+  };
   const e = new Error(`429 ${JSON.stringify(body)}`);
   e.status = 429;
   e.error = body;
@@ -347,7 +376,11 @@ function anthropicRateLimitError() {
 function openaiRateLimitExceededError() {
   // Shape matches the openai SDK's APIError for an RPM burst on a brand-new
   // key: code 'rate_limit_exceeded', NOT 'insufficient_quota'.
-  const body = { message: 'Rate limit reached for gpt-4o-mini on requests per min (RPM): Limit 3, Used 3, Requested 1.', type: 'requests', code: 'rate_limit_exceeded' };
+  const body = {
+    message: 'Rate limit reached for gpt-4o-mini on requests per min (RPM): Limit 3, Used 3, Requested 1.',
+    type: 'requests',
+    code: 'rate_limit_exceeded'
+  };
   const e = new Error(`429 ${JSON.stringify({ error: body })}`);
   e.status = 429;
   e.code = 'rate_limit_exceeded';
@@ -376,7 +409,11 @@ test('formatProviderErrorMessage: an OpenAI rate_limit_exceeded burst gets its o
 });
 
 test('formatProviderErrorMessage: a genuine OpenAI insufficient_quota error still shows quota-exhausted', () => {
-  const body = { message: 'You exceeded your current quota, please check your plan and billing details.', type: 'insufficient_quota', code: 'insufficient_quota' };
+  const body = {
+    message: 'You exceeded your current quota, please check your plan and billing details.',
+    type: 'insufficient_quota',
+    code: 'insufficient_quota'
+  };
   const e = new Error(`429 ${JSON.stringify({ error: body })}`);
   e.status = 429;
   e.code = 'insufficient_quota';
@@ -388,11 +425,14 @@ test('formatProviderErrorMessage: a genuine OpenAI insufficient_quota error stil
 // ---- Gemini model selection / self-healing migration -----------------------
 
 function geminiSettings(overrides) {
-  return Object.assign({
-    provider: 'gemini',
-    smart: false,
-    apiKeys: { gemini: 'test-key' }
-  }, overrides || {});
+  return Object.assign(
+    {
+      provider: 'gemini',
+      smart: false,
+      apiKeys: { gemini: 'test-key' }
+    },
+    overrides || {}
+  );
 }
 
 test('createLLM: falls back to CURRENT_GEMINI_DEFAULT when no model is configured', () => {
@@ -402,39 +442,49 @@ test('createLLM: falls back to CURRENT_GEMINI_DEFAULT when no model is configure
 });
 
 test('createLLM: a fresh install (store.js DEFAULTS shape) resolves to the current default', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-3.8-flash', smart: 'gemini-3.1-pro-preview' } }
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-3.8-flash', smart: 'gemini-3.1-pro-preview' } }
+    })
+  );
   assert.equal(llm.model, CURRENT_GEMINI_DEFAULT);
 });
 
 test('createLLM: self-heals a settings file saved with the retired gemini-2.5-flash default', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-pro' } },
-    smart: true
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-pro' } },
+      smart: true
+    })
+  );
   assert.equal(llm.model, CURRENT_GEMINI_DEFAULT);
 });
 
 test('createLLM: self-heals a settings file saved with the retired gemini-2.0-flash default', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-2.0-flash', smart: 'gemini-2.0-flash' } }
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-2.0-flash', smart: 'gemini-2.0-flash' } }
+    })
+  );
   assert.equal(llm.model, CURRENT_GEMINI_DEFAULT);
 });
 
 test('createLLM: self-heals a legacy gemini-1.5-* model saved before the 2.0-flash migration existed', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-1.5-flash', smart: 'gemini-1.5-pro' } },
-    smart: true
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-1.5-flash', smart: 'gemini-1.5-pro' } },
+      smart: true
+    })
+  );
   assert.equal(llm.model, CURRENT_GEMINI_DEFAULT);
 });
 
 test('createLLM: leaves a user-chosen current Gemini model alone', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-3.5-flash', smart: 'gemini-3.5-flash' } }
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-3.5-flash', smart: 'gemini-3.5-flash' } }
+    })
+  );
   assert.equal(llm.model, 'gemini-3.5-flash');
 });
 
@@ -473,7 +523,10 @@ test('publik: honours the provisioning response base_url and the smart tier alia
 
 test('publik: cleared model fields fall back to the per-tier aliases', () => {
   assert.equal(createLLM(publikSettings({ models: { publik: { fast: '', smart: '' } } })).model, 'publik-fast');
-  assert.equal(createLLM(publikSettings({ smart: true, models: { publik: { fast: '', smart: '' } } })).model, 'publik-balanced');
+  assert.equal(
+    createLLM(publikSettings({ smart: true, models: { publik: { fast: '', smart: '' } } })).model,
+    'publik-balanced'
+  );
 });
 
 test('publik: missing key → not ready, "not set up", no request', () => {
@@ -484,44 +537,82 @@ test('publik: missing key → not ready, "not set up", no request', () => {
 });
 
 test('publik: the raw Response reaches onResponse so x-publik-* headers can drive the balance line', async () => {
-  fakeResponseHeaders = { 'x-publik-balance': '181240', 'x-publik-claim-state': 'anonymous', 'x-publik-model': 'gpt-5.6-luna' };
+  fakeResponseHeaders = {
+    'x-publik-balance': '181240',
+    'x-publik-claim-state': 'anonymous',
+    'x-publik-model': 'gpt-5.6-luna'
+  };
   let seen = null;
   const llm = createLLM(publikSettings());
-  const out = await llm.stream({ system: 's', turns: [{ role: 'user', text: 'hi' }], onToken: () => {}, onResponse: (res) => { seen = res.headers.get('x-publik-balance'); } });
+  const out = await llm.stream({
+    system: 's',
+    turns: [{ role: 'user', text: 'hi' }],
+    onToken: () => {},
+    onResponse: (res) => {
+      seen = res.headers.get('x-publik-balance');
+    }
+  });
   assert.equal(out, 'ok');
   assert.equal(seen, '181240');
 });
 
 test('publik: a stub without withResponse() still streams (onResponse is optional)', async () => {
   const llm = createLLM(publikSettings());
-  const out = await llm.stream({ system: 's', turns: [{ role: 'user', text: 'hi' }], onToken: () => {}, onResponse: () => {} });
+  const out = await llm.stream({
+    system: 's',
+    turns: [{ role: 'user', text: 'hi' }],
+    onToken: () => {},
+    onResponse: () => {}
+  });
   assert.equal(out, 'ok');
 });
 
 function sdkError(status, error, headers = {}) {
   const e = new Error(`${status} ${JSON.stringify({ error })}`);
   e.name = 'APIError';
-  e.status = status;      // openai v4 APIError fields
-  e.error = error;        // the envelope's inner object
+  e.status = status; // openai v4 APIError fields
+  e.error = error; // the envelope's inner object
   e.headers = headers;
   return e;
 }
 
 test('formatProviderErrorMessage: publik 402 → Error with a single link action, not the 429 free-tier text', () => {
-  const err = sdkError(402, { type: 'insufficient_credit', message: 'Not enough publik credit for this request. Check billing.', claim_state: 'anonymous', top_up_url: 'https://publikhq.com/claim/abc' });
+  const err = sdkError(402, {
+    type: 'insufficient_credit',
+    message: 'Not enough publik credit for this request. Check billing.',
+    claim_state: 'anonymous',
+    top_up_url: 'https://publikhq.com/claim/abc'
+  });
   assert.equal(isQuotaError(err), true, 'precondition: the generic classifier WOULD misfile this as a quota error');
   const out = formatProviderErrorMessage(err, 'publik', 'publik-fast');
   assert.ok(out instanceof Error);
-  assert.deepEqual(out.action, { kind: 'link', label: 'Link this computer & pick a plan', url: 'https://publikhq.com/claim/abc' });
+  assert.deepEqual(out.action, {
+    kind: 'link',
+    label: 'Link this computer & pick a plan',
+    url: 'https://publikhq.com/claim/abc'
+  });
   // CONTRACT §12.3: the response's own message is what the banner shows.
   assert.equal(out.message, 'Not enough publik credit for this request. Check billing.');
   assert.doesNotMatch(out.message, /free-tier quota|add billing/);
 });
 
 test('formatProviderErrorMessage: publik 401 key_revoked → reprovision / reconnect; 429 daily cap; 400 unknown_model', () => {
-  assert.deepEqual(formatProviderErrorMessage(sdkError(401, { type: 'key_revoked', reprovision: true }), 'publik').action, { kind: 'reprovision' });
-  assert.equal(formatProviderErrorMessage(sdkError(401, { type: 'key_revoked', reprovision: false }), 'publik').action.kind, 'reconnect');
-  const cap = formatProviderErrorMessage(sdkError(429, { type: 'daily_cap_reached', claim_state: 'anonymous', claim_url: 'https://publikhq.com/claim/abc' }, { 'retry-after': '1800' }), 'publik');
+  assert.deepEqual(
+    formatProviderErrorMessage(sdkError(401, { type: 'key_revoked', reprovision: true }), 'publik').action,
+    { kind: 'reprovision' }
+  );
+  assert.equal(
+    formatProviderErrorMessage(sdkError(401, { type: 'key_revoked', reprovision: false }), 'publik').action.kind,
+    'reconnect'
+  );
+  const cap = formatProviderErrorMessage(
+    sdkError(
+      429,
+      { type: 'daily_cap_reached', claim_state: 'anonymous', claim_url: 'https://publikhq.com/claim/abc' },
+      { 'retry-after': '1800' }
+    ),
+    'publik'
+  );
   assert.match(cap.message, /daily publik API spending cap — it resets in 30 minutes/);
   const unknown = formatProviderErrorMessage(sdkError(400, { type: 'unknown_model' }), 'publik', 'gpt-9');
   assert.match(unknown.message, /does not serve "gpt-9"/);
@@ -536,19 +627,31 @@ test('formatProviderErrorMessage: publik connection failure → unreachable, not
 });
 
 test('formatProviderErrorMessage: a non-publik-specific error on publik falls through to the generic copy', () => {
-  const out = formatProviderErrorMessage(sdkError(400, { type: 'invalid_request', message: 'bad request' }), 'publik', 'publik-fast');
+  const out = formatProviderErrorMessage(
+    sdkError(400, { type: 'invalid_request', message: 'bad request' }),
+    'publik',
+    'publik-fast'
+  );
   assert.equal(typeof out, 'string');
   assert.match(out, /bad request/);
 });
 
 test('llm.stream on publik rethrows the structured error with its action', async () => {
-  fakeCreateError = sdkError(402, { type: 'insufficient_credit', claim_state: 'claimed', top_up_url: 'https://publikhq.com/dashboard/api/add', available_micros: 0 });
+  fakeCreateError = sdkError(402, {
+    type: 'insufficient_credit',
+    claim_state: 'claimed',
+    top_up_url: 'https://publikhq.com/dashboard/api/add',
+    available_micros: 0
+  });
   const llm = createLLM(publikSettings());
   await assert.rejects(llm.stream({ system: 's', turns: [{ role: 'user', text: 'hi' }], onToken: () => {} }), (e) => {
     assert.equal(e.action.label, 'Add a plan or pack');
     assert.equal(e.action.url, 'https://publikhq.com/dashboard/api/add');
     // No message in the body → the local sentence that says what the link does.
-    assert.match(e.message, /^publik API balance is used up \(\$0\.00 left\)\. Add a plan or a pack at the link below, or use your own key in Settings\.$/);
+    assert.match(
+      e.message,
+      /^publik API balance is used up \(\$0\.00 left\)\. Add a plan or a pack at the link below, or use your own key in Settings\.$/
+    );
     return true;
   });
 });
@@ -590,9 +693,11 @@ test('isRateLimitError: a genuine quota error is never also a rate limit, and no
 });
 
 test('createLLM: self-heals gemini-2.5-* , which Google closed to new API keys', () => {
-  const llm = createLLM(geminiSettings({
-    models: { gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-flash-lite' } }
-  }));
+  const llm = createLLM(
+    geminiSettings({
+      models: { gemini: { fast: 'gemini-2.5-flash', smart: 'gemini-2.5-flash-lite' } }
+    })
+  );
   assert.equal(llm.model, CURRENT_GEMINI_DEFAULT);
 });
 

@@ -34,40 +34,53 @@ const DEFAULTS = {
   meetingAudio: process.platform !== 'darwin',
   baseUrl: '',
   minimaxRegion: 'global_en',
-  apiKeys: { cerebras: '', openai: '', anthropic: '', gemini: '', deepgram: '', custom: '', ollama: '', groq: '', minimax: '', deepseek: '', azure: '', publik: '' },
+  apiKeys: {
+    cerebras: '',
+    openai: '',
+    anthropic: '',
+    gemini: '',
+    deepgram: '',
+    custom: '',
+    ollama: '',
+    groq: '',
+    minimax: '',
+    deepseek: '',
+    azure: '',
+    publik: ''
+  },
   azureEndpoint: '',
   // publik API (packaged-build default). apiKeys.publik holds the minted key;
   // everything here is state the main process owns — the renderer only reads
   // a redacted view of it through publik:state and can never write it.
   publik: {
-    installId: '',            // uuid minted locally before the first provision; idempotency key server-side
-    keyId: '',                // pk_live_<this>_… — safe to show
-    baseUrl: '',              // '' = build default; the provisioning response's base_url wins
-    claimUrl: '',             // where "Link this computer" goes until the install is claimed
+    installId: '', // uuid minted locally before the first provision; idempotency key server-side
+    keyId: '', // pk_live_<this>_… — safe to show
+    baseUrl: '', // '' = build default; the provisioning response's base_url wins
+    claimUrl: '', // where "Link this computer" goes until the install is claimed
     claimCode: '',
-    claimState: '',           // 'anonymous' | 'claimed' — last seen from the gateway
-    starterMicros: 0,         // from the mint response; 0 for every mint since policy 0059 — only an install minted before it still carries its old starter
-    balanceMicros: null,      // last known available balance (headers or GET /wallet)
+    claimState: '', // 'anonymous' | 'claimed' — last seen from the gateway
+    starterMicros: 0, // from the mint response; 0 for every mint since policy 0059 — only an install minted before it still carries its old starter
+    balanceMicros: null, // last known available balance (headers or GET /wallet)
     balanceAt: 0,
-    wallet: null,             // last GET /wallet, normalised (src/publik.js normalizeWallet)
-    disclosureAccepted: 0,    // disclosureVersion the user accepted; 0 = not yet
-    defaultApplied: false,    // provider was switched to publik once, automatically
-    revoked: false,           // last call was 401 → Reconnect re-mints
-    disconnected: false,      // 401 key_revoked with reprovision:false → user removed this computer
-    cardShown: false,         // the first-run card (CONTRACT §12.1) was shown for the current starter grant
+    wallet: null, // last GET /wallet, normalised (src/publik.js normalizeWallet)
+    disclosureAccepted: 0, // disclosureVersion the user accepted; 0 = not yet
+    defaultApplied: false, // provider was switched to publik once, automatically
+    revoked: false, // last call was 401 → Reconnect re-mints
+    disconnected: false, // 401 key_revoked with reprovision:false → user removed this computer
+    cardShown: false, // the first-run card (CONTRACT §12.1) was shown for the current starter grant
     lastError: ''
   },
   // Tab 2: Profile
   resumeText: '',
   jobDescription: '',
   // Tab 3: Interview Prep
-  starStories: '',       // 3-5 behavioral STAR stories in plain English
-  whyCompany: '',        // Why do you want to work here?
-  whyLeaving: '',        // Why are you leaving your current job?
-  workStyle: '',         // How you work, decision-making style, values
+  starStories: '', // 3-5 behavioral STAR stories in plain English
+  whyCompany: '', // Why do you want to work here?
+  whyLeaving: '', // Why are you leaving your current job?
+  workStyle: '', // How you work, decision-making style, values
   // Tab 4: Q&A
-  salaryTarget: '',      // e.g. "$150k-$180k base + equity"
-  questionsToAsk: '',    // Questions to ask the interviewer
+  salaryTarget: '', // e.g. "$150k-$180k base + equity"
+  questionsToAsk: '', // Questions to ask the interviewer
   // Tab 5: Style — custom response rules
   // The user writes how the AI should write: e.g. "no em-dashes", "use bullet
   // points", "casual tone". Applied to every LLM mode EXCEPT LeetCode (kept
@@ -187,7 +200,10 @@ function applyPublikDefault(build) {
   const hasOwnKey = !!(data.apiKeys && data.apiKeys[current]);
   const hasCustomEndpoint = current === 'custom' && !!data.baseUrl;
   data.publik = { ...data.publik, defaultApplied: true };
-  if (hasOwnKey || hasCustomEndpoint) { save(); return false; }
+  if (hasOwnKey || hasCustomEndpoint) {
+    save();
+    return false;
+  }
   data.provider = 'publik';
   save();
   return true;
@@ -196,7 +212,10 @@ function applyPublikDefault(build) {
 function stripRendererPatch(patch) {
   const out = { ...(patch || {}) };
   for (const k of RENDERER_READ_ONLY) delete out[k];
-  if (out.apiKeys && typeof out.apiKeys === 'object') { out.apiKeys = { ...out.apiKeys }; delete out.apiKeys.publik; }
+  if (out.apiKeys && typeof out.apiKeys === 'object') {
+    out.apiKeys = { ...out.apiKeys };
+    delete out.apiKeys.publik;
+  }
   return out;
 }
 
@@ -218,9 +237,13 @@ module.exports = {
   applyPublikDefault,
   stripRendererPatch,
   redactForRenderer,
-  getSettings() { return load(); },
+  getSettings() {
+    return load();
+  },
   /** Null when the last save succeeded; the Error otherwise. */
-  lastSaveError() { return lastError; },
+  lastSaveError() {
+    return lastError;
+  },
   // Main-process only: the provisioning flow writes the key and its state here.
   setPublik(patch) {
     load();

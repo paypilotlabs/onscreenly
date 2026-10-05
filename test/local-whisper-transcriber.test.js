@@ -10,7 +10,9 @@ test('serializes both channels through one persistent session', async () => {
   const fakeSession = {
     startCalls: 0,
     stopCalls: 0,
-    async start() { this.startCalls += 1; },
+    async start() {
+      this.startCalls += 1;
+    },
     async transcribe(pcm) {
       activeInferences += 1;
       maximumConcurrency = Math.max(maximumConcurrency, activeInferences);
@@ -19,7 +21,9 @@ test('serializes both channels through one persistent session', async () => {
       return pcm.toString();
     },
     abortInferences() {},
-    async stop() { this.stopCalls += 1; }
+    async stop() {
+      this.stopCalls += 1;
+    }
   };
 
   const transcriber = new LocalWhisperTranscriber({
@@ -61,19 +65,25 @@ test('bounds shutdown drain time before aborting an in-flight inference', async 
     async start() {},
     async transcribe() {
       transcribeCalls += 1;
-      return new Promise((_resolve, reject) => { rejectInference = reject; });
+      return new Promise((_resolve, reject) => {
+        rejectInference = reject;
+      });
     },
     abortInferences() {
       abortCalls += 1;
       rejectInference(new Error('inference aborted'));
     },
-    async stop(options) { stopOptions.push(options); }
+    async stop(options) {
+      stopOptions.push(options);
+    }
   };
   const transcriber = new LocalWhisperTranscriber({
     sessionOptions: {},
     sessionFactory: () => fakeSession,
     segmenterFactory: (options) => ({
-      push(pcm) { options.onUtterance(options.channel, Buffer.from(pcm)); },
+      push(pcm) {
+        options.onUtterance(options.channel, Buffer.from(pcm));
+      },
       stop() {}
     }),
     drainTimeoutMs: 0,

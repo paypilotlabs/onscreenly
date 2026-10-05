@@ -44,12 +44,12 @@ const SETTINGS = {
   smart: true,
   resumeContext: 'Mann Bellani — Texas A&M, worked at …',
   apiKeys: { openai: 'sk-proj-realkeyvaluehere', anthropic: '', gemini: 'AIzaSyRealKey', nvidia: '' },
-  models: { openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' } },
+  models: { openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' } }
 };
 
 const TRANSCRIPT = [
   { channel: 'them', text: 'So what salary were you expecting?', ts: 1754300000000 },
-  { channel: 'you', text: 'I was hoping for something around…', ts: 1754300005000 },
+  { channel: 'you', text: 'I was hoping for something around…', ts: 1754300005000 }
 ];
 
 function snapshot(overrides = {}) {
@@ -60,7 +60,7 @@ function snapshot(overrides = {}) {
     sttDisabled: false,
     shortcuts: { assist: 'CommandOrControl+Return', leetcode: true, quit: true },
     windowAlive: true,
-    ...overrides,
+    ...overrides
   };
 }
 
@@ -157,17 +157,29 @@ test('answers Iris over the link', async (t) => {
     appVersion: '0.2.1',
     pathOptions,
     stateProvider: () => describeState(snapshot({ sttDisabled: true })),
-    onConsentRequest: () => { asked += 1; return true; },
+    onConsentRequest: () => {
+      asked += 1;
+      return true;
+    }
   });
   await link.start();
   t.after(() => link.stop());
 
-  link.record({ level: 'error', event: 'stt_rejected', code: 'http_403', msg: 'no access to a speech model', frame: 'handleSttError' });
+  link.record({
+    level: 'error',
+    event: 'stt_rejected',
+    code: 'http_403',
+    msg: 'no access to a speech model',
+    frame: 'handleSttError'
+  });
 
   const found = AppLinkClient.discover(pathOptions).find((entry) => entry.appId === 'com.onscreenly.overlay');
   assert.ok(found, 'onscreenly did not announce itself');
 
-  const client = await AppLinkClient.open(found, { client: { id: 'com.publikhq.iris', name: 'Iris' }, scopes: ['read'] });
+  const client = await AppLinkClient.open(found, {
+    client: { id: 'com.publikhq.iris', name: 'Iris' },
+    scopes: ['read']
+  });
   t.after(() => client.close());
 
   assert.equal(asked, 1);
@@ -204,11 +216,16 @@ test('get_slides prompts separately for consent even though the caller already h
   const originalAction = AppLink.AppLinkServer.prototype.action;
   const originalStart = AppLink.AppLinkServer.prototype.start;
   const actions = new Map();
-  AppLink.AppLinkServer.prototype.action = function (name, def) { actions.set(name, def); };
+  AppLink.AppLinkServer.prototype.action = function (name, def) {
+    actions.set(name, def);
+  };
   AppLink.AppLinkServer.prototype.start = async function () {};
 
   const slidesConsent = {};
-  const slides = [{ text: 'Q3 roadmap', ts: 1 }, { text: 'Pricing', ts: 2 }];
+  const slides = [
+    { text: 'Q3 roadmap', ts: 1 },
+    { text: 'Pricing', ts: 2 }
+  ];
   const { applink, dialogCalls: calls } = loadAppLink({ dialogResponse: 1 }); // 1 = Allow
 
   try {
@@ -217,7 +234,9 @@ test('get_slides prompts separately for consent even though the caller already h
       setCapturing: () => {},
       getSlides: () => slides,
       getSlidesConsent: (id) => slidesConsent[id],
-      setSlidesConsent: (id, decision) => { slidesConsent[id] = decision; },
+      setSlidesConsent: (id, decision) => {
+        slidesConsent[id] = decision;
+      },
       getWindow: () => null // forces the dialog.showMessageBox fallback path
     });
 
@@ -247,7 +266,9 @@ test('get_slides is refused, without leaking captions, when the separate slides 
   const originalAction = AppLink.AppLinkServer.prototype.action;
   const originalStart = AppLink.AppLinkServer.prototype.start;
   const actions = new Map();
-  AppLink.AppLinkServer.prototype.action = function (name, def) { actions.set(name, def); };
+  AppLink.AppLinkServer.prototype.action = function (name, def) {
+    actions.set(name, def);
+  };
   AppLink.AppLinkServer.prototype.start = async function () {};
 
   const slidesConsent = {};
@@ -260,7 +281,9 @@ test('get_slides is refused, without leaking captions, when the separate slides 
       setCapturing: () => {},
       getSlides: () => slides,
       getSlidesConsent: (id) => slidesConsent[id],
-      setSlidesConsent: (id, decision) => { slidesConsent[id] = decision; },
+      setSlidesConsent: (id, decision) => {
+        slidesConsent[id] = decision;
+      },
       getWindow: () => null
     });
 
@@ -283,9 +306,16 @@ test('get_slides is refused, without leaking captions, when the separate slides 
 
 test('a publik API key is reported as a boolean only — the pk_ value never leaves the process', () => {
   const key = 'pk_live_' + 'a'.repeat(12) + '_' + 'b'.repeat(32);
-  const state = describeState(snapshot({
-    settings: { ...SETTINGS, provider: 'publik', apiKeys: { ...SETTINGS.apiKeys, publik: key }, publik: { keyId: 'a'.repeat(12), claimUrl: 'https://publikhq.com/claim/X' } }
-  }));
+  const state = describeState(
+    snapshot({
+      settings: {
+        ...SETTINGS,
+        provider: 'publik',
+        apiKeys: { ...SETTINGS.apiKeys, publik: key },
+        publik: { keyId: 'a'.repeat(12), claimUrl: 'https://publikhq.com/claim/X' }
+      }
+    })
+  );
   assert.equal(state.hasKey.publik, true);
   assert.equal(state.provider, 'publik');
   assert.doesNotMatch(JSON.stringify(state), /pk_/);

@@ -3,7 +3,6 @@
 // Separates raw capture (audio buffers, screen URL) from normalized context
 // (rolling transcript window, profile, memory) from LLM prompt construction.
 
-
 // Build the normalized context object. Pure, so it is unit-testable.
 // state = { transcript: [{channel, text, ts}], userText, settings, memory }
 function buildContext(state) {
@@ -26,9 +25,13 @@ function getRecent(turns, n) {
 
 // Compose the system prompt for a mode, weaving in profile/memory.
 function buildSystem(def, ctx) {
-  let system = typeof def.buildSystem === 'function' ? def.buildSystem('') : (def.system || '');
+  let system = typeof def.buildSystem === 'function' ? def.buildSystem('') : def.system || '';
   if (ctx.profile && ['assist', 'say', 'ask'].includes(def.key)) {
-    system = 'Here is my background and experience. Weave it into my answer naturally. Name the projects, the tech, the results. This keeps my answer real instead of generic.\n\n---\n' + ctx.profile + '\n---\n\n' + system;
+    system =
+      'Here is my background and experience. Weave it into my answer naturally. Name the projects, the tech, the results. This keeps my answer real instead of generic.\n\n---\n' +
+      ctx.profile +
+      '\n---\n\n' +
+      system;
   }
   return system;
 }

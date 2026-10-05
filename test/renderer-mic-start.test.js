@@ -16,6 +16,10 @@ test('capture:state handler starts the mic exactly once and startMic is re-entra
   const end = src.indexOf("onscreenly.on('", start + 10);
   const handler = src.slice(start, end > -1 ? end : undefined);
   assert.equal((handler.match(/\bstartMic\(\)/g) || []).length, 1, 'capture:state must call startMic() exactly once');
-  assert.match(src, /const gen = \+\+micGen;[\s\S]*?if \(gen !== micGen \|\| micStream\)/, 'startMic must drop a superseded getUserMedia result');
+  assert.match(
+    src,
+    /const gen = \+\+micGen;[\s\S]*?if \(gen !== micGen \|\| micStream\)/,
+    'startMic must drop a superseded getUserMedia result'
+  );
   assert.match(src, /function stopMic\(\) \{\s*micGen\+\+;/, 'stopMic must invalidate an in-flight startMic');
 });

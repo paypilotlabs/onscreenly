@@ -33,8 +33,13 @@ function fakeGenAI(script = 'ok') {
         const session = {
           sent: [],
           closed: false,
-          sendRealtimeInput(input) { if (this.closed) throw new Error('closed'); this.sent.push(input); },
-          close() { this.closed = true; },
+          sendRealtimeInput(input) {
+            if (this.closed) throw new Error('closed');
+            this.sent.push(input);
+          },
+          close() {
+            this.closed = true;
+          },
           // test hooks
           emit: (msg) => cb.onmessage(msg),
           serverClose: (evt) => cb.onclose(evt || { code: 1011, reason: 'session expired' })
@@ -119,7 +124,9 @@ test('a rejected session (reported by the SDK as a close, not a rejection) surfa
 });
 
 test('an unknown-model close is mapped to a 404 so the shared error wording applies', async () => {
-  const { stt, events } = make('closed:models/gemini-x is not found for API version v1beta, or is not supported for bidiGenerateContent.');
+  const { stt, events } = make(
+    'closed:models/gemini-x is not found for API version v1beta, or is not supported for bidiGenerateContent.'
+  );
   await stt.connect();
   assert.equal(events.errors[0].status, 404);
 });
@@ -176,12 +183,18 @@ test('createStreamingSTT uses Gemini Live only when Gemini is chosen explicitly'
   assert.ok(explicit.instance instanceof GeminiLiveSTT);
 
   // 'auto' with a Gemini-only key stays on the steadier batch path.
-  assert.deepEqual(createStreamingSTT({ sttProvider: 'auto', apiKeys: { gemini: 'g' } }, 'you', cb),
-    { type: 'batch', provider: 'gemini', instance: null });
+  assert.deepEqual(createStreamingSTT({ sttProvider: 'auto', apiKeys: { gemini: 'g' } }, 'you', cb), {
+    type: 'batch',
+    provider: 'gemini',
+    instance: null
+  });
 
   const deepgramFirst = createStreamingSTT({ sttProvider: 'auto', apiKeys: { gemini: 'g', deepgram: 'd' } }, 'you', cb);
   assert.equal(deepgramFirst.provider, 'deepgram');
 
-  assert.deepEqual(createStreamingSTT({ sttProvider: 'auto', apiKeys: {} }, 'you', cb),
-    { type: 'batch', provider: 'none', instance: null });
+  assert.deepEqual(createStreamingSTT({ sttProvider: 'auto', apiKeys: {} }, 'you', cb), {
+    type: 'batch',
+    provider: 'none',
+    instance: null
+  });
 });

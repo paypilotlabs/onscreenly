@@ -6,7 +6,8 @@ const path = require('path');
 const { createMeetingStore } = require('../src/meetings');
 const { createMeetingMemory } = require('../src/meeting-memory');
 
-const NOTES = 'Meeting Summary:\nAgreed to ship the Terraform pipeline Tuesday. Budget is $40k.\n\nKey Points:\n- Pipeline is green\n\nDecisions:\n- Ship Tuesday\n\nAction Items:\n- You: send the runbook\n\nFollow-Up:\n- Confirm budget with finance\n';
+const NOTES =
+  'Meeting Summary:\nAgreed to ship the Terraform pipeline Tuesday. Budget is $40k.\n\nKey Points:\n- Pipeline is green\n\nDecisions:\n- Ship Tuesday\n\nAction Items:\n- You: send the runbook\n\nFollow-Up:\n- Confirm budget with finance\n';
 
 function harness({ llmReady = true, llmText = NOTES, t0 = 1_000_000 } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-memory-'));
@@ -15,11 +16,29 @@ function harness({ llmReady = true, llmText = NOTES, t0 = 1_000_000 } = {}) {
   const llmCalls = [];
   const llmFactory = () => ({
     ready: llmReady,
-    async stream(params) { llmCalls.push(params); return llmText; }
+    async stream(params) {
+      llmCalls.push(params);
+      return llmText;
+    }
   });
   const logs = [];
-  const memory = createMeetingMemory({ store, llmFactory, now: () => clock, log: (m) => logs.push(m), minTurnsForNotes: 2 });
-  return { store, memory, llmCalls, logs, tick: (ms) => { clock += ms; }, file: store.file };
+  const memory = createMeetingMemory({
+    store,
+    llmFactory,
+    now: () => clock,
+    log: (m) => logs.push(m),
+    minTurnsForNotes: 2
+  });
+  return {
+    store,
+    memory,
+    llmCalls,
+    logs,
+    tick: (ms) => {
+      clock += ms;
+    },
+    file: store.file
+  };
 }
 const turn = (channel, text, ts) => ({ channel, text, ts });
 
@@ -31,7 +50,10 @@ test('the first turn opens a meeting and every turn is persisted', () => {
   assert.ok(memory.current);
   const onDisk = createMeetingStore({ file }).all();
   assert.equal(onDisk.length, 1);
-  assert.deepEqual(onDisk[0].transcript.map((t) => t.text), ['hello', 'hi']);
+  assert.deepEqual(
+    onDisk[0].transcript.map((t) => t.text),
+    ['hello', 'hi']
+  );
   assert.equal(onDisk[0].endedAt, null);
   assert.equal(store.all()[0].id, memory.current.id);
 });
@@ -100,9 +122,16 @@ test('resumeOpen picks up a recent interrupted meeting and restores its turns', 
   store.addTurn(m.id, turn('them', 'before the crash', 1_000_050));
   store.addTurn(m.id, turn('you', 'yes', 1_000_060));
   // fresh process, 5 minutes later
-  const later = createMeetingMemory({ store: createMeetingStore({ file }), llmFactory: () => null, now: () => 1_000_060 + 5 * 60 * 1000 });
+  const later = createMeetingMemory({
+    store: createMeetingStore({ file }),
+    llmFactory: () => null,
+    now: () => 1_000_060 + 5 * 60 * 1000
+  });
   const restored = later.resumeOpen();
-  assert.deepEqual(restored.map((t) => t.text), ['before the crash', 'yes']);
+  assert.deepEqual(
+    restored.map((t) => t.text),
+    ['before the crash', 'yes']
+  );
   assert.equal(later.current.id, m.id);
   later.onTurn(turn('them', 'continuing', 1_000_060 + 5 * 60 * 1000 + 1));
   assert.equal(createMeetingStore({ file }).get(m.id).transcript.length, 3);
@@ -113,7 +142,11 @@ test('resumeOpen closes a stale open meeting instead of resuming it', () => {
   const { store, file } = harness();
   const m = store.add();
   store.addTurn(m.id, turn('them', 'yesterday', 1_000_050));
-  const later = createMeetingMemory({ store: createMeetingStore({ file }), llmFactory: () => null, now: () => 1_000_050 + 2 * 60 * 60 * 1000 });
+  const later = createMeetingMemory({
+    store: createMeetingStore({ file }),
+    llmFactory: () => null,
+    now: () => 1_000_050 + 2 * 60 * 60 * 1000
+  });
   assert.deepEqual(later.resumeOpen(), []);
   assert.equal(later.current, null);
   assert.equal(createMeetingStore({ file }).get(m.id).endedAt, 1_000_050, 'closed at its last turn');
@@ -121,9 +154,17 @@ test('resumeOpen closes a stale open meeting instead of resuming it', () => {
 
 test('catchUp writes notes for ended meetings that have none', async () => {
   const { store, memory, llmCalls } = harness();
-  const a = store.add(); store.addTurn(a.id, turn('them', 'a', 1)); store.addTurn(a.id, turn('you', 'b', 2)); store.update(a.id, { endedAt: 3 });
-  const b = store.add(); store.addTurn(b.id, turn('them', 'short', 4)); store.update(b.id, { endedAt: 5 }); // too short
-  const c = store.add(); store.addTurn(c.id, turn('them', 'x', 6)); store.addTurn(c.id, turn('you', 'y', 7)); store.update(c.id, { endedAt: 8, summary: 'already done' });
+  const a = store.add();
+  store.addTurn(a.id, turn('them', 'a', 1));
+  store.addTurn(a.id, turn('you', 'b', 2));
+  store.update(a.id, { endedAt: 3 });
+  const b = store.add();
+  store.addTurn(b.id, turn('them', 'short', 4));
+  store.update(b.id, { endedAt: 5 }); // too short
+  const c = store.add();
+  store.addTurn(c.id, turn('them', 'x', 6));
+  store.addTurn(c.id, turn('you', 'y', 7));
+  store.update(c.id, { endedAt: 8, summary: 'already done' });
   assert.equal(await memory.catchUp(), 1);
   assert.equal(llmCalls.length, 1);
   assert.ok(store.get(a.id).summary);

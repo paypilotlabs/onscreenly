@@ -104,14 +104,17 @@ test('cancels an in-flight download while retaining resumable bytes', async (con
   const content = Buffer.from('cancel fixture');
   const model = createFixtureModel(content);
   let fetchStarted;
-  const started = new Promise((resolve) => { fetchStarted = resolve; });
+  const started = new Promise((resolve) => {
+    fetchStarted = resolve;
+  });
   const manager = new WhisperModelManager({
     userDataPath: createTestDirectory(context),
     models: [model],
-    fetchImpl: async (_url, options) => new Promise((_resolve, reject) => {
-      fetchStarted();
-      options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
-    })
+    fetchImpl: async (_url, options) =>
+      new Promise((_resolve, reject) => {
+        fetchStarted();
+        options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      })
   });
 
   const download = manager.download(model.id);
@@ -130,7 +133,9 @@ test('imports only a file matching the selected model integrity contract', async
   const manager = new WhisperModelManager({
     userDataPath,
     models: [model],
-    fetchImpl: async () => { throw new Error('not used'); }
+    fetchImpl: async () => {
+      throw new Error('not used');
+    }
   });
 
   await manager.importModel(model.id, sourcePath);
@@ -145,11 +150,10 @@ test('reports a missing selected model distinctly from a corrupt model', async (
   const manager = new WhisperModelManager({
     userDataPath: createTestDirectory(context),
     models: [model],
-    fetchImpl: async () => { throw new Error('not used'); }
+    fetchImpl: async () => {
+      throw new Error('not used');
+    }
   });
 
-  await assert.rejects(
-    manager.verifyInstalledModel(model.id),
-    (error) => error.code === 'ENOENT'
-  );
+  await assert.rejects(manager.verifyInstalledModel(model.id), (error) => error.code === 'ENOENT');
 });

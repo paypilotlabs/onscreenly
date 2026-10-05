@@ -13,7 +13,10 @@ const {
 function solidRGBA(w, h, r, g, b) {
   const buf = Buffer.alloc(w * h * 4, 0);
   for (let i = 0; i < w * h; i++) {
-    buf[i * 4] = r; buf[i * 4 + 1] = g; buf[i * 4 + 2] = b; buf[i * 4 + 3] = 255;
+    buf[i * 4] = r;
+    buf[i * 4 + 1] = g;
+    buf[i * 4 + 2] = b;
+    buf[i * 4 + 3] = 255;
   }
   return buf;
 }
@@ -88,7 +91,9 @@ test('clampSlidesConfig bounds untrusted settings', () => {
 });
 
 test('slide prompt builders stay text-only and bounded', () => {
-  assert.ok(buildSlideSystem().includes('Caption') || buildSlideSystem().includes('caption') || buildSlideSystem().length > 20);
+  assert.ok(
+    buildSlideSystem().includes('Caption') || buildSlideSystem().includes('caption') || buildSlideSystem().length > 20
+  );
   const u = buildSlideUser([{ channel: 'them', text: 'hello' }]);
   assert.ok(u.includes('Them: hello'));
 });

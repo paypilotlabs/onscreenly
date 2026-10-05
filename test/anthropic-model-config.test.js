@@ -28,8 +28,11 @@ test('CURRENT_ANTHROPIC_DEFAULT_FAST/_SMART are not known-retired Anthropic mode
 for (const relPath of FILES_THAT_CALL_ANTHROPIC) {
   test(`${relPath} does not hardcode a retired-looking Anthropic model id`, () => {
     const source = fs.readFileSync(path.join(__dirname, '..', relPath), 'utf8');
-    const literals = [...source.matchAll(/'(claude-[^']+)'/g)].map(m => m[1]);
-    assert.ok(literals.length > 0, `${relPath} has no 'claude-...' literals — did the pattern change? update this test`);
+    const literals = [...source.matchAll(/'(claude-[^']+)'/g)].map((m) => m[1]);
+    assert.ok(
+      literals.length > 0,
+      `${relPath} has no 'claude-...' literals — did the pattern change? update this test`
+    );
     for (const id of literals) {
       assert.ok(!DEAD_MODEL_RE.test(id), `${relPath} still references a retired-looking model ${id}`);
     }

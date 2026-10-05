@@ -13,18 +13,18 @@ class AdaptiveVAD {
     // Configurable thresholds
     this.sampleRate = options.sampleRate || 16000;
     this.frameDurationMs = options.frameDurationMs || 30; // 30ms frames
-    this.frameSize = Math.floor(this.sampleRate * this.frameDurationMs / 1000);
+    this.frameSize = Math.floor((this.sampleRate * this.frameDurationMs) / 1000);
 
     // Energy thresholds with hysteresis
-    this.onsetThreshold = options.onsetThreshold || 250;   // RMS to trigger speech start
-    this.offsetThreshold = options.offsetThreshold || 150;  // RMS to trigger speech end (lower = hysteresis)
-    this.silenceFrames = options.silenceFrames || 15;       // frames of silence before end (~450ms)
-    this.minSpeechFrames = options.minSpeechFrames || 4;   // minimum frames to count as speech (~120ms)
+    this.onsetThreshold = options.onsetThreshold || 250; // RMS to trigger speech start
+    this.offsetThreshold = options.offsetThreshold || 150; // RMS to trigger speech end (lower = hysteresis)
+    this.silenceFrames = options.silenceFrames || 15; // frames of silence before end (~450ms)
+    this.minSpeechFrames = options.minSpeechFrames || 4; // minimum frames to count as speech (~120ms)
 
     // Adaptive noise floor
     this.noiseFloor = 80;
-    this.noiseAdaptRate = 0.02;    // how fast noise floor adapts
-    this.noiseMaxAdapt = 400;      // don't adapt above this
+    this.noiseAdaptRate = 0.02; // how fast noise floor adapts
+    this.noiseMaxAdapt = 400; // don't adapt above this
 
     // State machine
     this.state = 'silence'; // 'silence' | 'speech' | 'trailing'
@@ -141,7 +141,7 @@ class AdaptiveVAD {
 // Ring buffer for keeping pre-speech audio (so we don't lose the first word)
 class AudioRingBuffer {
   constructor(durationMs, sampleRate = 16000) {
-    this.capacity = Math.floor(sampleRate * 2 * durationMs / 1000); // bytes
+    this.capacity = Math.floor((sampleRate * 2 * durationMs) / 1000); // bytes
     this.buffer = Buffer.alloc(this.capacity);
     this.writePos = 0;
     this.filled = false;
@@ -169,10 +169,7 @@ class AudioRingBuffer {
   // Get all buffered audio in order
   read() {
     if (!this.filled) return this.buffer.slice(0, this.writePos);
-    return Buffer.concat([
-      this.buffer.slice(this.writePos),
-      this.buffer.slice(0, this.writePos)
-    ]);
+    return Buffer.concat([this.buffer.slice(this.writePos), this.buffer.slice(0, this.writePos)]);
   }
 
   clear() {

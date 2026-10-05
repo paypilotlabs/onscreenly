@@ -98,9 +98,15 @@ function createSlideStore(opts = {}) {
   const max = opts.maxSlides || DEFAULT_MAX_SLIDES;
   let slides = [];
   return {
-    list() { return slides.slice(); },
-    count() { return slides.length; },
-    clear() { slides = []; },
+    list() {
+      return slides.slice();
+    },
+    count() {
+      return slides.length;
+    },
+    clear() {
+      slides = [];
+    },
     add({ hash, caption, txStart, txEnd }) {
       const slide = {
         id: crypto.randomBytes(8).toString('hex'),
@@ -131,17 +137,16 @@ function clampSlidesConfig(input = {}) {
 }
 
 function buildSlideSystem() {
-  return 'You are onscreenly, captioning a meeting slide. Describe the slide concisely: ' +
+  return (
+    'You are onscreenly, captioning a meeting slide. Describe the slide concisely: ' +
     'title on the first line, then 3-5 bullets for key points, visuals/charts, and any visible slide number. ' +
-    'Plain text only, no preamble.';
+    'Plain text only, no preamble.'
+  );
 }
 
 function buildSlideUser(transcriptSlice) {
-  const lines = (transcriptSlice || [])
-    .map((t) => (t.channel === 'them' ? 'Them: ' : 'You: ') + t.text)
-    .join('\n');
-  return 'Caption the slide in the screenshot.' +
-    (lines ? '\n\nSpoken context:\n' + lines.slice(0, 1200) : '');
+  const lines = (transcriptSlice || []).map((t) => (t.channel === 'them' ? 'Them: ' : 'You: ') + t.text).join('\n');
+  return 'Caption the slide in the screenshot.' + (lines ? '\n\nSpoken context:\n' + lines.slice(0, 1200) : '');
 }
 
 module.exports = {

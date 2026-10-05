@@ -36,13 +36,15 @@ const BYO = 'or use your own key in Settings.';
 // starter amount is rendered from the server's response, never hardcoded.
 const COPY = {
   label: PROVIDER_LABEL,
-  cost: 'Every request is priced per use at 50% of the model\'s published list price. Most people spend under $2 a month.',
-  dataPath: 'Your prompts and screenshots go through publik\'s servers to a shared model account. publik never trains on them and does not store them. You can switch to your own key at any time.',
+  cost: "Every request is priced per use at 50% of the model's published list price. Most people spend under $2 a month.",
+  dataPath:
+    "Your prompts and screenshots go through publik's servers to a shared model account. publik never trains on them and does not store them. You can switch to your own key at any time.",
   disclosure: {
     title: 'Onscreenly uses publik API',
     intro: 'Onscreenly needs an AI model to work. By default it runs on publik API, so you need no key of your own.',
-    cost: 'Every request is priced per use at 50% of the model\'s published list price, from your publik balance. A new computer starts at $0.00. Linking this computer to your publik account gives $0.05 of free use, once. Most people spend under $2 a month. You can see every charge in the app and at publikhq.com.',
-    dataPath: 'Your prompts and screenshots go through publik\'s servers to a shared model account. publik never trains on them and does not store them. You can switch to your own key at any time in Settings.',
+    cost: "Every request is priced per use at 50% of the model's published list price, from your publik balance. A new computer starts at $0.00. Linking this computer to your publik account gives $0.05 of free use, once. Most people spend under $2 a month. You can see every charge in the app and at publikhq.com.",
+    dataPath:
+      "Your prompts and screenshots go through publik's servers to a shared model account. publik never trains on them and does not store them. You can switch to your own key at any time in Settings.",
     accept: 'Continue with publik API',
     decline: 'Use my own key instead',
     terms: 'By continuing you agree to the publik API terms.'
@@ -51,22 +53,27 @@ const COPY = {
   // from publik's lib/publik-api/why-it-costs.ts. Same sentence under the
   // first-run card, behind the settings toggle and nowhere else — never a
   // new pricing claim.
-  whyItCosts: 'A provider charges for every request the app makes; publik pays that bill and passes it on at half the provider\'s list price. Nothing is charged behind your back — usage only draws from a plan or pack you choose to buy.',
+  whyItCosts:
+    "A provider charges for every request the app makes; publik pays that bill and passes it on at half the provider's list price. Nothing is charged behind your back — usage only draws from a plan or pack you choose to buy.",
   whyItCostsToggle: 'Why it costs money',
   cta: {
     cardTitle: 'publik API is set up',
-    starterSuffix: 'of free starter usage',      // "$0.05 of free starter usage" — the amount comes from a linked-account mint response (an unlinked install's starter is $0.00)
-    link: 'Link this computer & pick a plan',     // anonymous → claim_url
-    pickPlan: 'Pick a plan',                      // claimed, no plan → dashboard
-    managePlan: 'Manage plan',                    // claimed with a plan → dashboard
-    addPlanOrPack: 'Add a plan or pack',          // claimed → add_credit_url (§12.2)
+    starterSuffix: 'of free starter usage', // "$0.05 of free starter usage" — the amount comes from a linked-account mint response (an unlinked install's starter is $0.00)
+    link: 'Link this computer & pick a plan', // anonymous → claim_url
+    pickPlan: 'Pick a plan', // claimed, no plan → dashboard
+    managePlan: 'Manage plan', // claimed with a plan → dashboard
+    addPlanOrPack: 'Add a plan or pack', // claimed → add_credit_url (§12.2)
     later: 'Later'
   }
 };
 
 function loadBuildConfig(file = path.join(__dirname, 'publik-build.json')) {
   let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* dev checkout without the file */ }
+  try {
+    cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    /* dev checkout without the file */
+  }
   // PUBLIK_APP_TOKEN in the environment wins so `npm start` can test against staging.
   const appToken = String(process.env.PUBLIK_APP_TOKEN || cfg.appToken || '').trim();
   return {
@@ -80,9 +87,15 @@ function loadBuildConfig(file = path.join(__dirname, 'publik-build.json')) {
 
 /** Only publikhq.com links may be opened from gateway-supplied URLs. */
 function isSafePublikLink(url) {
-  try { return typeof url === 'string' && new URL(url).origin === ALLOWED_LINK_ORIGIN; } catch { return false; }
+  try {
+    return typeof url === 'string' && new URL(url).origin === ALLOWED_LINK_ORIGIN;
+  } catch {
+    return false;
+  }
 }
-function safeLink(url) { return isSafePublikLink(url) ? url : null; }
+function safeLink(url) {
+  return isSafePublikLink(url) ? url : null;
+}
 
 function formatMicros(micros) {
   const n = Number(micros);
@@ -117,7 +130,9 @@ async function timedFetch(fetchImpl, url, init, timeoutMs) {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetchImpl(url, { ...init, signal: controller.signal });
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function gatewayError(res, body) {
@@ -126,7 +141,8 @@ function gatewayError(res, body) {
   e.status = res.status;
   e.type = err.type || '';
   e.reprovision = err.reprovision === true;
-  e.retryAfter = Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('retry-after') : 0) || null;
+  e.retryAfter =
+    Number(res.headers && typeof res.headers.get === 'function' ? res.headers.get('retry-after') : 0) || null;
   return e;
 }
 
@@ -152,11 +168,16 @@ async function provision({ build, installId, appVersion, platform, osVersion, ar
     dialects: ['chat_completions']
   };
   if (deviceName) body.device_name = String(deviceName).slice(0, 120);
-  const res = await timedFetch(fetchImpl, `${build.baseUrl.replace(/\/+$/, '')}/installs`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${build.appToken}` },
-    body: JSON.stringify(body)
-  }, PROVISION_TIMEOUT_MS);
+  const res = await timedFetch(
+    fetchImpl,
+    `${build.baseUrl.replace(/\/+$/, '')}/installs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${build.appToken}` },
+      body: JSON.stringify(body)
+    },
+    PROVISION_TIMEOUT_MS
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw gatewayError(res, data);
 
@@ -170,7 +191,12 @@ async function provision({ build, installId, appVersion, platform, osVersion, ar
     claimCode: typeof data.claim_code === 'string' ? data.claim_code : '',
     claimState,
     starterMicros: micros(data.starter_micros) || 0,
-    balanceMicros: firstMicros(data.balance_micros, data.starting_credit_micros, data.starter_micros, wallet && wallet.balanceMicros),
+    balanceMicros: firstMicros(
+      data.balance_micros,
+      data.starting_credit_micros,
+      data.starter_micros,
+      wallet && wallet.balanceMicros
+    ),
     wallet
   };
   if (data.key === null || data.key === undefined) {
@@ -183,7 +209,10 @@ async function provision({ build, installId, appVersion, platform, osVersion, ar
 }
 
 function firstMicros(...values) {
-  for (const v of values) { const m = micros(v); if (m !== null) return m; }
+  for (const v of values) {
+    const m = micros(v);
+    if (m !== null) return m;
+  }
   return 0;
 }
 
@@ -192,7 +221,9 @@ function normalizeBase(url) {
     const u = new URL(String(url || ''));
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
     return u.toString().replace(/\/+$/, '');
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 
 // The response carries { fast, balanced, smart }; Onscreenly has two tiers.
@@ -234,9 +265,14 @@ function normalizeWallet(b) {
 }
 
 async function fetchWallet({ baseUrl, apiKey, fetchImpl = fetch }) {
-  const res = await timedFetch(fetchImpl, `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/wallet`, {
-    headers: { Authorization: `Bearer ${apiKey}` }
-  }, WALLET_TIMEOUT_MS);
+  const res = await timedFetch(
+    fetchImpl,
+    `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/wallet`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` }
+    },
+    WALLET_TIMEOUT_MS
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw gatewayError(res, data);
   return normalizeWallet(data);
@@ -244,9 +280,15 @@ async function fetchWallet({ baseUrl, apiKey, fetchImpl = fetch }) {
 
 /** POST /installs/revoke with the install's own key (R21 §2.6). 204, idempotent. */
 async function revokeInstall({ baseUrl, apiKey, fetchImpl = fetch }) {
-  const res = await timedFetch(fetchImpl, `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/installs/revoke`, {
-    method: 'POST', headers: { Authorization: `Bearer ${apiKey}` }
-  }, WALLET_TIMEOUT_MS);
+  const res = await timedFetch(
+    fetchImpl,
+    `${String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')}/installs/revoke`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` }
+    },
+    WALLET_TIMEOUT_MS
+  );
   if (!res.ok && res.status !== 401) throw gatewayError(res, await res.json().catch(() => ({})));
   return true;
 }
@@ -273,7 +315,7 @@ function readGatewayHeaders(headers) {
     weekUsedMicros: micros(get('x-publik-week-used')),
     weekBudgetMicros: budget && budget !== 'none' ? micros(budget) : null,
     weekResetsAt: get('x-publik-week-resets-at'),
-    claimState: get('x-publik-claim-state') === 'claimed' ? 'claimed' : (get('x-publik-claim-state') ? 'anonymous' : ''),
+    claimState: get('x-publik-claim-state') === 'claimed' ? 'claimed' : get('x-publik-claim-state') ? 'anonymous' : '',
     starterRemainingMicros: get('x-publik-starter-remaining') ? micros(get('x-publik-starter-remaining')) : null,
     reservedMicros: micros(get('x-publik-reserved-micros')),
     chargeMicros: micros(get('x-publik-charge-micros'))
@@ -318,7 +360,11 @@ function describeGatewayError({ status, body, model, retryAfter } = {}) {
       ? `${PROVIDER_LABEL} balance is used up (${formatMicros(err.available_micros || 0)} left). Add a plan or a pack at the link below, ${BYO}`
       : `${PROVIDER_LABEL}: your balance is too low for this request. Link this computer to your publik account at the link below for $0.05 of free use, pick a plan there, ${BYO}`;
     const message = typeof err.message === 'string' && err.message.trim() ? err.message.trim() : fallback;
-    return { message, action: link(claimed ? 'Add a plan or pack' : 'Link this computer & pick a plan', topUp), fromResponse: message !== fallback };
+    return {
+      message,
+      action: link(claimed ? 'Add a plan or pack' : 'Link this computer & pick a plan', topUp),
+      fromResponse: message !== fallback
+    };
   }
   if (status === 401) {
     if (type === 'key_revoked' && err.reprovision === true) {
@@ -352,7 +398,10 @@ function describeGatewayError({ status, body, model, retryAfter } = {}) {
         action: link('Add credit', err.add_credit_url)
       };
     }
-    return { message: `${PROVIDER_LABEL} is busy right now. Wait ${wait || 'a moment'} and try again, ${BYO}`, action: null };
+    return {
+      message: `${PROVIDER_LABEL} is busy right now. Wait ${wait || 'a moment'} and try again, ${BYO}`,
+      action: null
+    };
   }
   if ((status === 400 && type === 'unknown_model') || status === 404) {
     return {
@@ -361,7 +410,10 @@ function describeGatewayError({ status, body, model, retryAfter } = {}) {
     };
   }
   if (status === 413) {
-    return { message: `That request was too large for ${PROVIDER_LABEL}. Try again with less on screen, ${BYO}`, action: null };
+    return {
+      message: `That request was too large for ${PROVIDER_LABEL}. Try again with less on screen, ${BYO}`,
+      action: null
+    };
   }
   if (status === 503 || status === 502 || status === 504 || !status) {
     return {
@@ -381,10 +433,14 @@ function describeGatewayError({ status, body, model, retryAfter } = {}) {
 function balanceLine(p, now = Date.now()) {
   if (!p || !p.connected) return '';
   const w = p.wallet || {};
-  const left = formatMicros(p.balanceMicros === null || p.balanceMicros === undefined ? w.balanceMicros : p.balanceMicros);
+  const left = formatMicros(
+    p.balanceMicros === null || p.balanceMicros === undefined ? w.balanceMicros : p.balanceMicros
+  );
   if (!left) return 'Ready';
   if ((w.claimState || p.claimState) !== 'claimed') {
-    return p.starterMicros > 0 ? `Ready · ${left} left of ${formatMicros(p.starterMicros)} free starter usage` : `Ready · ${left} left`;
+    return p.starterMicros > 0
+      ? `Ready · ${left} left of ${formatMicros(p.starterMicros)} free starter usage`
+      : `Ready · ${left} left`;
   }
   const parts = ['Linked to your publik account', `${left} left`];
   if (w.weekBudgetMicros) {
@@ -444,7 +500,7 @@ function ctaView(p) {
 function settingsCta(p) {
   if (!p || !p.connected || p.revoked) return null;
   const w = p.wallet || {};
-  const claimed = ((w.claimState || p.claimState) || 'anonymous') === 'claimed';
+  const claimed = (w.claimState || p.claimState || 'anonymous') === 'claimed';
   if (!claimed) {
     const url = safeLink(p.claimUrl);
     return url ? { label: COPY.cta.link, url } : null;
@@ -462,12 +518,15 @@ const LOW_STARTER_FRACTION = 0.2;
 function lowStarterNotice(p) {
   if (!p || !p.connected || p.revoked) return null;
   const w = p.wallet || {};
-  if (((w.claimState || p.claimState) || 'anonymous') === 'claimed') return null;
+  if ((w.claimState || p.claimState || 'anonymous') === 'claimed') return null;
   const starter = Number(p.starterMicros) || 0;
   if (starter <= 0) return null;
-  const remaining = w.starterRemainingMicros !== null && w.starterRemainingMicros !== undefined
-    ? Number(w.starterRemainingMicros)
-    : (p.balanceMicros !== null && p.balanceMicros !== undefined ? Number(p.balanceMicros) : null);
+  const remaining =
+    w.starterRemainingMicros !== null && w.starterRemainingMicros !== undefined
+      ? Number(w.starterRemainingMicros)
+      : p.balanceMicros !== null && p.balanceMicros !== undefined
+        ? Number(p.balanceMicros)
+        : null;
   if (remaining === null || !Number.isFinite(remaining) || remaining >= starter * LOW_STARTER_FRACTION) return null;
   const url = safeLink(p.topUpUrl) || safeLink(w.topUpUrl) || safeLink(p.claimUrl);
   return {
@@ -516,20 +575,40 @@ async function provisionInstall({ build, store, device = {}, fetchImpl = fetch, 
       r = await provision({ build, installId, fetchImpl, ...device });
     } catch (e) {
       store.setPublik({ installId, lastError: e.message });
-      log({ level: 'error', event: 'publik_provision_failed', msg: e.message, context: { status: e.status || null, type: e.type || '' } });
+      log({
+        level: 'error',
+        event: 'publik_provision_failed',
+        msg: e.message,
+        context: { status: e.status || null, type: e.type || '' }
+      });
       return { ok: false, error: e };
     }
     if (r.replay) {
-      if (!s.apiKeys.publik && !mintedFresh) { installId = randomUUID(); mintedFresh = true; continue; }
+      if (!s.apiKeys.publik && !mintedFresh) {
+        installId = randomUUID();
+        mintedFresh = true;
+        continue;
+      }
       const e = new Error(`${PROVIDER_LABEL} could not set up this computer. Reconnect to try again, ${BYO}`);
       store.setPublik({ installId, lastError: e.message });
       log({ level: 'error', event: 'publik_provision_replayed', msg: 'replay without a key', context: {} });
       return { ok: false, error: e };
     }
     store.setPublik({
-      apiKey: r.key, installId, keyId: r.keyId, baseUrl: r.baseUrl, claimUrl: r.claimUrl || '', claimCode: r.claimCode,
-      claimState: r.claimState, starterMicros: r.starterMicros, balanceMicros: r.balanceMicros, balanceAt: Date.now(),
-      wallet: r.wallet, revoked: false, disconnected: false, lastError: '',
+      apiKey: r.key,
+      installId,
+      keyId: r.keyId,
+      baseUrl: r.baseUrl,
+      claimUrl: r.claimUrl || '',
+      claimCode: r.claimCode,
+      claimState: r.claimState,
+      starterMicros: r.starterMicros,
+      balanceMicros: r.balanceMicros,
+      balanceAt: Date.now(),
+      wallet: r.wallet,
+      revoked: false,
+      disconnected: false,
+      lastError: '',
       // A new starter grant must be shown on the card before it is spent (§12.4).
       ...(r.starterMicros > 0 ? { cardShown: false } : {})
     });
@@ -540,9 +619,34 @@ async function provisionInstall({ build, store, device = {}, fetchImpl = fetch, 
 }
 
 module.exports = {
-  PUBLIK_PROVIDER, PROVIDER_LABEL, DEFAULT_BASE_URL, DEFAULT_MODELS, TIER_NAMES, LINKS, COPY, KEY_RE,
-  loadBuildConfig, provision, provisionInstall, fetchWallet, revokeInstall, normalizeWallet, readGatewayHeaders,
-  describeGatewayError, balanceLine, isSafePublikLink, formatMicros, formatResetTime, osName, pickModels,
-  starterLine, ctaView, settingsCta, lowStarterNotice, resolveOpenTarget, markCardSeen, LOW_STARTER_FRACTION,
+  PUBLIK_PROVIDER,
+  PROVIDER_LABEL,
+  DEFAULT_BASE_URL,
+  DEFAULT_MODELS,
+  TIER_NAMES,
+  LINKS,
+  COPY,
+  KEY_RE,
+  loadBuildConfig,
+  provision,
+  provisionInstall,
+  fetchWallet,
+  revokeInstall,
+  normalizeWallet,
+  readGatewayHeaders,
+  describeGatewayError,
+  balanceLine,
+  isSafePublikLink,
+  formatMicros,
+  formatResetTime,
+  osName,
+  pickModels,
+  starterLine,
+  ctaView,
+  settingsCta,
+  lowStarterNotice,
+  resolveOpenTarget,
+  markCardSeen,
+  LOW_STARTER_FRACTION,
   newInstallId: randomUUID
 };

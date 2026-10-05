@@ -7,7 +7,7 @@ const { APP_ID, PRODUCT_NAME } = require('../src/app-identity');
 const builder = require('../electron-builder.cjs');
 const pkg = require('../package.json');
 const lock = require('../package-lock.json');
-const read = name => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
+const read = (name) => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
 
 test('package, lock, installers and local app-link use a consistent Onscreenly identity', () => {
   assert.equal(pkg.name, 'onscreenly');
@@ -22,7 +22,10 @@ test('package, lock, installers and local app-link use a consistent Onscreenly i
   assert.match(read('src/applink.js'), /appSlug: 'onscreenly'/);
   assert.equal(pkg.license, 'GPL-3.0-or-later');
   assert.equal(pkg.author, 'Lohith Kumar <lkneerukonda@gmail.com>');
-  assert.ok(pkg.contributors.some(c => c.includes('Cue contributors')), 'retain upstream attribution');
+  assert.ok(
+    pkg.contributors.some((c) => c.includes('Cue contributors')),
+    'retain upstream attribution'
+  );
   assert.match(read('NOTICE'), /Cue \(https:\/\/github\.com\/Blueturboguy07\/cue\)/);
 });
 
@@ -31,13 +34,24 @@ test('both preload names retain the same IPC API and event allowlist', async () 
   const calls = [];
   const listeners = [];
   const ipcRenderer = {
-    invoke: async (...args) => { calls.push(args); return true; },
+    invoke: async (...args) => {
+      calls.push(args);
+      return true;
+    },
     send: (...args) => calls.push(args),
-    on: (name, callback) => listeners.push([name, callback]),
+    on: (name, callback) => listeners.push([name, callback])
   };
   vm.runInNewContext(read('preload.js'), {
-    require: () => ({ contextBridge: { exposeInMainWorld: (name, api) => { exposed[name] = api; } }, ipcRenderer }),
-    process: { platform: 'darwin' }, console,
+    require: () => ({
+      contextBridge: {
+        exposeInMainWorld: (name, api) => {
+          exposed[name] = api;
+        }
+      },
+      ipcRenderer
+    }),
+    process: { platform: 'darwin' },
+    console
   });
   assert.equal(exposed.onscreenly, exposed.cue);
   await exposed.onscreenly.captureToggle();
@@ -46,7 +60,9 @@ test('both preload names retain the same IPC API and event allowlist', async () 
   exposed.onscreenly.on('arbitrary-channel', () => {});
   assert.equal(listeners.length, 0);
   let received;
-  exposed.onscreenly.on('capture:state', data => { received = data; });
+  exposed.onscreenly.on('capture:state', (data) => {
+    received = data;
+  });
   listeners[0][1]({}, { active: true });
   assert.deepEqual(received, { active: true });
 });
@@ -54,12 +70,13 @@ test('both preload names retain the same IPC API and event allowlist', async () 
 test('the renamed AudioWorklet is registered under the name used by both audio channels', () => {
   const names = [];
   vm.runInNewContext(read('renderer/audio-worklet-processor.js'), {
-    AudioWorkletProcessor: class {}, registerProcessor: name => names.push(name),
+    AudioWorkletProcessor: class {},
+    registerProcessor: (name) => names.push(name)
   });
   assert.deepEqual(names, ['onscreenly-audio-processor']);
   const consumers = [...read('renderer/renderer.js').matchAll(/new AudioWorkletNode\([^,]+, '([^']+)'\)/g)];
   assert.equal(consumers.length, 2);
-  assert.ok(consumers.every(match => names.includes(match[1])));
+  assert.ok(consumers.every((match) => names.includes(match[1])));
 });
 
 test('visible entry points and retired setup scripts do not impersonate another product', () => {

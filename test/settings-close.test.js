@@ -30,10 +30,7 @@ test('closeSettings awaits saveSettings before hiding the modal', () => {
 });
 
 test('Done, scrim-click, and Escape all go through closeSettings', () => {
-  assert.match(source, /\$\('#s-close'\)\.addEventListener\('click',\s*\(\) => \{ void closeSettings\(\); \}\)/);
+  assert.match(source, /\$\('#s-close'\)\.addEventListener\('click',\s*\(\) => \{\s*void closeSettings\(\);\s*\}\)/);
   assert.match(source, /if \(e\.target === scrim\) void closeSettings\(\)/);
-  assert.match(
-    source,
-    /if \(e\.key === 'Escape' && !scrim\.classList\.contains\('hidden'\)\) void closeSettings\(\)/
-  );
+  assert.match(source, /if \(e\.key === 'Escape' && !scrim\.classList\.contains\('hidden'\)\) void closeSettings\(\)/);
 });

@@ -10,12 +10,12 @@ function pcmToWav(pcm, sampleRate = 16000, channels = 1) {
   buf.write('WAVE', 8);
   buf.write('fmt ', 12);
   buf.writeUInt32LE(16, 16);
-  buf.writeUInt16LE(1, 20);          // PCM
+  buf.writeUInt16LE(1, 20); // PCM
   buf.writeUInt16LE(channels, 22);
   buf.writeUInt32LE(sampleRate, 24);
   buf.writeUInt32LE(byteRate, 28);
   buf.writeUInt16LE(blockAlign, 32);
-  buf.writeUInt16LE(16, 34);         // bits per sample
+  buf.writeUInt16LE(16, 34); // bits per sample
   buf.write('data', 36);
   buf.writeUInt32LE(dataSize, 40);
   pcm.copy(buf, 44);
@@ -27,7 +27,10 @@ function rms16(pcm) {
   if (pcm.length < 2) return 0;
   let sum = 0;
   const n = pcm.length / 2;
-  for (let i = 0; i < pcm.length; i += 2) { const s = pcm.readInt16LE(i); sum += s * s; }
+  for (let i = 0; i < pcm.length; i += 2) {
+    const s = pcm.readInt16LE(i);
+    sum += s * s;
+  }
   return Math.sqrt(sum / n);
 }
 

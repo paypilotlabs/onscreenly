@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-process.on('uncaughtException', error => {
+process.on('uncaughtException', (error) => {
   console.error(error);
   app.exit(1);
 });
@@ -32,7 +32,9 @@ const timeout = setTimeout(() => {
   app.exit(1);
 }, 15000);
 
-ipcMain.on('app:quit', () => { receivedQuit = true; });
+ipcMain.on('app:quit', () => {
+  receivedQuit = true;
+});
 app.on('quit', (_event, exitCode) => {
   clearTimeout(timeout);
   if (clickedQuit && receivedQuit && exitCode === 0) {
@@ -78,7 +80,7 @@ app.on('browser-window-created', (_event, win) => {
       }
 
       await click('#ob-skip');
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       clickedQuit = true;
       await click('#quit-btn');
     } catch (error) {

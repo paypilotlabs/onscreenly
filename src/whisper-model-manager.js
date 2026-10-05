@@ -35,19 +35,21 @@ class WhisperModelManager {
 
   async listModels() {
     await fs.promises.mkdir(this.modelDirectory, { recursive: true });
-    return Promise.all(this.models.map(async (model) => {
-      const [installedBytes, partialBytes] = await Promise.all([
-        this._getFileSize(this.getModelPath(model.id)),
-        this._getFileSize(this.getPartialPath(model.id))
-      ]);
-      return {
-        ...model,
-        installed: installedBytes === model.bytes,
-        installedBytes,
-        partialBytes,
-        downloading: this.activeDownload?.modelId === model.id
-      };
-    }));
+    return Promise.all(
+      this.models.map(async (model) => {
+        const [installedBytes, partialBytes] = await Promise.all([
+          this._getFileSize(this.getModelPath(model.id)),
+          this._getFileSize(this.getPartialPath(model.id))
+        ]);
+        return {
+          ...model,
+          installed: installedBytes === model.bytes,
+          installedBytes,
+          partialBytes,
+          downloading: this.activeDownload?.modelId === model.id
+        };
+      })
+    );
   }
 
   /**

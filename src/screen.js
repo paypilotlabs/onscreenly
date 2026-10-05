@@ -40,7 +40,10 @@ function encodeScreenshot(img, { maxLongEdge = MAX_LONG_EDGE_PX, quality = JPEG_
  */
 function captureMacNative() {
   return new Promise((resolve) => {
-    const tmpPath = path.join(os.tmpdir(), `onscreenly_capture_${Date.now()}_${Math.random().toString(36).slice(2)}.png`);
+    const tmpPath = path.join(
+      os.tmpdir(),
+      `onscreenly_capture_${Date.now()}_${Math.random().toString(36).slice(2)}.png`
+    );
     execFile('/usr/sbin/screencapture', ['-x', '-t', 'png', tmpPath], (err) => {
       if (err) return resolve(null);
       try {
@@ -79,4 +82,11 @@ async function captureScreenshot() {
   return encodeScreenshot(img); // data:image/jpeg;base64,...
 }
 
-module.exports = { captureScreenshot, encodeScreenshot, captureMacNative, MAX_LONG_EDGE_PX, JPEG_QUALITY, MAX_DATA_URL_BYTES };
+module.exports = {
+  captureScreenshot,
+  encodeScreenshot,
+  captureMacNative,
+  MAX_LONG_EDGE_PX,
+  JPEG_QUALITY,
+  MAX_DATA_URL_BYTES
+};

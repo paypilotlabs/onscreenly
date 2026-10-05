@@ -123,7 +123,7 @@ class UtteranceSegmenter {
   }
 
   _millisecondsToBytes(durationMs) {
-    return Math.floor(this.sampleRate * PCM_BYTES_PER_SAMPLE * durationMs / 1000);
+    return Math.floor((this.sampleRate * PCM_BYTES_PER_SAMPLE * durationMs) / 1000);
   }
 }
 

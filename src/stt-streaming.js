@@ -45,7 +45,7 @@ class OpenAIRealtimeSTT {
 
       const ws = new WebSocket(url, {
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`
+          Authorization: `Bearer ${this.apiKey}`
         }
       });
       this.ws = ws;
@@ -101,7 +101,6 @@ class OpenAIRealtimeSTT {
         if (this.ws !== ws || this._closedByUs) return;
         this.onError({ provider: 'openai-realtime', message: err.message, status: null });
       });
-
     } catch (e) {
       this.onError({ provider: 'openai-realtime', message: e.message, status: null });
     }
@@ -166,14 +165,14 @@ class OpenAIRealtimeSTT {
   _resample16to24(pcm16kHz) {
     // Linear interpolation from 16000 Hz to 24000 Hz (ratio 2:3)
     const srcSamples = pcm16kHz.length / 2;
-    const dstSamples = Math.floor(srcSamples * 24000 / 16000);
+    const dstSamples = Math.floor((srcSamples * 24000) / 16000);
     const out = Buffer.alloc(dstSamples * 2);
     for (let i = 0; i < dstSamples; i++) {
-      const srcPos = i * 16000 / 24000;
+      const srcPos = (i * 16000) / 24000;
       const idx = Math.floor(srcPos);
       const frac = srcPos - idx;
       const s0 = idx < srcSamples ? pcm16kHz.readInt16LE(idx * 2) : 0;
-      const s1 = (idx + 1) < srcSamples ? pcm16kHz.readInt16LE((idx + 1) * 2) : s0;
+      const s1 = idx + 1 < srcSamples ? pcm16kHz.readInt16LE((idx + 1) * 2) : s0;
       const sample = Math.round(s0 + (s1 - s0) * frac);
       out.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), i * 2);
     }
@@ -193,7 +192,8 @@ class OpenAIRealtimeSTT {
   }
 
   _sendEvent(event) {
-    if (this.ws && this.ws.readyState === 1) { // WebSocket.OPEN
+    if (this.ws && this.ws.readyState === 1) {
+      // WebSocket.OPEN
       this.ws.send(JSON.stringify(event));
     }
   }
@@ -206,23 +206,33 @@ class OpenAIRealtimeSTT {
     this.reconnecting = true;
     this._reconnectAttempts++;
     const delay = this._reconnectDelay * Math.pow(2, this._reconnectAttempts - 1);
-    this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = null;
-      this.reconnecting = false;
-      if (!this._closedByUs) this.connect();
-    }, Math.min(delay, 16000));
+    this._reconnectTimer = setTimeout(
+      () => {
+        this._reconnectTimer = null;
+        this.reconnecting = false;
+        if (!this._closedByUs) this.connect();
+      },
+      Math.min(delay, 16000)
+    );
   }
 
   disconnect() {
     this._closedByUs = true;
-    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     this.reconnecting = false;
     this._sessionReady = false;
     this._pendingAudio = [];
     if (this.ws) {
       const ws = this.ws;
       this.ws = null; // detach first so the resulting close/error events are ignored
-      try { ws.close(1000); } catch (e) { /* ignore */ }
+      try {
+        ws.close(1000);
+      } catch (e) {
+        /* ignore */
+      }
     }
     this.connected = false;
   }
@@ -275,7 +285,7 @@ class DeepgramStreamingSTT {
       const url = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 
       const ws = new WebSocket(url, {
-        headers: { 'Authorization': `Token ${this.apiKey}` }
+        headers: { Authorization: `Token ${this.apiKey}` }
       });
       this.ws = ws;
 
@@ -298,7 +308,9 @@ class DeepgramStreamingSTT {
         try {
           const msg = JSON.parse(data.toString());
           this._handleMessage(msg);
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+          /* ignore */
+        }
       });
 
       ws.on('close', (code) => {
@@ -316,7 +328,6 @@ class DeepgramStreamingSTT {
         if (this.ws !== ws || this._closedByUs) return;
         this.onError({ provider: 'deepgram', message: err.message, status: null });
       });
-
     } catch (e) {
       this.onError({ provider: 'deepgram', message: e.message, status: null });
     }
@@ -368,7 +379,10 @@ class DeepgramStreamingSTT {
   }
 
   _clearKeepAlive() {
-    if (this._keepAliveInterval) { clearInterval(this._keepAliveInterval); this._keepAliveInterval = null; }
+    if (this._keepAliveInterval) {
+      clearInterval(this._keepAliveInterval);
+      this._keepAliveInterval = null;
+    }
   }
 
   _attemptReconnect() {
@@ -378,25 +392,43 @@ class DeepgramStreamingSTT {
     }
     this._reconnectAttempts++;
     const delay = this._reconnectDelay * Math.pow(2, this._reconnectAttempts - 1);
-    this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; if (!this._closedByUs) this.connect(); }, Math.min(delay, 16000));
+    this._reconnectTimer = setTimeout(
+      () => {
+        this._reconnectTimer = null;
+        if (!this._closedByUs) this.connect();
+      },
+      Math.min(delay, 16000)
+    );
   }
 
   disconnect() {
     this._closedByUs = true;
-    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     this._flushCommitted();
     this._clearKeepAlive();
     if (this.ws) {
       const ws = this.ws;
       this.ws = null; // detach first so the resulting close/error events are ignored
       // Send CloseStream message for clean shutdown (only meaningful on an open socket)
-      if (ws.readyState === 1) { try { ws.send(JSON.stringify({ type: 'CloseStream' })); } catch (e) { /* ignore */ } }
-      try { ws.close(1000); } catch (e) { /* ignore */ }
+      if (ws.readyState === 1) {
+        try {
+          ws.send(JSON.stringify({ type: 'CloseStream' }));
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      try {
+        ws.close(1000);
+      } catch (e) {
+        /* ignore */
+      }
     }
     this.connected = false;
   }
 }
-
 
 // ============================================================================
 // Gemini Live transcription (gemini-*-transcribe-live over the Live API)
@@ -430,10 +462,12 @@ class GeminiLiveSTT {
     this._connecting = false;
     this._conn = null; // token for the current socket so a stale one can't drive callbacks
     // Injectable for tests; production lazily loads @google/genai.
-    this._createClient = options.createClient || ((apiKey) => {
-      const { GoogleGenAI } = require('@google/genai');
-      return new GoogleGenAI({ apiKey });
-    });
+    this._createClient =
+      options.createClient ||
+      ((apiKey) => {
+        const { GoogleGenAI } = require('@google/genai');
+        return new GoogleGenAI({ apiKey });
+      });
   }
 
   async connect() {
@@ -448,7 +482,9 @@ class GeminiLiveSTT {
       // a rejected session (bad key, unknown model, quota) arrives as a socket
       // close carrying the reason, so race it against that close and a timeout.
       let rejectClosed = () => {};
-      const closedEarly = new Promise((_, reject) => { rejectClosed = reject; });
+      const closedEarly = new Promise((_, reject) => {
+        rejectClosed = reject;
+      });
       const attempt = ai.live.connect({
         model: this.model,
         config: {
@@ -459,28 +495,46 @@ class GeminiLiveSTT {
           }
         },
         callbacks: {
-          onmessage: (msg) => { if (this._conn === conn) this._handleMessage(msg); },
+          onmessage: (msg) => {
+            if (this._conn === conn) this._handleMessage(msg);
+          },
           onerror: (err) => {
             if (this._conn !== conn) return;
-            this.onError({ provider: 'gemini-live', message: (err && err.message) || 'Gemini Live connection error', status: null });
+            this.onError({
+              provider: 'gemini-live',
+              message: (err && err.message) || 'Gemini Live connection error',
+              status: null
+            });
           },
           onclose: (evt) => {
             if (this._conn !== conn || conn.closed) return;
             conn.closed = true;
             const reason = (evt && evt.reason) || '';
-            if (!this.connected) { rejectClosed(new Error(reason || `Gemini Live closed before setup (code ${evt && evt.code})`)); return; }
+            if (!this.connected) {
+              rejectClosed(new Error(reason || `Gemini Live closed before setup (code ${evt && evt.code})`));
+              return;
+            }
             this._onClosed(evt);
           }
         }
       });
       let timer = null;
-      const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Gemini Live connection timed out')), GEMINI_LIVE_CONNECT_TIMEOUT_MS); });
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Gemini Live connection timed out')), GEMINI_LIVE_CONNECT_TIMEOUT_MS);
+      });
       try {
         this.session = await Promise.race([attempt, closedEarly, timeout]);
       } finally {
         clearTimeout(timer); // don't keep the process alive for a race that already settled
       }
-      if (this._conn !== conn) { try { this.session.close(); } catch (e) { /* ignore */ } return; } // disconnect() raced us
+      if (this._conn !== conn) {
+        try {
+          this.session.close();
+        } catch (e) {
+          /* ignore */
+        }
+        return;
+      } // disconnect() raced us
       this.connected = true;
       this._reconnectAttempts = 0;
       this.onStatusChange('connected');
@@ -491,7 +545,11 @@ class GeminiLiveSTT {
       // Rejected sessions carry the API error in the close reason ("API key not
       // valid", "... is not found for API version ...", quota text) — surface a
       // status so the shared error mapping in stt.js/llm.js reads it the same.
-      const status = /not found|not supported/i.test(message) ? 404 : (/quota|rate limit|resource_exhausted/i.test(message) ? 429 : null);
+      const status = /not found|not supported/i.test(message)
+        ? 404
+        : /quota|rate limit|resource_exhausted/i.test(message)
+          ? 429
+          : null;
       this.onError({ provider: 'gemini-live', message, status });
     } finally {
       this._connecting = false;
@@ -561,18 +619,35 @@ class GeminiLiveSTT {
     }
     this._reconnectAttempts++;
     const delay = this._reconnectDelay * Math.pow(2, this._reconnectAttempts - 1);
-    this._reconnectTimer = setTimeout(() => { this._reconnectTimer = null; if (!this._closedByUs) this.connect(); }, Math.min(delay, 16000));
+    this._reconnectTimer = setTimeout(
+      () => {
+        this._reconnectTimer = null;
+        if (!this._closedByUs) this.connect();
+      },
+      Math.min(delay, 16000)
+    );
   }
 
   disconnect() {
     this._closedByUs = true;
     this._conn = null; // orphan any in-flight connect so its callbacks are ignored
-    if (this._reconnectTimer) { clearTimeout(this._reconnectTimer); this._reconnectTimer = null; }
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
     this._pendingAudio = [];
     this._flushInterimAsFinal();
     if (this.session) {
-      try { this.session.sendRealtimeInput({ audioStreamEnd: true }); } catch (e) { /* ignore */ }
-      try { this.session.close(); } catch (e) { /* ignore */ }
+      try {
+        this.session.sendRealtimeInput({ audioStreamEnd: true });
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        this.session.close();
+      } catch (e) {
+        /* ignore */
+      }
       this.session = null;
     }
     this.connected = false;
@@ -648,7 +723,10 @@ function createStreamingSTT(settings, channel, callbacks) {
   // in main.js.
   if (selectedProvider === 'gemini' && keys.gemini) {
     const stt = new GeminiLiveSTT(keys.gemini, {
-      vocabulary: buildVocabPrompt(settings).split(',').map((t) => t.trim()).filter(Boolean),
+      vocabulary: buildVocabPrompt(settings)
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
       onTranscript: (text) => onTranscript(channel, text),
       onInterim: (text) => onInterim(channel, text),
       onError,
@@ -663,7 +741,7 @@ function createStreamingSTT(settings, channel, callbacks) {
   // here too and is served by createSTT()'s batch chain — same as local/gemini.
   return {
     type: 'batch',
-    provider: selectedProvider === 'custom' ? 'custom' : (selectedProvider === 'auto' && keys.gemini ? 'gemini' : 'none'),
+    provider: selectedProvider === 'custom' ? 'custom' : selectedProvider === 'auto' && keys.gemini ? 'gemini' : 'none',
     instance: null
   };
 }

@@ -43,7 +43,10 @@ test('loads one server process and reuses it for multiple in-memory inferences',
     modelPath,
     language: 'en',
     threads: 3,
-    spawnImpl: (...args) => { spawnCalls.push(args); return child; },
+    spawnImpl: (...args) => {
+      spawnCalls.push(args);
+      return child;
+    },
     findPort: async () => 43123,
     randomBytes: (size) => Buffer.alloc(size, 7),
     wait: async () => {},
@@ -91,7 +94,9 @@ test('cancels model loading and force-terminates the sidecar', async (context) =
   const child = new FakeChild();
   let releaseHealthPoll;
   let markHealthPollStarted;
-  const healthPollStarted = new Promise((resolve) => { markHealthPollStarted = resolve; });
+  const healthPollStarted = new Promise((resolve) => {
+    markHealthPollStarted = resolve;
+  });
   const session = new WhisperServerSession({
     executablePath,
     runtimeDirectory: root,
@@ -101,7 +106,9 @@ test('cancels model loading and force-terminates the sidecar', async (context) =
     fetchImpl: async () => ({ ok: false, status: 503 }),
     wait: async () => {
       markHealthPollStarted();
-      await new Promise((resolve) => { releaseHealthPoll = resolve; });
+      await new Promise((resolve) => {
+        releaseHealthPoll = resolve;
+      });
     }
   });
 
