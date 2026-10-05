@@ -27,6 +27,7 @@ const {
 const { registerShortcuts } = require('./shortcuts');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
+const { configure: configureKnowledge, registerKnowledgeIpc, stopKnowledge } = require('./knowledge');
 const { safeStorageBackend } = require('./secure-storage');
 
 // Since Electron 39, macOS meeting audio goes through Core Audio taps, which
@@ -61,6 +62,7 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 registerAppIpc();
+registerKnowledgeIpc();
 registerPublikIpc();
 registerCaptureIpc();
 registerWhisperIpc();
@@ -134,6 +136,8 @@ function launchApp() {
 
   createWindow();
   registerShortcuts();
+  // Index the Obsidian vault in the background when Knowledge is on.
+  configureKnowledge().catch((e) => console.warn('[knowledge] could not index the vault:', e && e.message));
 }
 
 // -------- lifecycle --------
@@ -189,6 +193,7 @@ app.on('will-quit', () => {
   // Delaying shutdown to tidy a directory would be the wrong trade.
   stopAppLink();
   stopSlideLoop();
+  stopKnowledge();
   shutdownWhisper();
 });
 app.on('window-all-closed', (e) => {

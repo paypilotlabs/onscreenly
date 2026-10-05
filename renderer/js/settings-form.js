@@ -3,6 +3,8 @@ import { state } from './state.js';
 import { $, isMac, onscreenly } from './core.js';
 import { applyOpacity } from './toolbar.js';
 import { updateAiRulesCounter, updateCustomProviderFields, updateSmartTooltip } from './settings-panel.js';
+import { fillProfile } from './profile-settings.js';
+import { fillKnowledge } from './knowledge-settings.js';
 
 function fillSettings() {
   // Keys tab
@@ -32,6 +34,8 @@ function fillSettings() {
   fillAppLinkCallers();
   fillKeyStorageNote();
   $('#s-status').textContent = statusText();
+  fillProfile();
+  fillKnowledge();
   // Transcription tab
   document.querySelectorAll('#meeting-audio-seg button').forEach((button) => {
     button.classList.toggle('on', (button.dataset.meetingAudio === 'on') === !!state.settings.meetingAudio);
@@ -61,8 +65,6 @@ function fillSettings() {
   applyOpacity(state.settings.opacity, false);
 }
 
-// Whoever Onscreenly has been told it may answer questions for. Empty is the normal
-// state — nothing appears here until something has asked and been allowed.
 // How saved API keys are protected on this computer (see src/storage/secrets.js).
 async function fillKeyStorageNote() {
   const note = $('#key-storage-note');
@@ -76,6 +78,8 @@ async function fillKeyStorageNote() {
   }
 }
 
+// Whoever Onscreenly has been told it may answer questions for. Empty is the normal
+// state — nothing appears here until something has asked and been allowed.
 async function fillAppLinkCallers() {
   const host = $('#applink-callers');
   if (!host || !onscreenly.appLinkState) return;

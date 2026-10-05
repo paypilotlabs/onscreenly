@@ -3,6 +3,7 @@ import { state } from './state.js';
 import { onscreenly, setSessionButton } from './core.js';
 import {
   MAX_RESPONSES,
+  addAnswerExtras,
   appendToken,
   clearTranscriptInterim,
   finalizeAi,
@@ -158,7 +159,7 @@ export function init() {
     const title = last && last.caption ? last.caption.split('\n')[0].slice(0, 80) : 'Slide ' + count;
     showToast(`Slide ${count} captured · ${title}`, 3000);
   });
-  onscreenly.on('llm:start', ({ userBubble, small, category }) => {
+  onscreenly.on('llm:start', ({ userBubble, small, category, layout }) => {
     state.responseCount++;
     if (state.responseCount > MAX_RESPONSES) {
       const oldest = messages.querySelector('.response-group');
@@ -184,7 +185,7 @@ export function init() {
       group.appendChild(pill);
     }
     state.aiEl = document.createElement('div');
-    state.aiEl.className = 'ai-text' + (small ? ' small' : '');
+    state.aiEl.className = 'ai-text' + (small ? ' small' : '') + (layout === 'cards' ? ' cards' : '');
     state.aiEl.dataset.raw = '';
     state.caretEl = document.createElement('span');
     state.caretEl.className = 'ai-caret';
@@ -206,8 +207,9 @@ export function init() {
     setBusy(true);
   });
   onscreenly.on('llm:token', ({ text }) => appendToken(text));
-  onscreenly.on('llm:done', () => {
-    finalizeAi();
+  onscreenly.on('llm:done', ({ sources } = {}) => {
+    const el = finalizeAi();
+    if (el) addAnswerExtras(el, sources);
     setBusy(false);
   });
   onscreenly.on('llm:error', ({ message, action }) => {

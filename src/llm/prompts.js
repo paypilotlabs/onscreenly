@@ -1,10 +1,21 @@
 // @ts-check
 // prompts.js — Feature definitions with interview-category-aware system prompts.
-// ctx = { transcript, userText }
+// ctx = { transcript, userText, settings }
 // System prompt receives the interview context block prepended by app/main/llm-runner.js,
 // then optionally the user's AI rules appended at the end.
 
 const { appendAiRules } = require('../context/profile-context');
+const { describeKeywordMatch, keywordMatch } = require('../context/resume-analysis');
+
+// The analysis reads the whole résumé and job description, not the clipped
+// excerpts live answers use.
+const ANALYSIS_RESUME_CHARS = 12000;
+const ANALYSIS_JD_CHARS = 6000;
+
+function clipFor(text, limit) {
+  const value = String(text || '').trim();
+  return value.length > limit ? value.slice(0, limit).trimEnd() + '…' : value;
+}
 
 function formatTranscript(turns, limit) {
   const recent = limit ? turns.slice(-limit) : turns;
@@ -185,6 +196,57 @@ const MODES = {
         (ctx.userText || '(no question provided)') +
         '"\n\nGive the full answer the candidate should say out loud.'
       );
+    }
+  },
+
+  // ── Résumé analysis: structured review against the target job ───────────
+  // ownContext: the runner passes only vault notes as the context block; the
+  // full résumé and job description go in the user turn instead of the
+  // clipped interview excerpts.
+  resumeAnalysis: {
+    needsScreen: false,
+    userBubble: 'Analyse my résumé',
+    small: false,
+    resumeMode: 'resumeAnalysis',
+    ownContext: true,
+    needsResume: true,
+    layout: 'cards',
+    // Seven sections run well past the 700/1,400-token cap of live answers.
+    maxTokens: 3000,
+    buildSystem(contextBlock, aiRules) {
+      return applyRules(
+        buildSystem(
+          "You are Onscreenly's résumé reviewer. " +
+            BASE_RULES +
+            "Analyse the candidate's résumé against the target job description when one is given. Be specific and honest, quote the résumé when you point at a problem, and never invent experience, employers or numbers the résumé does not show.\n\n" +
+            "Answer in Markdown with these sections, each starting with a '## ' heading, in this order:\n" +
+            '## Summary: 2–3 sentences on who the candidate is and how well they fit the role.\n' +
+            '## Strengths: 3–5 bullets, each tied to evidence in the résumé.\n' +
+            '## Gaps vs the job: one bullet per requirement in the job description the résumé does not show, with how to address it. Leave this section out when no job description is given.\n' +
+            '## Keyword match: quote the computed score exactly as given, list the most important missing keywords, and say where each could honestly appear in the résumé. Leave this section out when no score is given.\n' +
+            '## Rewritten bullets: 3–5 weak résumé bullets, each as a "Before:" bullet followed by an "After:" bullet. The After line uses an action verb, what was done and a measurable result; write [X] where a number is needed rather than inventing one.\n' +
+            '## Likely interview questions: 5–7 questions this résumé and role invite, each with a one-line hint for answering.\n' +
+            '## STAR stories to prepare: 3 stories drawn from the résumé, each with one line per Situation, Task, Action and Result.\n\n' +
+            "If reference notes from the user's vault are included above, use them as extra evidence about the candidate's work and name the note title in brackets when you rely on one.",
+          contextBlock
+        ),
+        aiRules,
+        'resumeAnalysis'
+      );
+    },
+    build(ctx) {
+      const settings = ctx.settings || {};
+      const resume = clipFor(settings.resumeText, ANALYSIS_RESUME_CHARS);
+      const jd = clipFor(settings.jobDescription, ANALYSIS_JD_CHARS);
+      const match = describeKeywordMatch(keywordMatch(settings.resumeText, settings.jobDescription));
+      return [
+        'Résumé:\n<<<\n' + (resume || '(empty)') + '\n>>>',
+        jd ? 'Job description:\n<<<\n' + jd + '\n>>>' : 'Job description: none given. Review the résumé on its own.',
+        match,
+        'Analyse my résumé.'
+      ]
+        .filter(Boolean)
+        .join('\n\n');
     }
   },
 

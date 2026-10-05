@@ -15,7 +15,9 @@ Onscreenly is maintained by Lohith Kumar and licensed under GPL-3.0-or-later. It
 | AI providers | OpenAI, Anthropic, Gemini, Azure, Cerebras, Groq, MiniMax, DeepSeek, Ollama, Custom OpenAI-compatible endpoints, and optionally Publik. Availability depends on your endpoint, account, and selected model. |
 | Local transcription | Whisper model download/import, cancel/resume, and integrity checks. Local transcription does not silently fall back to a cloud provider. |
 | Meeting memory | Local transcript/history, generated meeting notes, recap, and recent-meeting context. |
-| Personal context | Résumé/document import, professional background, interview preparation, and custom response rules. |
+| Personal context | Settings → Profile: résumé and target job (paste, or import PDF, DOCX, Markdown or text), interview-prep answers, and custom response rules. |
+| Résumé analysis | **Analyse my résumé** shows cards for summary, strengths, gaps against the job, keyword match, rewritten bullets, likely interview questions and STAR stories to prepare. The keyword score is computed locally, not guessed by the model. Copy it or save it as Markdown. |
+| Obsidian notes | Settings → Knowledge: choose your vault folder and answers draw on your best-matching notes, listed under each answer and opened in Obsidian with a click. Read-only, indexed on this computer, and updated as you edit. |
 | Slide tracking | Optional automatic slide capture/caption context while listening. |
 | App-link integration | Consent-controlled access to app status and actions; slide-caption access has a separate consent. |
 
@@ -153,7 +155,7 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
 - **Settings → API Keys → Delete all my data** removes settings, saved keys, résumé and profile text, and meeting history, then restarts Onscreenly. Downloaded Whisper models are kept and can be removed in Settings → Audio.
 - `meetings.json` stores transcript history and generated notes. The app retains a bounded number of recent meetings and may restore an interrupted session; it is not a lossless recording system.
 - Audio chunks are processed in memory. Downloaded Whisper models remain on disk until deleted through Settings.
-- Screen images, conversation context, profile text, and custom response rules can be sent to your selected answer provider. Cloud transcription sends audio to the selected speech provider. Optional Publik routes requests through its gateway.
+- Screen images, conversation context, profile text, and custom response rules can be sent to your selected answer provider. With Knowledge on, the best-matching excerpts from your Obsidian vault (about 3,000 characters at most) are sent too; recap and coding solves never use them. The vault is only read, never written, and its index lives in memory only. Cloud transcription sends audio to the selected speech provider. Optional Publik routes requests through its gateway.
 - App-link callers need explicit consent. A separate consent controls access to captured slide captions.
 - Do not commit personal profiles or provider keys. Both new and legacy settings filenames and their backups are excluded by `.gitignore`.
 
@@ -164,6 +166,7 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
   - `window.js`: the overlay window, screen-share protection, dragging.
   - `capture.js`, `whisper.js`, `slides.js`: listening, local Whisper, slide tracking.
   - `llm-runner.js`: runs an AI feature and streams the answer.
+  - `knowledge.js`: Settings → Knowledge, the vault index and note search for answers.
   - `publik-controller.js`, `permissions.js`, `media.js`, `shortcuts.js`, `ipc.js`: Publik, OS permissions, media handlers, shortcuts, shared IPC.
   - `session.js`, `platform.js`: shared live state and platform facts.
 - `preload.js`: limited renderer API bridge.
@@ -172,7 +175,8 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
   - `llm/`: answer providers, OpenAI-compatible endpoints, prompt modes.
   - `stt/`: cloud and streaming transcription, voice activity detection, utterance segmentation, WAV encoding.
   - `whisper/`: local Whisper runtime, model catalog/downloads, server session.
-  - `context/`: résumé parsing, interview and profile context.
+  - `context/`: résumé parsing and analysis, interview and profile context.
+  - `knowledge/`: the read-only Obsidian vault index (BM25 search over heading sections) and its prompt block.
   - `capture/`: screenshots and slide tracking.
   - `meetings/`: meeting history, memory, generated notes.
   - `storage/`: settings persistence.

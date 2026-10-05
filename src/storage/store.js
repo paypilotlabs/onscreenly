@@ -10,6 +10,7 @@ const { app } = require('electron');
 const { createFileStore } = require('./settings-store-core');
 const { createSecretsFile, describeKeyStorage, maskKey } = require('./secrets');
 const { normalizeBaseUrl } = require('../llm/openai-compatible');
+const { DEFAULT_KNOWLEDGE, normalizeKnowledge } = require('../knowledge/knowledge-context');
 const { APP_ID, resolveSettingsFilename } = require('../platform/app-identity');
 
 const fileStore = createFileStore(() => app.getPath('userData'), resolveSettingsFilename);
@@ -88,6 +89,9 @@ const DEFAULTS = {
   // points", "casual tone". Applied to every LLM mode EXCEPT LeetCode (kept
   // strict for coding problems).
   aiRules: '',
+  // Knowledge: a read-only Obsidian vault searched for notes that match each
+  // question. vaultPath is set only by the main process's folder picker.
+  knowledge: DEFAULT_KNOWLEDGE,
   // Overlay opacity (1 = fully opaque). Clamped so the window never vanishes.
   opacity: 1,
   // Slides: opt-in auto slide tracking (memory-only, forwarded, never written to disk).
@@ -369,6 +373,11 @@ function applyPublikDefault(build) {
 function stripRendererPatch(patch) {
   const out = { ...(patch || {}) };
   for (const k of RENDERER_READ_ONLY) delete out[k];
+  // The vault folder comes only from the folder picker in the main process.
+  if (out.knowledge && typeof out.knowledge === 'object') {
+    out.knowledge = { ...out.knowledge };
+    delete out.knowledge.vaultPath;
+  }
   if (out.apiKeys && typeof out.apiKeys === 'object') {
     out.apiKeys = { ...out.apiKeys };
     delete out.apiKeys.publik;
@@ -430,6 +439,7 @@ module.exports = {
     const nextSettings = deepMerge(data, patch || {});
     nextSettings.baseUrl = normalizeBaseUrl(nextSettings.baseUrl);
     nextSettings.opacity = clampOpacity(nextSettings.opacity);
+    nextSettings.knowledge = normalizeKnowledge(nextSettings.knowledge);
     data = nextSettings;
     save();
     return data;

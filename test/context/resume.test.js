@@ -56,8 +56,15 @@ test('rejects a file that is not a PDF', async () => {
 });
 
 test('rejects unsupported file types', async () => {
-  const file = tempFile('resume.txt', 'plain text');
-  await assert.rejects(parseDocumentFile(file), /Unsupported file type: \.txt/);
+  const file = tempFile('resume.rtf', '{\\rtf1 plain text}');
+  await assert.rejects(parseDocumentFile(file), /Unsupported file type: \.rtf/);
+});
+
+test('reads Markdown and plain-text résumés as they are', async () => {
+  const md = tempFile('resume.md', '﻿# Jane Doe\n\n## Experience\n- Built the payments ledger\n');
+  assert.equal(await parseDocumentFile(md), '# Jane Doe\n\n## Experience\n- Built the payments ledger');
+  const txt = tempFile('RESUME.TXT', 'Jane Doe\nEngineer\n');
+  assert.equal(await parseDocumentFile(txt), 'Jane Doe\nEngineer');
 });
 
 test('the font folder handed to pdf.js ends in a forward slash on every OS', () => {

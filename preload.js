@@ -39,6 +39,14 @@ const api = {
   appLinkRevoke: (callerId) => ipcRenderer.invoke('applink:revoke', callerId),
   appLinkConsentRespond: (id, allowed) => ipcRenderer.send('applink:consent-response', { id, allowed }),
   pickProfileDocument: () => ipcRenderer.invoke('profile:pickDocument'),
+  knowledgeStatus: () => ipcRenderer.invoke('knowledge:status'),
+  knowledgePickVault: () => ipcRenderer.invoke('knowledge:pick-vault'),
+  knowledgeForgetVault: () => ipcRenderer.invoke('knowledge:forget-vault'),
+  knowledgeReindex: () => ipcRenderer.invoke('knowledge:reindex'),
+  knowledgeSearch: (query) => ipcRenderer.invoke('knowledge:search', query),
+  knowledgeOpenNote: (relPath) => ipcRenderer.invoke('knowledge:open-note', relPath),
+  copyAnswer: (text) => ipcRenderer.invoke('answer:copy', text),
+  saveAnswerMarkdown: (text, kind) => ipcRenderer.invoke('answer:save-markdown', { text, kind }),
   keyStorageStatus: () => ipcRenderer.invoke('data:key-storage'),
   deleteAllData: () => ipcRenderer.invoke('data:delete-all'),
   quit: () => ipcRenderer.send('app:quit'),
@@ -65,7 +73,8 @@ const api = {
       'whisper:download-progress',
       'whisper:models-changed',
       'publik:state',
-      'slides:update'
+      'slides:update',
+      'knowledge:status'
     ];
     if (!allowed.includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => cb(data));

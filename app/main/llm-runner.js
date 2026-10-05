@@ -10,6 +10,7 @@ const publik = require('../../src/integrations/publik');
 const { recordEvent } = require('../../src/integrations/applink');
 const { session, send } = require('./session');
 const publikController = require('./publik-controller');
+const { retrieveNotes } = require('./knowledge');
 
 const STREAM_INACTIVITY_MS = 25000; // abort a stalled LLM stream so state.busy can't wedge forever
 
@@ -31,8 +32,13 @@ async function runFeature(mode, userText) {
           : mode === 'answerThis'
             ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"`
             : null;
-    const category = mode !== 'leetcode' ? detectCategory(transcript) : null;
-    send('llm:start', { userBubble, small: !!def.small, category });
+    const category = mode !== 'leetcode' && !def.ownContext ? detectCategory(transcript) : null;
+    send('llm:start', { userBubble, small: !!def.small, category, layout: def.layout || null });
+
+    if (def.needsResume && !String(settings.resumeText || '').trim()) {
+      send('llm:error', { message: 'Add your résumé in Settings › Profile first, then try again.' });
+      return;
+    }
 
     if (!llm.ready) {
       const message =
@@ -102,13 +108,24 @@ async function runFeature(mode, userText) {
     }
 
     const settingsForPrompt = store.getSettings();
-    let contextBlock = buildInterviewContext(settingsForPrompt, mode, transcript);
+    const ctx = { transcript, userText: userText || '', settings: settingsForPrompt };
+    // Modes with their own context (résumé analysis) put the full documents in
+    // the user turn and skip the clipped interview excerpts and meeting memory.
+    let contextBlock = def.ownContext ? null : buildInterviewContext(settingsForPrompt, mode, transcript);
     // Summaries of the last few meetings, so "what did we agree last time?"
     // has something to draw on. Never the current meeting, never leetcode.
-    const memoryBlock = mode !== 'leetcode' && session.meetingMemory ? session.meetingMemory.memoryBlock() : null;
+    const memoryBlock =
+      mode !== 'leetcode' && !def.ownContext && session.meetingMemory ? session.meetingMemory.memoryBlock() : null;
     if (memoryBlock) contextBlock = contextBlock ? contextBlock + '\n\n' + memoryBlock : memoryBlock;
+    // Matching notes from the user's Obsidian vault, when Knowledge is on.
+    const notes = await retrieveNotes(mode, ctx).catch((e) => {
+      console.warn('[knowledge] note search failed:', e && e.message);
+      return { block: '', sources: [] };
+    });
+    if (notes.block) contextBlock = contextBlock ? contextBlock + '\n\n' + notes.block : notes.block;
+    console.log(`[llm] notes=${notes.sources.length}`);
     const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : def.system || '';
-    const built = def.build({ transcript, userText: userText || '' });
+    const built = def.build(ctx);
 
     // Watchdog: a provider that stalls mid-stream would otherwise hang the await forever,
     // leaving state.busy = true and wedging every later question until an app restart.
@@ -130,6 +147,7 @@ async function runFeature(mode, userText) {
           system,
           turns: [{ role: 'user', text: built }],
           imageDataUrl,
+          ...(def.maxTokens ? { maxTokens: def.maxTokens } : {}),
           onToken: (t) => {
             if (streamSettled) return;
             rearm();
@@ -146,7 +164,7 @@ async function runFeature(mode, userText) {
       streamSettled = true;
       clearTimeout(watchdog);
     }
-    send('llm:done', {});
+    send('llm:done', { sources: notes.sources });
     // Streams settle after their headers, so the charge is reconciled from
     // GET /wallet shortly after the answer — one request per answer, debounced.
     if (settings.provider === publik.PUBLIK_PROVIDER) publikController.publikScheduleWalletRefresh();
