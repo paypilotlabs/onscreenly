@@ -4,223 +4,28 @@
 // the user's own notes. Nothing here ever writes inside the vault.
 const fs = require('fs');
 const path = require('path');
+const { chunksOf, parseNote, tokenize } = require('./note-parser');
+
+/**
+ * @typedef {import('./note-parser').Chunk} Chunk
+ * @typedef {{ relPath: string, title: string, heading: string, text: string, score: number }} SearchResult
+ */
 
 // Hidden folders (.obsidian, .trash, .git) are always skipped as well.
 const DEFAULT_EXCLUDE = ['templates'];
 const MAX_FILES = 20000;
 const MAX_FILE_BYTES = 1024 * 1024;
-const CHUNK_CHARS = 800;
-const MAX_CHUNK_CHARS = 1600;
+// About 50 MB of Markdown keeps the in-memory index well under a few hundred
+// MB; notes past it are left out and the status says the index is incomplete.
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+// On Linux, Node's recursive fs.watch adds one inotify watch per file and
+// folder, hidden ones included; Onscreenly watches the visited folders itself
+// and stops watching past this many.
+const MAX_WATCHED_DIRS = 2000;
 
-// BM25 parameters and how much a match in each part of a note counts.
+// BM25 parameters.
 const K1 = 1.2;
 const B = 0.75;
-const WEIGHTS = { title: 3, tags: 2, heading: 2, body: 1 };
-
-const STOPWORDS = new Set(
-  (
-    'a an and are as at be been but by can could did do does for from had has have he her here hers him his how i if ' +
-    'in into is it its just me my of on or our ours she so than that the their them then there these they this those ' +
-    'to too us was we were what when where which while who whom why will with would you your yours about also any ' +
-    'some such no not only own same very s t don should now am being both each few more most other over under again ' +
-    'further once all out up down off above below between through during before after'
-  ).split(' ')
-);
-
-/**
- * @typedef {{ title: string, tags: string[], aliases: string[], body: string }} ParsedNote
- * @typedef {{ relPath: string, title: string, heading: string, text: string, tags: string[],
- *   tf: Map<string, number>, len: number }} Chunk
- * @typedef {{ relPath: string, title: string, heading: string, text: string, score: number }} SearchResult
- */
-
-/** @param {string} word */
-function stem(word) {
-  if (word.length > 4 && word.endsWith('ies')) return word.slice(0, -3) + 'y';
-  if (word.length > 3 && word.endsWith('s') && !word.endsWith('ss') && !word.endsWith('us')) return word.slice(0, -1);
-  return word;
-}
-
-/**
- * Lower-cased word stems without stop words. Keeps "c++" and "c#" whole.
- * @param {string} text
- */
-function tokenize(text) {
-  const out = [];
-  for (const match of String(text || '')
-    .toLowerCase()
-    .matchAll(/[\p{L}\p{N}]+(?:\+\+|#)?/gu)) {
-    const word = match[0];
-    if (word.length < 2 && !/\d/.test(word)) continue;
-    if (STOPWORDS.has(word)) continue;
-    out.push(stem(word));
-  }
-  return out;
-}
-
-/** @param {string} value */
-function listValue(value) {
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-  const inner = trimmed.startsWith('[') && trimmed.endsWith(']') ? trimmed.slice(1, -1) : trimmed;
-  return inner
-    .split(',')
-    .map((item) => item.trim().replace(/^["']|["']$/g, ''))
-    .filter(Boolean);
-}
-
-/**
- * The small part of YAML front matter notes use: title, tags and aliases,
- * written inline ("tags: [a, b]") or as a list ("tags:\n  - a").
- * @param {string} yaml
- */
-function parseFrontmatter(yaml) {
-  const meta = { title: '', tags: [], aliases: [] };
-  let listKey = '';
-  for (const line of yaml.split('\n')) {
-    const item = /^\s*-\s+(.*)$/.exec(line);
-    if (item && listKey) {
-      meta[listKey].push(...listValue(item[1]));
-      continue;
-    }
-    const pair = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line);
-    listKey = '';
-    if (!pair) continue;
-    const key = pair[1].toLowerCase();
-    const value = pair[2];
-    if (key === 'title') meta.title = value.trim().replace(/^["']|["']$/g, '');
-    else if (key === 'tags' || key === 'tag' || key === 'aliases' || key === 'alias') {
-      const target = key.startsWith('tag') ? 'tags' : 'aliases';
-      if (value.trim()) meta[target].push(...listValue(value));
-      else listKey = target;
-    }
-  }
-  meta.tags = meta.tags.map((tag) => tag.replace(/^#/, ''));
-  return meta;
-}
-
-/**
- * @param {string} source
- * @param {string} relPath
- * @returns {ParsedNote}
- */
-function parseNote(source, relPath) {
-  let text = String(source).replace(/\r\n?/g, '\n');
-  let meta = { title: '', tags: [], aliases: [] };
-  const frontmatter = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(text);
-  if (frontmatter) {
-    meta = parseFrontmatter(frontmatter[1]);
-    text = text.slice(frontmatter[0].length);
-  }
-  text = text
-    .replace(/%%[\s\S]*?%%/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/!\[\[[^\]]*\]\]/g, '')
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-    .replace(/\[\[([^\]|#]*)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g, (_m, target, label) => (label || target).trim())
-    .replace(/\[([^\]]+)\]\((?:[^)\s]+)\)/g, '$1');
-  const tags = new Set(meta.tags);
-  for (const match of text.matchAll(/(?:^|[\s(])#([\p{L}\p{N}_/-]*[\p{L}_/-][\p{L}\p{N}_/-]*)/gu)) tags.add(match[1]);
-  const title = meta.title || path.basename(relPath).replace(/\.md$/i, '');
-  return { title, tags: [...tags], aliases: meta.aliases, body: text };
-}
-
-/**
- * Splits a long section at paragraph breaks into pieces of about CHUNK_CHARS.
- * @param {string} text
- */
-function splitSection(text) {
-  const pieces = [];
-  let current = '';
-  for (const paragraph of text.split(/\n\s*\n/)) {
-    const para = paragraph.trim();
-    if (!para) continue;
-    if (current && current.length + para.length + 2 > CHUNK_CHARS) {
-      pieces.push(current);
-      current = '';
-    }
-    current = current ? current + '\n\n' + para : para;
-    while (current.length > MAX_CHUNK_CHARS) {
-      const cut = current.lastIndexOf(' ', CHUNK_CHARS);
-      const at = cut > CHUNK_CHARS / 2 ? cut : CHUNK_CHARS;
-      pieces.push(current.slice(0, at).trim());
-      current = current.slice(at).trim();
-    }
-  }
-  if (current) pieces.push(current);
-  return pieces;
-}
-
-/**
- * Sections of a note body, each with its heading trail ("Projects › Payments").
- * @param {string} body
- */
-function sectionsOf(body) {
-  const sections = [];
-  const trail = [];
-  let lines = [];
-  let inFence = false;
-  const flush = () => {
-    const text = lines.join('\n').trim();
-    if (text) {
-      const heading = trail.filter(Boolean).join(' › ');
-      for (const piece of splitSection(text)) sections.push({ heading, text: piece });
-    }
-    lines = [];
-  };
-  for (const line of body.split('\n')) {
-    if (/^\s*(```|~~~)/.test(line)) inFence = !inFence;
-    const heading = !inFence && /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
-    if (heading) {
-      flush();
-      const level = heading[1].length;
-      trail.length = level - 1;
-      trail[level - 1] = heading[2];
-      continue;
-    }
-    lines.push(line);
-  }
-  flush();
-  return sections;
-}
-
-/**
- * @param {Map<string, number>} tf
- * @param {string} text
- * @param {number} weight
- */
-function addTerms(tf, text, weight) {
-  let count = 0;
-  for (const term of tokenize(text)) {
-    tf.set(term, (tf.get(term) || 0) + weight);
-    count += weight;
-  }
-  return count;
-}
-
-/**
- * @param {ParsedNote} note
- * @param {string} relPath
- * @returns {Chunk[]}
- */
-function chunksOf(note, relPath) {
-  const titleText = [note.title, ...note.aliases].join(' ');
-  const tagText = note.tags.join(' ').replace(/[/_-]/g, ' ');
-  return sectionsOf(note.body).map((section) => {
-    const { text } = section;
-    // Most notes open with an H1 that repeats the title; keep only what follows it.
-    let heading = section.heading;
-    if (heading === note.title) heading = '';
-    else if (heading.startsWith(note.title + ' › ')) heading = heading.slice(note.title.length + 3);
-    const tf = new Map();
-    const len =
-      addTerms(tf, titleText, WEIGHTS.title) +
-      addTerms(tf, tagText, WEIGHTS.tags) +
-      addTerms(tf, heading, WEIGHTS.heading) +
-      addTerms(tf, text, WEIGHTS.body);
-    return { relPath, title: note.title, heading, text, tags: note.tags, tf, len };
-  });
-}
 
 /**
  * True when a vault-relative path is inside an excluded folder. An entry
@@ -257,10 +62,13 @@ function isExcluded(relPath, exclude) {
 async function listMarkdownFiles(root, exclude) {
   /** @type {string[]} */
   const files = [];
+  /** @type {string[]} */
+  const dirs = [];
   let truncated = false;
   const pending = [''];
   while (pending.length) {
     const rel = /** @type {string} */ (pending.shift());
+    dirs.push(rel);
     let entries;
     try {
       entries = await fs.promises.readdir(path.join(root, rel), { withFileTypes: true });
@@ -284,7 +92,28 @@ async function listMarkdownFiles(root, exclude) {
     }
     if (truncated) break;
   }
-  return { files, truncated };
+  return { files, dirs, truncated };
+}
+
+/**
+ * Reads a note without following a symbolic link, even one swapped in after
+ * the folder listing, and only if it still resolves inside the vault.
+ * Resolves null when the path is no longer a regular file inside the vault.
+ * @param {string} vaultReal real path of the vault folder
+ * @param {string} full
+ */
+async function readNoteFile(vaultReal, full) {
+  const real = await fs.promises.realpath(full);
+  if (!real.startsWith(vaultReal + path.sep)) return null;
+  const handle = await fs.promises.open(full, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) return null;
+    if (info.size > MAX_FILE_BYTES) return { info, text: null };
+    return { info, text: await handle.readFile('utf8') };
+  } finally {
+    await handle.close();
+  }
 }
 
 /**
@@ -300,9 +129,14 @@ function obsidianUrl(vaultPath, relPath) {
 }
 
 /**
- * @param {{ root: string, exclude?: string[] }} options
+ * @param {{ root: string, exclude?: string[], maxTotalBytes?: number, maxWatchedDirs?: number }} options
  */
-function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
+function createVaultIndex({
+  root,
+  exclude = DEFAULT_EXCLUDE,
+  maxTotalBytes = MAX_TOTAL_BYTES,
+  maxWatchedDirs = MAX_WATCHED_DIRS
+}) {
   const vaultRoot = path.resolve(root);
   /** @type {Map<string, { mtimeMs: number, size: number, chunks: Chunk[] }>} */
   const files = new Map();
@@ -311,6 +145,9 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
   let indexedAt = 0;
   let truncated = false;
   let refreshing = null;
+  let refreshAgain = false;
+  /** @type {string[]} */
+  let dirs = [];
 
   function rebuildStats() {
     const chunks = [];
@@ -325,11 +162,26 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
     return stats;
   }
 
+  function forgetAll() {
+    if (files.size) stats = null;
+    files.clear();
+    dirs = [];
+  }
+
   async function doRefresh() {
-    const stat = await fs.promises.stat(vaultRoot);
-    if (!stat.isDirectory()) throw new Error('The vault path is not a folder.');
+    let vaultReal;
+    try {
+      const stat = await fs.promises.stat(vaultRoot);
+      if (!stat.isDirectory()) throw new Error('The vault path is not a folder.');
+      vaultReal = await fs.promises.realpath(vaultRoot);
+    } catch (e) {
+      // A vault that is gone must stop feeding answers.
+      forgetAll();
+      throw e;
+    }
     const listing = await listMarkdownFiles(vaultRoot, exclude);
     truncated = listing.truncated;
+    dirs = listing.dirs;
     const seen = new Set(listing.files);
     let changed = 0;
     for (const relPath of [...files.keys()]) {
@@ -338,24 +190,38 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
         changed++;
       }
     }
+    let totalBytes = 0;
     for (const relPath of listing.files) {
       const full = path.join(vaultRoot, relPath);
       let info;
       try {
-        info = await fs.promises.stat(full);
+        info = await fs.promises.lstat(full);
       } catch (_) {
+        info = null;
+      }
+      if (!info || !info.isFile()) {
+        if (files.delete(relPath)) changed++;
+        continue;
+      }
+      if (info.size <= MAX_FILE_BYTES) totalBytes += info.size;
+      if (totalBytes > maxTotalBytes) {
+        truncated = true;
+        if (files.delete(relPath)) changed++;
         continue;
       }
       const known = files.get(relPath);
       if (known && known.mtimeMs === info.mtimeMs && known.size === info.size) continue;
-      let chunks = [];
-      if (info.size <= MAX_FILE_BYTES) {
-        try {
-          chunks = chunksOf(parseNote(await fs.promises.readFile(full, 'utf8'), relPath), relPath);
-        } catch (_) {
-          chunks = [];
-        }
+      let read = null;
+      try {
+        read = await readNoteFile(vaultReal, full);
+      } catch (_) {
+        read = null;
       }
+      if (!read) {
+        if (files.delete(relPath)) changed++;
+        continue;
+      }
+      const chunks = read.text === null ? [] : chunksOf(parseNote(read.text, relPath), relPath);
       files.set(relPath, { mtimeMs: info.mtimeMs, size: info.size, chunks });
       changed++;
     }
@@ -364,13 +230,27 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
     return { changed };
   }
 
-  /** Re-reads notes added, changed or removed since the last refresh. */
+  /**
+   * Re-reads notes added, changed or removed since the last refresh. A call
+   * made while a refresh is running schedules one more pass after it, so a
+   * change made mid-refresh is never missed.
+   */
   function refresh() {
-    if (!refreshing) {
-      refreshing = doRefresh().finally(() => {
-        refreshing = null;
-      });
+    if (refreshing) {
+      refreshAgain = true;
+      return refreshing;
     }
+    refreshing = (async () => {
+      let result;
+      do {
+        refreshAgain = false;
+        result = await doRefresh();
+      } while (refreshAgain);
+      return result;
+    })().finally(() => {
+      refreshing = null;
+      refreshAgain = false;
+    });
     return refreshing;
   }
 
@@ -409,44 +289,112 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
       if (score < floor || results.length >= limit) break;
       const count = perNoteCount.get(chunk.relPath) || 0;
       if (count >= perNote) continue;
-      const room = maxChars - used;
+      // Title and heading travel with the excerpt, so they count too.
+      const labels = chunk.title.length + chunk.heading.length;
+      const room = maxChars - used - labels;
       if (room < 200) break;
       const text = chunk.text.length > room ? chunk.text.slice(0, room).trimEnd() + '…' : chunk.text;
       results.push({ relPath: chunk.relPath, title: chunk.title, heading: chunk.heading, text, score });
       perNoteCount.set(chunk.relPath, count + 1);
-      used += text.length;
+      used += labels + text.length;
     }
     return results;
   }
 
   /**
-   * Watches the vault and refreshes after edits settle. Returns a stop
-   * function, or null when the platform cannot watch folders recursively.
-   * @param {(result: { changed: number } | { error: string }) => void} onChange
-   * @param {number} [delayMs]
+   * Watches the vault and refreshes after edits settle. macOS and Windows get
+   * one native recursive watch; on Linux each indexed folder gets its own
+   * watch, so hidden and excluded folders cost nothing. Returns a stop
+   * function, or null when the vault cannot be watched; the caller then
+   * refreshes on demand. onChange receives { stopped: true } when watching
+   * had to stop (too many folders), and { error } when a refresh failed.
+   * @param {(result: { changed: number } | { error: string } | { stopped: true }) => void} onChange
+   * @param {{ delayMs?: number, platform?: string }} [options]
    */
-  function watch(onChange, delayMs = 1500) {
+  function watch(onChange, { delayMs = 1500, platform = process.platform } = {}) {
+    const perFolder = platform === 'linux';
+    /** @type {Map<string, fs.FSWatcher>} */
+    const watchers = new Map();
     let timer = null;
-    let watcher;
+    let stopped = false;
+
+    const closeAll = () => {
+      for (const watcher of watchers.values()) watcher.close();
+      watchers.clear();
+    };
+    // Obsidian rewrites .obsidian/workspace.json constantly; only notes and
+    // folders matter.
+    const relevant = (filename) => {
+      const name = String(filename || '').replace(/\\/g, '/');
+      if (name.split('/').some((part) => part.startsWith('.'))) return false;
+      return !path.extname(name) || /\.md$/i.test(name);
+    };
+    const add = (rel, recursive) => {
+      const watcher = fs.watch(
+        rel ? path.join(vaultRoot, rel) : vaultRoot,
+        { recursive, persistent: false },
+        (_event, filename) => {
+          if (relevant(filename)) schedule();
+        }
+      );
+      watcher.on('error', () => {}); // a removed folder; the next refresh drops it
+      watchers.set(rel, watcher);
+    };
+    // Matches the watched folders to the folders the last refresh visited.
+    const syncFolders = () => {
+      if (dirs.length > maxWatchedDirs) {
+        closeAll();
+        return false;
+      }
+      const wanted = new Set(dirs);
+      for (const [rel, watcher] of watchers) {
+        if (!wanted.has(rel)) {
+          watcher.close();
+          watchers.delete(rel);
+        }
+      }
+      for (const rel of dirs) {
+        if (watchers.has(rel)) continue;
+        try {
+          add(rel, false);
+        } catch (_) {}
+      }
+      return true;
+    };
+    function schedule() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        refresh().then(
+          (result) => {
+            if (stopped) return;
+            if (perFolder && !syncFolders()) {
+              stopped = true;
+              onChange({ stopped: true });
+              return;
+            }
+            onChange(result);
+          },
+          (e) => {
+            if (!stopped) onChange({ error: e && e.message ? e.message : String(e) });
+          }
+        );
+      }, delayMs);
+    }
+
     try {
-      watcher = fs.watch(vaultRoot, { recursive: true, persistent: false }, (_event, filename) => {
-        const name = String(filename || '').replace(/\\/g, '/');
-        // Obsidian rewrites .obsidian/workspace.json constantly; only notes
-        // and folders matter.
-        if (name.split('/').some((part) => part.startsWith('.'))) return;
-        if (path.extname(name) && !/\.md$/i.test(name)) return;
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          refresh().then(onChange, (e) => onChange({ error: e && e.message ? e.message : String(e) }));
-        }, delayMs);
-      });
-      watcher.on('error', () => {});
+      if (perFolder) {
+        if (!syncFolders() || !watchers.size) return null;
+      } else {
+        add('', true);
+      }
     } catch (_) {
+      closeAll();
       return null;
     }
     return () => {
+      stopped = true;
       clearTimeout(timer);
-      watcher.close();
+      closeAll();
     };
   }
 
@@ -471,10 +419,10 @@ function createVaultIndex({ root, exclude = DEFAULT_EXCLUDE }) {
 module.exports = {
   DEFAULT_EXCLUDE,
   MAX_FILES,
+  MAX_TOTAL_BYTES,
+  MAX_WATCHED_DIRS,
+  readNoteFile,
   createVaultIndex,
   isExcluded,
-  obsidianUrl,
-  parseNote,
-  sectionsOf,
-  tokenize
+  obsidianUrl
 };

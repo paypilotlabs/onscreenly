@@ -19,6 +19,21 @@ function esc(s) {
   );
 }
 
+// "## Heading" → "Heading". A single "#" stays text ("# of users is n"), and a
+// closing run of #s only counts after a space, so "## C#" keeps its "#".
+// No backtracking regex: a long line from a model must not freeze the window.
+function headingText(line) {
+  const open = /^ {0,3}#{2,6}[ \t]/.exec(line);
+  if (!open) return '';
+  let text = line.slice(open[0].length).trim();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '#') end--;
+  if (end < text.length && (end === 0 || text[end - 1] === ' ' || text[end - 1] === '\t')) {
+    text = text.slice(0, end).trimEnd();
+  }
+  return text;
+}
+
 // minimal, safe markdown: fenced code, headings, bullet and numbered lists,
 // inline code, bold, paragraphs. Everything is escaped before tags are added.
 function renderMarkdown(text) {
@@ -67,11 +82,11 @@ function renderMarkdown(text) {
       html += esc(line) + '\n';
       continue;
     }
-    const heading = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
+    const heading = headingText(line);
     if (heading) {
       flushP();
       closeList();
-      html += '<h3>' + inline(heading[1]) + '</h3>';
+      html += '<h3>' + inline(heading) + '</h3>';
       continue;
     }
     if (/^\s*[-*•]\s+/.test(line)) {
@@ -80,10 +95,13 @@ function renderMarkdown(text) {
       html += '<li>' + inline(line.replace(/^\s*[-*•]\s+/, '')) + '</li>';
       continue;
     }
-    if (/^\s*\d{1,3}[.)]\s+/.test(line)) {
+    const numbered = /^\s*(\d{1,3})[.)]\s+/.exec(line);
+    if (numbered) {
       flushP();
       openList('ol');
-      html += '<li>' + inline(line.replace(/^\s*\d{1,3}[.)]\s+/, '')) + '</li>';
+      // The item keeps its own number, so a list split by a blank line or a
+      // code block does not restart at 1.
+      html += `<li value="${Number(numbered[1])}">` + inline(line.slice(numbered[0].length)) + '</li>';
       continue;
     }
     if (line.trim() === '') {
@@ -211,17 +229,25 @@ function addAnswerExtras(el, sources) {
 }
 
 let busyFailsafe = null;
+function armBusyFailsafe() {
+  clearTimeout(busyFailsafe);
+  busyFailsafe = setTimeout(() => {
+    busy = false;
+    $('#send-btn').classList.toggle('busy', false);
+  }, 40000);
+}
 function setBusy(v) {
   busy = v;
   $('#send-btn').classList.toggle('busy', v);
   clearTimeout(busyFailsafe);
   // Failsafe: main has a 25s stream watchdog that always sends llm:done/llm:error, but if a
   // terminal event is ever lost the whole UI stays frozen — self-clear after a generous window.
-  if (v)
-    busyFailsafe = setTimeout(() => {
-      busy = false;
-      $('#send-btn').classList.toggle('busy', false);
-    }, 40000);
+  if (v) armBusyFailsafe();
+}
+// Each streamed token restarts the failsafe window, so a long answer (a
+// résumé analysis can run past 40 s) is never marked idle while it streams.
+function noteStreamActivity() {
+  if (busy) armBusyFailsafe();
 }
 
 // ---- transcript helpers ------------------------------------------------
@@ -283,6 +309,7 @@ export {
   esc,
   finalizeAi,
   messages,
+  noteStreamActivity,
   runMode,
   setBusy,
   showToast,

@@ -42,6 +42,7 @@ const api = {
   knowledgeStatus: () => ipcRenderer.invoke('knowledge:status'),
   knowledgePickVault: () => ipcRenderer.invoke('knowledge:pick-vault'),
   knowledgeForgetVault: () => ipcRenderer.invoke('knowledge:forget-vault'),
+  knowledgeSetEnabled: (enabled) => ipcRenderer.invoke('knowledge:set-enabled', enabled),
   knowledgeReindex: () => ipcRenderer.invoke('knowledge:reindex'),
   knowledgeSearch: (query) => ipcRenderer.invoke('knowledge:search', query),
   knowledgeOpenNote: (relPath) => ipcRenderer.invoke('knowledge:open-note', relPath),

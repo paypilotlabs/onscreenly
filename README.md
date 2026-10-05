@@ -176,7 +176,7 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
   - `stt/`: cloud and streaming transcription, voice activity detection, utterance segmentation, WAV encoding.
   - `whisper/`: local Whisper runtime, model catalog/downloads, server session.
   - `context/`: résumé parsing and analysis, interview and profile context.
-  - `knowledge/`: the read-only Obsidian vault index (BM25 search over heading sections) and its prompt block.
+  - `knowledge/`: the read-only Obsidian vault: note parsing, the index (BM25 search over heading sections) and its prompt block.
   - `capture/`: screenshots and slide tracking.
   - `meetings/`: meeting history, memory, generated notes.
   - `storage/`: settings persistence.

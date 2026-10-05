@@ -8,6 +8,7 @@ import {
   clearTranscriptInterim,
   finalizeAi,
   messages,
+  noteStreamActivity,
   setBusy,
   showToast,
   startAi
@@ -206,7 +207,10 @@ export function init() {
     });
     setBusy(true);
   });
-  onscreenly.on('llm:token', ({ text }) => appendToken(text));
+  onscreenly.on('llm:token', ({ text }) => {
+    noteStreamActivity();
+    appendToken(text);
+  });
   onscreenly.on('llm:done', ({ sources } = {}) => {
     const el = finalizeAi();
     if (el) addAnswerExtras(el, sources);

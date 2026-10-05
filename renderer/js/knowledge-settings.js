@@ -2,7 +2,6 @@
 // skip folders, and try a search to see which notes a question would use.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
-import { saveSettings } from './settings-save.js';
 
 let searchTimer = null;
 
@@ -68,12 +67,14 @@ function fillKnowledge() {
   refreshStatus();
 }
 
+// Only the skipped folders go through the general Save; the vault folder and
+// the on/off switch are set through their own calls.
 function readKnowledge() {
   const exclude = $('#knowledge-exclude')
     .value.split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
-  state.settings.knowledge = { ...(state.settings.knowledge || {}), enabled: $('#knowledge-enabled').checked, exclude };
+  state.settings.knowledge = { ...(state.settings.knowledge || {}), exclude };
 }
 
 function renderResults(results) {
@@ -129,14 +130,16 @@ export function init() {
     $('#knowledge-results').innerHTML = '';
   });
   // Turning notes on or off takes effect at once, not when Settings closes.
-  $('#knowledge-enabled').addEventListener('change', () => {
-    saveSettings().then(refreshStatus);
+  $('#knowledge-enabled').addEventListener('change', async () => {
+    adoptStatus(await onscreenly.knowledgeSetEnabled($('#knowledge-enabled').checked).catch(() => null));
   });
   $('#knowledge-test').addEventListener('input', () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(runTestSearch, 250);
   });
-  onscreenly.on('knowledge:status', renderStatus);
+  // Status pushes carry the saved on/off state too (for example while a newly
+  // picked vault is still indexing), so the next Save keeps it.
+  onscreenly.on('knowledge:status', adoptStatus);
 }
 
 export { fillKnowledge, readKnowledge };

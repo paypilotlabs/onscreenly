@@ -27,6 +27,53 @@ test('job keywords are tool names and repeated words, not ad boilerplate', () =>
   }
 });
 
+test('a real-world ad: company, city, perks and contractions are not keywords; slash lists are split', () => {
+  const ad = `Acme Payments is hiring a Senior Backend Engineer in Berlin.
+
+You'll build and run the services behind our checkout in Python/Go, with a React/TypeScript front end.
+We're on AWS (ECS/Lambda/DynamoDB) and PostgreSQL, and we ship with CI/CD and Terraform.
+Python and SQL are a must. You'll mentor engineers and own on-call for your services.
+Degree in Computer Science or equivalent experience. Experience with Kafka, e.g. for event streaming, is a plus.
+At Acme we value ownership. Benefits: 30 days PTO, Urban Sports Club membership, relocation to Berlin. Ready to go?`;
+  const labels = extractKeywords(ad).map((k) => k.label);
+  for (const skill of [
+    'Python',
+    'Go',
+    'React',
+    'TypeScript',
+    'AWS',
+    'ECS',
+    'Lambda',
+    'DynamoDB',
+    'PostgreSQL',
+    'CI/CD',
+    'Terraform',
+    'SQL',
+    'Kafka'
+  ]) {
+    assert.ok(labels.includes(skill), `${skill} in ${labels.join(', ')}`);
+  }
+  for (const noise of [
+    'Acme',
+    'Berlin',
+    'PTO',
+    'Urban',
+    'Sports',
+    'Club',
+    'Computer',
+    'Science',
+    'll',
+    're',
+    'e.g',
+    'go'
+  ]) {
+    assert.ok(!labels.includes(noise), `${noise} should not be a keyword`);
+  }
+  const resume =
+    'Python, Go, TypeScript, React, SQL, PostgreSQL, AWS (ECS, Lambda, DynamoDB), Terraform, Kafka, CI/CD. Built payment services; mentored engineers.';
+  assert.equal(keywordMatch(resume, ad).score, 100, 'a résumé with every skill scores 100%');
+});
+
 test('the score counts which job keywords appear in the résumé', () => {
   const match = keywordMatch(RESUME, JD);
   assert.ok(match);

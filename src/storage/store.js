@@ -373,10 +373,13 @@ function applyPublikDefault(build) {
 function stripRendererPatch(patch) {
   const out = { ...(patch || {}) };
   for (const k of RENDERER_READ_ONLY) delete out[k];
-  // The vault folder comes only from the folder picker in the main process.
+  // The vault folder and the on/off switch have their own IPC channels
+  // (knowledge:pick-vault, knowledge:set-enabled), so a Save made while a
+  // folder is being picked cannot undo the choice.
   if (out.knowledge && typeof out.knowledge === 'object') {
     out.knowledge = { ...out.knowledge };
     delete out.knowledge.vaultPath;
+    delete out.knowledge.enabled;
   }
   if (out.apiKeys && typeof out.apiKeys === 'object') {
     out.apiKeys = { ...out.apiKeys };

@@ -1,6 +1,7 @@
 // Settings › Knowledge: one read-only index of the user's Obsidian vault,
 // refreshed when notes change, searched for the notes that match each
 // question. The vault is only ever read.
+const crypto = require('crypto');
 const path = require('path');
 const { dialog, shell } = require('electron');
 const store = require('../../src/storage/store');
@@ -41,6 +42,31 @@ function publish() {
   send('knowledge:status', status());
 }
 
+function describeError(e) {
+  return e && e.code === 'ENOENT' ? 'The vault folder was not found.' : (e && e.message) || String(e);
+}
+
+function stopWatchingVault() {
+  if (stopWatching) stopWatching();
+  stopWatching = null;
+}
+
+// Watches the vault while it is reachable. When the watch fails or has to
+// stop, answers fall back to re-checking the vault at most every STALE_MS,
+// and the next successful refresh starts watching again.
+function startWatching(target) {
+  if (stopWatching || index !== target) return;
+  stopWatching = target.watch((result) => {
+    if (index !== target) return;
+    if ('changed' in result) lastError = '';
+    else {
+      if ('error' in result) lastError = result.error;
+      stopWatchingVault();
+    }
+    publish();
+  });
+}
+
 async function reindex() {
   const target = index;
   if (!target) return status();
@@ -48,9 +74,15 @@ async function reindex() {
   publish();
   try {
     await target.refresh();
-    if (target === index) lastError = '';
+    if (target === index) {
+      lastError = '';
+      startWatching(target);
+    }
   } catch (e) {
-    if (target === index) lastError = e && e.code === 'ENOENT' ? 'The vault folder was not found.' : e.message;
+    if (target === index) {
+      lastError = describeError(e);
+      stopWatchingVault();
+    }
   } finally {
     if (target === index) indexing = false;
   }
@@ -64,8 +96,7 @@ async function configure() {
   const key = k.enabled && k.vaultPath ? JSON.stringify([k.vaultPath, k.exclude]) : '';
   if (key === configKey) return status();
   configKey = key;
-  if (stopWatching) stopWatching();
-  stopWatching = null;
+  stopWatchingVault();
   index = null;
   indexing = false;
   lastError = '';
@@ -73,18 +104,8 @@ async function configure() {
     publish();
     return status();
   }
-  const target = createVaultIndex({ root: k.vaultPath, exclude: k.exclude });
-  index = target;
-  await reindex();
-  if (index === target) {
-    stopWatching = target.watch((result) => {
-      if (index !== target) return;
-      lastError = 'error' in result ? result.error : '';
-      publish();
-    });
-    publish();
-  }
-  return status();
+  index = createVaultIndex({ root: k.vaultPath, exclude: k.exclude });
+  return reindex();
 }
 
 /**
@@ -99,11 +120,11 @@ async function retrieveNotes(mode, ctx) {
   if (!target || !knowledgeSettings().enabled) return empty;
   const query = notesQuery(mode, ctx);
   if (!query.trim()) return empty;
-  if (!stopWatching && Date.now() - target.status().indexedAt > STALE_MS) {
-    await target.refresh().catch(() => {});
-  }
+  if (!stopWatching && Date.now() - target.status().indexedAt > STALE_MS) await reindex();
   const results = target.search(query, { limit: 5, maxChars: knowledgeSettings().maxChars });
-  return { block: notesBlock(results), sources: sourcesOf(results) };
+  // A fresh marker per question, so a note cannot fake the end of the block.
+  const marker = crypto.randomBytes(6).toString('hex');
+  return { block: notesBlock(results, marker), sources: sourcesOf(results) };
 }
 
 async function pickVault() {
@@ -113,7 +134,10 @@ async function pickVault() {
   });
   if (result.canceled || !result.filePaths.length) return status();
   store.setSettings({ knowledge: { ...knowledgeSettings(), vaultPath: result.filePaths[0], enabled: true } });
-  return configure();
+  // Answer at once: Settings shows the saved choice and follows the indexing
+  // through knowledge:status, so a Save made meanwhile keeps notes on.
+  configure().catch((e) => console.warn('[knowledge] could not index the vault:', e && e.message));
+  return status();
 }
 
 function registerKnowledgeIpc() {
@@ -122,6 +146,14 @@ function registerKnowledgeIpc() {
   handle('knowledge:forget-vault', () => {
     store.setSettings({ knowledge: { ...knowledgeSettings(), vaultPath: '', enabled: false } });
     return configure();
+  });
+  handle('knowledge:set-enabled', (_e, enabled) => {
+    if (typeof enabled !== 'boolean') throw new Error('Refused: enabled must be true or false');
+    const k = knowledgeSettings();
+    if (enabled && !k.vaultPath) return status();
+    store.setSettings({ knowledge: { ...k, enabled } });
+    configure().catch((e) => console.warn('[knowledge] could not index the vault:', e && e.message));
+    return status();
   });
   handle('knowledge:reindex', () => reindex());
   // The "test search" box in Settings: what a question would pull from the vault.
@@ -141,8 +173,7 @@ function registerKnowledgeIpc() {
 }
 
 function stopKnowledge() {
-  if (stopWatching) stopWatching();
-  stopWatching = null;
+  stopWatchingVault();
 }
 
 module.exports = { configure, registerKnowledgeIpc, retrieveNotes, stopKnowledge };
