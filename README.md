@@ -161,9 +161,18 @@ The dependency audit on **2026-10-05** reported **eight high-severity vulnerable
 - `main.js`: Electron lifecycle, IPC, capture orchestration, and AI actions.
 - `preload.js`: limited renderer API bridge.
 - `renderer/`: existing HTML/CSS/JavaScript overlay, permissions, onboarding, and audio processing.
-- `src/`: providers, context, persistence, identity compatibility, transcription, and meeting memory.
-- `scripts/`: packaging/runtime preparation and regression helpers.
-- `test/`: automated tests using synthetic data and mocked integrations.
+- `src/`, grouped by area:
+  - `llm/`: answer providers, OpenAI-compatible endpoints, prompt modes.
+  - `stt/`: cloud and streaming transcription, voice activity detection, utterance segmentation, WAV encoding.
+  - `whisper/`: local Whisper runtime, model catalog/downloads, server session.
+  - `context/`: résumé parsing, interview and profile context.
+  - `capture/`: screenshots and slide tracking.
+  - `meetings/`: meeting history, memory, generated notes.
+  - `storage/`: settings persistence.
+  - `integrations/`: app-link and Publik.
+  - `platform/`: app identity and Cue profile compatibility, environment variables, shortcuts.
+- `scripts/`: packaging and runtime preparation; `scripts/dev/` holds manual regression helpers.
+- `test/`: automated tests using synthetic data and mocked integrations, mirroring the `src/` groups plus `renderer/` and `build/`.
 - `vendor/app-link/`: vendored integration library with its original provenance.
 
 Historical screenshots under `docs/` show the upstream Cue interface and are not current Onscreenly product screenshots. No new visual design or icon is included in this rename.

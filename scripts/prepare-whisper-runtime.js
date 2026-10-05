@@ -12,7 +12,7 @@ const {
   SOURCE_ARCHIVE_SHA256,
   getRuntimeTarget,
   getRuntimeExecutablePath
-} = require('../src/whisper-runtime-manifest');
+} = require('../src/whisper/whisper-runtime-manifest');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_CACHE_ROOT = path.join(PROJECT_ROOT, '.cache', 'whisper-runtime');

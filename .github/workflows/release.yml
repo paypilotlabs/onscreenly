@@ -50,7 +50,7 @@ jobs:
           set -euo pipefail
           test -n "$PUBLIK_APP_TOKEN" || { echo "PUBLIK_APP_TOKEN secret is not set"; exit 1; }
           node -e '
-            const fs = require("fs"); const p = "src/publik-build.json";
+            const fs = require("fs"); const p = "src/integrations/publik-build.json";
             const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
             cfg.appToken = process.env.PUBLIK_APP_TOKEN;
             fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n");

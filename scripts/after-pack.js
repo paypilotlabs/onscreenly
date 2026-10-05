@@ -15,8 +15,8 @@ const Arch = {
   universal: 4
 };
 const { prepareWhisperRuntime } = require('./prepare-whisper-runtime');
-const { getRuntimeTarget } = require('../src/whisper-runtime-manifest');
-const { readEnvironment } = require('../src/environment');
+const { getRuntimeTarget } = require('../src/whisper/whisper-runtime-manifest');
+const { readEnvironment } = require('../src/platform/environment');
 
 /** Add the matching native runtime after Electron has assembled each target.
  *

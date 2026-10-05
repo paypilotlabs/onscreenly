@@ -10,28 +10,34 @@ const {
   dialog,
   systemPreferences
 } = require('electron');
-const { bootstrapIdentity } = require('./src/app-identity');
+const { bootstrapIdentity } = require('./src/platform/app-identity');
 bootstrapIdentity(app);
-const { readEnvironment } = require('./src/environment');
+const { readEnvironment } = require('./src/platform/environment');
 const path = require('path');
 const os = require('os');
-const store = require('./src/store');
-const { captureScreenshot } = require('./src/screen');
-const { createSTT } = require('./src/stt');
-const { parseDocumentFile } = require('./src/resume');
-const { createLLM } = require('./src/llm');
-const { MODES } = require('./src/prompts');
-const { rms16 } = require('./src/wav');
-const { createStreamingSTT } = require('./src/stt-streaming');
-const { AdaptiveVAD, AudioRingBuffer } = require('./src/vad');
-const { buildInterviewContext, detectCategory } = require('./src/interview-context');
-const { startAppLink, stopAppLink, recordEvent, appLinkConsentState, revokeAppLinkCaller } = require('./src/applink');
-const publik = require('./src/publik');
+const store = require('./src/storage/store');
+const { captureScreenshot } = require('./src/capture/screen');
+const { createSTT } = require('./src/stt/stt');
+const { parseDocumentFile } = require('./src/context/resume');
+const { createLLM } = require('./src/llm/llm');
+const { MODES } = require('./src/llm/prompts');
+const { rms16 } = require('./src/stt/wav');
+const { createStreamingSTT } = require('./src/stt/stt-streaming');
+const { AdaptiveVAD, AudioRingBuffer } = require('./src/stt/vad');
+const { buildInterviewContext, detectCategory } = require('./src/context/interview-context');
+const {
+  startAppLink,
+  stopAppLink,
+  recordEvent,
+  appLinkConsentState,
+  revokeAppLinkCaller
+} = require('./src/integrations/applink');
+const publik = require('./src/integrations/publik');
 // The app token release.yml baked into src/publik-build.json (empty in a dev
 // checkout → the publik option is simply absent from the provider picker).
 const publikBuild = publik.loadBuildConfig();
-const { createMeetingStore } = require('./src/meetings');
-const { createMeetingMemory } = require('./src/meeting-memory');
+const { createMeetingStore } = require('./src/meetings/meetings');
+const { createMeetingMemory } = require('./src/meetings/meeting-memory');
 const {
   hashRGBA,
   shouldEmitSlide,
@@ -40,7 +46,7 @@ const {
   buildSlideSystem,
   buildSlideUser,
   DEFAULT_STABLE_REQUIRED
-} = require('./src/slides');
+} = require('./src/capture/slides');
 
 // macOS system-audio loopback (the "them" channel via getDisplayMedia) does not
 // start on Electron 31–38 unless these Chromium features are enabled; without
@@ -58,10 +64,10 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform,WaylandWindowDecorations');
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
 }
-const { WhisperModelManager } = require('./src/whisper-model-manager');
-const { requireWhisperModel } = require('./src/whisper-model-catalog');
-const { locateWhisperRuntime } = require('./src/whisper-runtime');
-const { LocalWhisperTranscriber } = require('./src/local-whisper-transcriber');
+const { WhisperModelManager } = require('./src/whisper/whisper-model-manager');
+const { requireWhisperModel } = require('./src/whisper/whisper-model-catalog');
+const { locateWhisperRuntime } = require('./src/whisper/whisper-runtime');
+const { LocalWhisperTranscriber } = require('./src/whisper/local-whisper-transcriber');
 
 let win = null;
 // Which global shortcuts Onscreenly actually holds. `globalShortcut.register` returns
