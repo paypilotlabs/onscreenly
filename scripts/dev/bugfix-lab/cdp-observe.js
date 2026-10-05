@@ -16,7 +16,7 @@
 //   8. prints one JSON line of evidence to stdout.
 //
 // This is not a tautology: it observes the real browser API's real return
-// value and the real DOM text onscreenly's own renderer.js writes on failure —
+// value and the real DOM text onscreenly's own renderer writes on failure —
 // exactly the entry point onscreenly's own startSystemAudio() calls.
 //
 // Exit codes (of THIS script — the .ps1 wrapper maps these to BUGFIX_LAB_*):

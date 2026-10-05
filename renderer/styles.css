@@ -834,7 +834,7 @@ button:focus { outline: none; }
 
 /* ============================ Assistant access ============================ */
 /* Anything full-screen added here must ALSO be listed in the pointer-events
-   rule near the top and in the click-through selector in renderer.js, or the
+   rule near the top and in the click-through selector in renderer/js/window-behaviour.js, or the
    window stays transparent to the mouse and the buttons cannot be clicked. */
 #consent-scrim { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 /* Keep full-window overlays over the main column, not the sidebar strips. Declared after

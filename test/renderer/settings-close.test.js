@@ -1,9 +1,8 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const fs = require('node:fs');
-const path = require('node:path');
+const { rendererSource } = require('../helpers/renderer-source');
 
-const source = fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'renderer.js'), 'utf8');
+const source = rendererSource();
 
 // Settings used to declare closeSettings twice. The async one waited for a
 // successful save; the sync one always hid the modal. JavaScript kept the
@@ -17,7 +16,7 @@ test('renderer defines closeSettings once', () => {
 });
 
 test('closeSettings awaits saveSettings before hiding the modal', () => {
-  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n {2}\}/);
+  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n\}/);
   assert.ok(match, 'could not find async closeSettings body');
   const body = match[1];
   assert.match(body, /await saveSettings\(\)/);

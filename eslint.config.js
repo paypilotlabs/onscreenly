@@ -33,6 +33,10 @@ module.exports = [
     languageOptions: { sourceType: 'script', globals: { ...globals.browser } }
   },
   {
+    files: ['renderer/js/**/*.js'],
+    languageOptions: { sourceType: 'module', globals: { ...globals.browser } }
+  },
+  {
     files: ['renderer/*-processor.js'],
     languageOptions: {
       globals: {

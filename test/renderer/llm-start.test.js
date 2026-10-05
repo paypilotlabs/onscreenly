@@ -1,9 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
+const { rendererModule } = require('../helpers/renderer-source');
 
-const source = fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'renderer.js'), 'utf8');
+const source = rendererModule('events.js');
 
 test('starting a new answer keeps the earlier conversation on screen', () => {
   const start = source.indexOf("onscreenly.on('llm:start'");
