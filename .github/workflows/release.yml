@@ -38,7 +38,7 @@ jobs:
 
       - name: Embed publik app token
         # The token is a publishable identifier (it ships in the binary); it lets
-        # the publik API gateway attribute this install to the legacy Cue registration and rate-limit
+        # the publik API gateway attribute this install to its registration (legacy "cue" slug) and rate-limit
         # minting. It is NOT a pk_ key and holds no balance. Written into src/,
         # which the electron-builder.cjs files allowlist already packages.
         # Fails closed: a release without it would ship a build whose provider
