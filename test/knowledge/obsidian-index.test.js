@@ -187,28 +187,38 @@ async function waitFor(check, ms = 5000) {
   return false;
 }
 
+// One watch per folder is the Linux code path; macOS and Windows always use
+// one native recursive watch, which every platform's Node also supports.
 for (const platform of ['linux', 'darwin']) {
-  test(`watching (${platform === 'linux' ? 'one watch per folder' : 'one recursive watch'}) sees new folders and deletions`, async (t) => {
-    const root = makeVault({ 'a.md': 'Alpha', 'Deep/b.md': 'Bravo' });
-    const index = createVaultIndex({ root });
-    await index.refresh();
-    let changes = 0;
-    const stop = index.watch(() => changes++, { delayMs: 50, platform });
-    if (!stop) {
-      t.skip('folder watching is not available here');
-      return;
+  const perFolder = platform === 'linux';
+  const options = {
+    skip: perFolder && process.platform !== 'linux' ? 'per-folder watching runs only on Linux' : false
+  };
+  test(
+    `watching (${perFolder ? 'one watch per folder' : 'one recursive watch'}) sees new folders and deletions`,
+    options,
+    async (t) => {
+      const root = makeVault({ 'a.md': 'Alpha', 'Deep/b.md': 'Bravo' });
+      const index = createVaultIndex({ root });
+      await index.refresh();
+      let changes = 0;
+      const stop = index.watch(() => changes++, { delayMs: 50, platform });
+      if (!stop) {
+        t.skip('folder watching is not available here');
+        return;
+      }
+      try {
+        fs.mkdirSync(path.join(root, 'New'));
+        await waitFor(() => changes > 0);
+        fs.writeFileSync(path.join(root, 'New', 'c.md'), 'Charlie kubernetes');
+        assert.ok(await waitFor(() => index.search('kubernetes').length === 1), 'a note in a new folder is found');
+        fs.rmSync(path.join(root, 'Deep'), { recursive: true });
+        assert.ok(await waitFor(() => !index.hasNote('Deep/b.md')), 'a removed folder drops its notes');
+      } finally {
+        stop();
+      }
     }
-    try {
-      fs.mkdirSync(path.join(root, 'New'));
-      await waitFor(() => changes > 0);
-      fs.writeFileSync(path.join(root, 'New', 'c.md'), 'Charlie kubernetes');
-      assert.ok(await waitFor(() => index.search('kubernetes').length === 1), 'a note in a new folder is found');
-      fs.rmSync(path.join(root, 'Deep'), { recursive: true });
-      assert.ok(await waitFor(() => !index.hasNote('Deep/b.md')), 'a removed folder drops its notes');
-    } finally {
-      stop();
-    }
-  });
+  );
 }
 
 test('on Linux, hidden and excluded folders are not watched, and a huge tree is not watched at all', async () => {
@@ -282,7 +292,9 @@ test('notes past the total size cap are left out and the index says it is incomp
 test('a note read never follows a symbolic link or leaves the vault', async (t) => {
   const outside = makeVault({ 'secret.md': 'outside' });
   const root = makeVault({ 'note.md': 'inside' });
-  const vaultReal = fs.realpathSync(root);
+  // The same native realpath the index uses (on Windows it expands 8.3 short
+  // names such as RUNNER~1, which fs.realpathSync leaves as they are).
+  const vaultReal = await fs.promises.realpath(root);
   try {
     fs.symlinkSync(path.join(outside, 'secret.md'), path.join(root, 'swapped.md'));
     fs.symlinkSync(path.join(root, 'note.md'), path.join(root, 'inner-link.md'));
@@ -292,7 +304,12 @@ test('a note read never follows a symbolic link or leaves the vault', async (t) 
   }
   assert.equal((await readNoteFile(vaultReal, path.join(root, 'note.md'))).text, 'inside');
   assert.equal(await readNoteFile(vaultReal, path.join(root, 'swapped.md')), null, 'resolves outside the vault');
-  await assert.rejects(readNoteFile(vaultReal, path.join(root, 'inner-link.md')), 'a link is not opened');
+  if (fs.constants.O_NOFOLLOW) {
+    await assert.rejects(readNoteFile(vaultReal, path.join(root, 'inner-link.md')), 'a link is not opened');
+  } else {
+    // Windows cannot refuse to open a link; it still never leaves the vault.
+    assert.equal((await readNoteFile(vaultReal, path.join(root, 'inner-link.md'))).text, 'inside');
+  }
 });
 
 test('titles and headings count toward the character budget', async () => {

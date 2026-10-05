@@ -101,14 +101,18 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run dist:mac
         env:
-          # Ad-hoc signed unless a Developer ID certificate is configured; see
-          # electron-builder.cjs.
-          MAC_SIGN: ${{ secrets.CSC_LINK != '' && '1' || '' }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Ad-hoc signed unless a Developer ID certificate is configured (see
+          # electron-builder.cjs). Pull requests always build ad-hoc and never
+          # see the certificate. electron-builder skips all signing on pull
+          # requests unless told otherwise, which would leave a broken
+          # signature; an ad-hoc signature uses no secret, so it is safe there.
+          CSC_FOR_PULL_REQUEST: 'true'
+          MAC_SIGN: ${{ github.event_name != 'pull_request' && secrets.CSC_LINK != '' && '1' || '' }}
+          CSC_LINK: ${{ github.event_name != 'pull_request' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ github.event_name != 'pull_request' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ github.event_name != 'pull_request' && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Verify the macOS signatures
         if: runner.os == 'macOS'

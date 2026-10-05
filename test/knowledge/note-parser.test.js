@@ -69,6 +69,8 @@ test('hostile notes parse in linear time', () => {
     '[['.repeat(100000),
     '![['.repeat(50000),
     '['.repeat(100000),
+    '[a]('.repeat(50000),
+    '!['.repeat(100000),
     '%%'.repeat(50000),
     '<!--'.repeat(30000),
     '#' + '1'.repeat(100000),
