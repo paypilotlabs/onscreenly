@@ -17,26 +17,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # One job runs the suite on Node 22 and then Node 24, so each push needs a
+  # single Ubuntu runner. With one job per version, a runner shortage left one
+  # of them queued until it was cancelled without running a test.
   test:
-    name: Test (Node ${{ matrix.node-version }})
+    name: Test (Node 22 and 24)
     runs-on: ubuntu-latest
-    # The suite takes under a minute. The limit also counts time spent waiting
-    # for a hosted runner, and at 15 minutes jobs were cancelled before any
-    # runner picked them up.
+    # The suite takes about a minute per Node version. The limit also counts
+    # time spent waiting for a hosted runner.
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: [22, 24]
 
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Install Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -60,8 +58,16 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Run tests
+      - name: Run tests on Node 22
         run: npm test
+
+      - name: Install Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run tests on Node 24
+        run: node --version && npm test
 
   package-windows:
     name: Package Windows
