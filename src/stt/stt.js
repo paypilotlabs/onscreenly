@@ -83,10 +83,10 @@ function extractGeminiTranscript(res) {
 }
 
 // gemini-3.5-transcribe is capped at 10 requests/min per model on free-tier
-// keys, and flushChannel in main.js sends a clip every ~900ms per channel
+// keys, and flushChannel in app/main/capture.js sends a clip every ~900ms per channel
 // while someone is talking — so a 429 from it is routine, not a dead key.
 // Park the model for a minute and use the chat model (far higher per-minute
-// quota) for the same clip, instead of letting the error reach main.js's
+// quota) for the same clip, instead of letting the error reach the main process's
 // handleSttError, which switches transcription off for the whole session.
 const TRANSCRIBE_MODEL_COOLDOWN_MS = 60000;
 let transcribeModelDownUntil = 0;

@@ -5,7 +5,7 @@
 // apiKeys.publik like every other provider key; the renderer never sees it.
 //
 // Everything Electron-specific (app version, platform, userData) is passed in
-// by main.js so this file runs under plain `node --test`.
+// by the main process so this file runs under plain `node --test`.
 //
 // Contract: ~/publik-api-research/CONTRACT.md §1, §3.2, §5.
 const fs = require('fs');
@@ -454,7 +454,7 @@ function balanceLine(p, now = Date.now()) {
 }
 
 // ---- CONTRACT §12: the in-app CTA ----------------------------------------
-// Pure views over the redacted publik state (main.js publikState()). The
+// Pure views over the redacted publik state (app/main/publik-controller.js publikState()). The
 // renderer paints exactly what these return, so the copy and the link rules
 // are testable without a DOM.
 
@@ -556,7 +556,7 @@ function markCardSeen(store) {
 }
 
 /**
- * The provisioning flow main.js runs after the disclosure is accepted (and on
+ * The provisioning flow the main process runs after the disclosure is accepted (and on
  * Reconnect). `store` is the app's settings store: getSettings(), setPublik(),
  * setSettings(). Rules:
  *   - never mint twice for a live key;

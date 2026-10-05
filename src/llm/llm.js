@@ -174,7 +174,7 @@ function formatRetryWait(seconds) {
   return `${minutes} minute${minutes === 1 ? '' : 's'}`;
 }
 
-// Structured errors for publik so main.js can offer a button, not just a sentence.
+// Structured errors for publik so the main process can offer a button, not just a sentence.
 function publikError(message, action) {
   const e = new Error(message);
   e.action = action || null;

@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s globstar
-          for file in main.js preload.js electron-builder.cjs renderer/*.js src/**/*.js scripts/**/*.js test/**/*.js; do
+          for file in app/**/*.js preload.js electron-builder.cjs renderer/*.js src/**/*.js scripts/**/*.js test/**/*.js; do
             node --check "$file"
           done
 

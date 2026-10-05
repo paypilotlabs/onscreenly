@@ -12,7 +12,7 @@ const FILES = [
   'src/integrations/publik.js',
   'src/llm/llm.js',
   'src/storage/store.js',
-  'main.js',
+  ...fs.readdirSync(path.join(__dirname, '..', '..', 'app', 'main')).map((f) => `app/main/${f}`),
   'renderer/renderer.js',
   'renderer/index.html'
 ];

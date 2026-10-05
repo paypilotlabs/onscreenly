@@ -94,4 +94,4 @@ app.on('browser-window-created', (_event, win) => {
   });
 });
 
-require('../main.js');
+require('../app/main/index.js');

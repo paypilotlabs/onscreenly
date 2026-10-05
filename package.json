@@ -4,7 +4,7 @@
   "description": "Onscreenly: an open-source AI overlay for screen context, microphone transcription, and meeting assistance.",
   "license": "GPL-3.0-or-later",
   "author": "Lohith Kumar <lkneerukonda@gmail.com>",
-  "main": "main.js",
+  "main": "app/main/index.js",
   "scripts": {
     "start": "electron .",
     "test": "node --test \"test/**/*.test.js\"",

@@ -109,7 +109,7 @@ test('stripRendererPatch drops the publik key and block, keeps everything else',
   });
   assert.deepEqual(out, { provider: 'publik', apiKeys: { openai: 'sk-y' }, aiRules: 'x' });
 
-  // Through setSettings, the way main.js wires settings:set.
+  // Through setSettings, the way app/main/ipc.js wires settings:set.
   store.setPublik({ apiKey: 'pk_live_real', claimUrl: 'https://publikhq.com/claim/A' });
   store.setSettings(
     store.stripRendererPatch({

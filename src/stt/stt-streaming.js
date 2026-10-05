@@ -720,7 +720,7 @@ function createStreamingSTT(settings, channel, callbacks) {
   // batch Gemini path). Opt-in only: its interim hypotheses get rewritten as
   // it goes, which reads as glitchy next to Deepgram, so 'auto' with a
   // Gemini-only key stays on batch. A failure here falls back to batch Gemini
-  // in main.js.
+  // in app/main/capture.js.
   if (selectedProvider === 'gemini' && keys.gemini) {
     const stt = new GeminiLiveSTT(keys.gemini, {
       vocabulary: buildVocabPrompt(settings)
