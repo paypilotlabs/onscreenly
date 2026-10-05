@@ -39,6 +39,19 @@ test('install paths with spaces, accents and escaped characters still match', ()
   assert.equal(isTrustedPageUrl(pathToFileURL(path.join(dir, 'other.html')).href, dir), false);
 });
 
+test('a bare % in the install path, which loadFile leaves unescaped, still matches', () => {
+  const nodeUrl = require('node:url');
+  for (const folder of ['Leo%Kumar', 'Apps 100%', '50% off']) {
+    const dir = path.join(path.sep === '\\' ? 'C:\\' : '/', 'Users', folder, 'Onscreenly', 'renderer');
+    // Electron's loadFile builds the page URL with url.format, which keeps a lone '%'.
+    const loaded = new URL(nodeUrl.format({ protocol: 'file', slashes: true, pathname: path.join(dir, 'index.html') }))
+      .href;
+    assert.match(loaded, /%(?![0-9A-Fa-f]{2})/, 'the URL keeps a bare %');
+    assert.equal(isTrustedPageUrl(loaded, dir), true, folder);
+    assert.equal(isTrustedPageUrl(loaded, path.join(dir, '..', 'other')), false, folder + ' elsewhere');
+  }
+});
+
 test('open-pane only reaches the OS privacy panes the app links to', () => {
   for (const url of [
     'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',

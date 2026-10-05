@@ -18,7 +18,9 @@ const samePath =
  * True when a frame URL is one of Onscreenly's own pages inside rendererDir.
  * Compares decoded file paths, not URL text, so install paths with spaces,
  * accents or other escaped characters still match. A #fragment is ignored: it
- * cannot change which document is loaded.
+ * cannot change which document is loaded. Electron's loadFile leaves a '%'
+ * from the folder name unescaped (".../Apps 100%/renderer/index.html"), which
+ * strict URL decoding rejects, so such a '%' is read as a literal character.
  * @param {string} frameUrl
  * @param {string} rendererDir
  */
@@ -32,7 +34,7 @@ function isTrustedPageUrl(frameUrl, rendererDir) {
   if (url.protocol !== 'file:' || url.search || url.host) return false;
   let filePath;
   try {
-    filePath = fileURLToPath(url);
+    filePath = fileURLToPath(url.href.replace(/%(?![0-9A-Fa-f]{2})/g, '%25'));
   } catch {
     return false;
   }

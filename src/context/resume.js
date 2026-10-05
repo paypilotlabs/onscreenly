@@ -4,6 +4,12 @@
 const fs = require('fs');
 const path = require('path');
 
+// pdf.js requires this location to end in '/', and a Windows path joined with
+// path.sep ends in '\\', which it rejects. Forward slashes work for fs on every OS.
+function standardFontDataUrl(packageDir, pathImpl = path) {
+  return pathImpl.join(packageDir, 'standard_fonts').split(pathImpl.sep).join('/') + '/';
+}
+
 // pdf.js parses untrusted files here. Current pdf.js has no eval code path
 // (CVE-2024-4367 was code execution through font programs evaluated with
 // eval in pdf.js before 4.2.67, which the old pdf-parse still bundled), and
@@ -15,7 +21,7 @@ async function extractPdfText(buf) {
     data: new Uint8Array(buf),
     disableFontFace: true,
     useSystemFonts: false,
-    standardFontDataUrl: path.join(packageDir, 'standard_fonts') + path.sep,
+    standardFontDataUrl: standardFontDataUrl(packageDir),
     verbosity: pdfjs.VerbosityLevel.ERRORS
   });
   const doc = await loadingTask.promise;
@@ -53,4 +59,4 @@ async function parseDocumentFile(filePath) {
   throw new Error('Unsupported file type: ' + (ext || '(none)') + '. Use a PDF or DOCX file.');
 }
 
-module.exports = { parseDocumentFile };
+module.exports = { parseDocumentFile, standardFontDataUrl };

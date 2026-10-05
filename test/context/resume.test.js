@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseDocumentFile } = require('../../src/context/resume');
+const { parseDocumentFile, standardFontDataUrl } = require('../../src/context/resume');
 
 // A minimal one-page PDF using the built-in Helvetica font, with each line
 // drawn by its own text operator.
@@ -58,4 +58,15 @@ test('rejects a file that is not a PDF', async () => {
 test('rejects unsupported file types', async () => {
   const file = tempFile('resume.txt', 'plain text');
   await assert.rejects(parseDocumentFile(file), /Unsupported file type: \.txt/);
+});
+
+test('the font folder handed to pdf.js ends in a forward slash on every OS', () => {
+  assert.equal(
+    standardFontDataUrl('C:\\Users\\Leo\\AppData\\Local\\Programs\\Onscreenly\\node_modules\\pdfjs-dist', path.win32),
+    'C:/Users/Leo/AppData/Local/Programs/Onscreenly/node_modules/pdfjs-dist/standard_fonts/'
+  );
+  assert.equal(
+    standardFontDataUrl('/Applications/Onscreenly.app/node_modules/pdfjs-dist', path.posix),
+    '/Applications/Onscreenly.app/node_modules/pdfjs-dist/standard_fonts/'
+  );
 });
