@@ -10,11 +10,20 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch or PR supersedes the run in progress, so it
+# stops holding runners that the newer run is waiting for.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The suite takes under a minute. The limit also counts time spent waiting
+    # for a hosted runner, and at 15 minutes jobs were cancelled before any
+    # runner picked them up.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
