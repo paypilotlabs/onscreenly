@@ -30,6 +30,7 @@ function fillSettings() {
   $('#model-fast').value = m.fast;
   $('#model-smart').value = m.smart;
   fillAppLinkCallers();
+  fillKeyStorageNote();
   $('#s-status').textContent = statusText();
   // Transcription tab
   document.querySelectorAll('#meeting-audio-seg button').forEach((button) => {
@@ -62,6 +63,19 @@ function fillSettings() {
 
 // Whoever Onscreenly has been told it may answer questions for. Empty is the normal
 // state — nothing appears here until something has asked and been allowed.
+// How saved API keys are protected on this computer (see src/storage/secrets.js).
+async function fillKeyStorageNote() {
+  const note = $('#key-storage-note');
+  if (!note || !onscreenly.keyStorageStatus) return;
+  try {
+    const status = await onscreenly.keyStorageStatus();
+    note.textContent = status.message;
+    note.classList.toggle('warn', !status.protected);
+  } catch (_) {
+    note.textContent = '';
+  }
+}
+
 async function fillAppLinkCallers() {
   const host = $('#applink-callers');
   if (!host || !onscreenly.appLinkState) return;
@@ -129,6 +143,9 @@ function statusText() {
 }
 
 export function init() {
+  $('#delete-all-data').addEventListener('click', () => {
+    onscreenly.deleteAllData().catch(() => {});
+  });
   document.querySelectorAll('#provider-seg button').forEach((b) =>
     b.addEventListener('click', () => {
       state.settings.provider = b.dataset.provider;

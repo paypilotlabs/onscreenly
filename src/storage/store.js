@@ -5,8 +5,10 @@
 // recovery, 0600 permissions) live in ./settings-store-core so they can be
 // unit tested without Electron; this file owns the schema, defaults and
 // public surface (getSettings/setSettings/etc.) as before.
+const fs = require('fs');
 const { app } = require('electron');
 const { createFileStore } = require('./settings-store-core');
+const { createSecretsFile, describeKeyStorage, maskKey } = require('./secrets');
 const { normalizeBaseUrl } = require('../llm/openai-compatible');
 const { APP_ID, resolveSettingsFilename } = require('../platform/app-identity');
 
@@ -148,6 +150,160 @@ const RENDERER_READ_ONLY = ['publik', 'applinkSlidesConsent', 'applinkSlidesCons
 let data = null;
 let lastError = null;
 
+// -------- API key encryption --------
+// Until initSecureStorage() runs (at app start, once safeStorage is usable),
+// keys stay where they were. Afterwards they live only in memory and in the
+// encrypted secrets.bin; the settings JSON carries blank key fields.
+/** @type {'pending' | 'encrypted' | 'weak' | 'unavailable' | 'unreadable'} */
+let keyMode = 'pending';
+/** @type {ReturnType<typeof createSecretsFile> | null} */
+let secretsFile = null;
+let secretsWrite = Promise.resolve();
+let lastWrittenKeys = null; // JSON of the key map secrets.bin holds
+
+// The Ollama "key" field holds a local URL, not a secret, so Settings shows it as is.
+const UNMASKED_KEYS = new Set(['ollama']);
+
+function keysLiveInSecretsFile() {
+  return keyMode === 'encrypted' || keyMode === 'weak' || keyMode === 'unreadable';
+}
+
+function nonEmptyKeys(keys) {
+  const out = {};
+  for (const [name, value] of Object.entries(keys || {})) if (typeof value === 'string' && value) out[name] = value;
+  return out;
+}
+
+function withBlankKeys(settings) {
+  const apiKeys = {};
+  for (const name of Object.keys(settings.apiKeys || {})) apiKeys[name] = '';
+  return { ...settings, apiKeys };
+}
+
+// What goes into the settings JSON.
+function persistable(settings) {
+  return keysLiveInSecretsFile() ? withBlankKeys(settings) : settings;
+}
+
+function queueSecretsWrite() {
+  const snapshot = JSON.stringify(nonEmptyKeys(data.apiKeys));
+  if (snapshot === lastWrittenKeys) return;
+  // An undecryptable secrets.bin may only be unreadable for now (a locked key
+  // store); it is replaced once the user actually saves a key, not before.
+  if (keyMode === 'unreadable' && snapshot === '{}') return;
+  const file = secretsFile;
+  secretsWrite = secretsWrite
+    .catch(() => {})
+    .then(async () => {
+      await file.write(JSON.parse(snapshot));
+      lastWrittenKeys = snapshot;
+      if (keyMode === 'unreadable') keyMode = 'encrypted';
+    })
+    .catch((e) => {
+      // Never lose a key: if it cannot be written encrypted, keep it in the
+      // settings file the way it was stored before encryption existed.
+      console.error('[onscreenly] could not write encrypted API keys:', e && e.message);
+      keyMode = 'unavailable';
+      save();
+    });
+}
+
+function backupHasPlaintextKeys() {
+  try {
+    const backup = JSON.parse(fs.readFileSync(fileStore.bakPath(), 'utf8'));
+    return Object.keys(nonEmptyKeys(backup && backup.apiKeys)).length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Moves API keys into secrets.bin, encrypted by the OS key store. Called once
+ * at startup after app 'ready'. Keys found in the settings JSON (a profile from
+ * before encryption, or one edited by an older version) are written to
+ * secrets.bin, read back to verify, and only then removed from the JSON and
+ * its backup. Any failure leaves the keys where they were.
+ * @param {import('./secrets').EncryptionBackend} backend
+ */
+async function initSecureStorage(backend) {
+  load();
+  secretsFile = createSecretsFile(() => app.getPath('userData'), backend);
+  let available = false;
+  try {
+    available = await backend.isAvailable();
+  } catch (_) {
+    available = false;
+  }
+  if (!available) {
+    keyMode = 'unavailable';
+    return keyStorageStatus();
+  }
+  const protectedMode = backend.isWeak() ? 'weak' : 'encrypted';
+
+  let stored = null;
+  let unreadable = false;
+  try {
+    stored = await secretsFile.read();
+  } catch (e) {
+    console.error('[onscreenly] could not decrypt saved API keys:', e && e.message);
+    unreadable = true;
+  }
+  // A key still in the JSON is newer than secrets.bin: only an older version
+  // of the app, which does not know about secrets.bin, writes keys there.
+  const fromJson = nonEmptyKeys(data.apiKeys);
+  const merged = { ...(stored || {}), ...fromJson };
+  data.apiKeys = { ...data.apiKeys, ...merged };
+
+  if (Object.keys(fromJson).length) {
+    try {
+      await secretsFile.write(merged);
+      const check = await secretsFile.read();
+      if (JSON.stringify(check) !== JSON.stringify(merged)) throw new Error('encrypted keys did not read back');
+      lastWrittenKeys = JSON.stringify(merged);
+      keyMode = protectedMode;
+    } catch (e) {
+      console.error('[onscreenly] keeping API keys in the settings file:', e && e.message);
+      keyMode = 'unavailable';
+      return keyStorageStatus();
+    }
+  } else {
+    keyMode = unreadable ? 'unreadable' : protectedMode;
+    lastWrittenKeys = stored ? JSON.stringify(stored) : null;
+  }
+
+  if (Object.keys(fromJson).length || backupHasPlaintextKeys()) {
+    // Saving twice: the first write moves the old plaintext file to .bak, the
+    // second replaces that backup with the key-free copy.
+    save();
+    save();
+  }
+  return keyStorageStatus();
+}
+
+function keyStorageStatus() {
+  return describeKeyStorage(keyMode, process.platform);
+}
+
+/** Resolves once any pending encrypted-key write has finished. */
+function flushSecrets() {
+  return secretsWrite.catch(() => {});
+}
+
+/** Removes the settings file, its backup and the encrypted keys. */
+async function deleteLocalSettings() {
+  await flushSecrets();
+  for (const target of [fileStore.mainPath(), fileStore.bakPath(), fileStore.tmpPath()]) {
+    try {
+      fs.unlinkSync(target);
+    } catch (e) {
+      if (!(e && e.code === 'ENOENT')) throw e;
+    }
+  }
+  if (secretsFile) secretsFile.remove();
+  data = null;
+  lastWrittenKeys = null;
+}
+
 function deepMerge(base, over) {
   const out = Array.isArray(base) ? base.slice() : { ...base };
   for (const k of Object.keys(over || {})) {
@@ -178,7 +334,8 @@ function load() {
 // IPC handler) surface it instead of pretending the save succeeded.
 function save() {
   try {
-    fileStore.persist(data);
+    fileStore.persist(persistable(data));
+    if (keysLiveInSecretsFile()) queueSecretsWrite();
     lastError = null;
     return true;
   } catch (e) {
@@ -215,15 +372,26 @@ function stripRendererPatch(patch) {
   if (out.apiKeys && typeof out.apiKeys === 'object') {
     out.apiKeys = { ...out.apiKeys };
     delete out.apiKeys.publik;
+    // A masked key sent back unchanged means "keep the saved key".
+    const saved = (load() && data.apiKeys) || {};
+    for (const [name, value] of Object.entries(out.apiKeys)) {
+      if (saved[name] && !UNMASKED_KEYS.has(name) && value === maskKey(saved[name])) delete out.apiKeys[name];
+    }
   }
   return out;
 }
 
-// What the renderer gets from settings:get: the same object minus the key.
+// What the renderer gets from settings:get: saved keys only as a mask (the
+// last four characters), and never the publik key.
 function redactForRenderer(s) {
+  const apiKeys = {};
+  for (const [name, value] of Object.entries(s.apiKeys || {})) {
+    apiKeys[name] = UNMASKED_KEYS.has(name) ? value : maskKey(value);
+  }
+  apiKeys.publik = '';
   return {
     ...s,
-    apiKeys: { ...(s.apiKeys || {}), publik: '' },
+    apiKeys,
     publik: { ...(s.publik || {}), connected: !!(s.apiKeys && s.apiKeys.publik) }
   };
 }
@@ -237,6 +405,10 @@ module.exports = {
   applyPublikDefault,
   stripRendererPatch,
   redactForRenderer,
+  initSecureStorage,
+  keyStorageStatus,
+  flushSecrets,
+  deleteLocalSettings,
   getSettings() {
     return load();
   },

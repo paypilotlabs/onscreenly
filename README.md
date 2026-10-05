@@ -143,13 +143,14 @@ For release acceptance, inspect the packaged application name, bundle ID, permis
 
 ## Security policy and planned work
 
-Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: OS-backed key storage, data retention and deletion, a dependency update cadence, and protected signed releases.
+Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: retention rules for meeting history, a dependency update cadence, and protected signed releases.
 
 On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed, and every IPC message is checked for its sender and payload. `npm audit` now reports no vulnerable packages. The policy documents planned requirements and does not claim this build is production-hardened.
 
 ## Privacy and local storage
 
-- Settings and API keys are stored as **plain JSON**, with owner-only file permissions where supported. This is not encrypted or Keychain-backed storage.
+- API keys are encrypted with the operating system's key store (macOS Keychain, Windows DPAPI, GNOME Keyring or KWallet on Linux) in `secrets.bin`; the settings JSON keeps blank key fields. Keys from an older profile are moved there on first launch, and Settings only ever shows a saved key masked to its last four characters. Without a key store, Settings says so: on Linux without a keyring the keys are only obfuscated, and where encryption is unavailable they stay in the settings file as before.
+- **Settings → API Keys → Delete all my data** removes settings, saved keys, résumé and profile text, and meeting history, then restarts Onscreenly. Downloaded Whisper models are kept and can be removed in Settings → Audio.
 - `meetings.json` stores transcript history and generated notes. The app retains a bounded number of recent meetings and may restore an interrupted session; it is not a lossless recording system.
 - Audio chunks are processed in memory. Downloaded Whisper models remain on disk until deleted through Settings.
 - Screen images, conversation context, profile text, and custom response rules can be sent to your selected answer provider. Cloud transcription sends audio to the selected speech provider. Optional Publik routes requests through its gateway.

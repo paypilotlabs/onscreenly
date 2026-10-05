@@ -27,11 +27,20 @@ const {
 const { registerShortcuts } = require('./shortcuts');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
+const { safeStorageBackend } = require('./secure-storage');
 
-// No Chromium switches are needed on Electron 44. macOS system-audio loopback
-// uses Core Audio taps by default since Electron 39 (it needs
-// NSAudioCaptureUsageDescription, set in electron-builder.cjs), and Linux runs
-// natively on Wayland since Electron 38 (--ozone-platform defaults to auto).
+// Since Electron 39, macOS meeting audio goes through Core Audio taps, which
+// need a separate "System Audio Recording" permission; without it the stream
+// is silent and nothing reports an error. Electron 39-44 can keep the
+// ScreenCaptureKit path that the Screen Recording grant already covers, which
+// is what Onscreenly used before. The switch does nothing from Electron 45, so
+// revisit this with the next major upgrade. Must run before app is ready.
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('disable-features', 'MacCatapLoopbackAudioForScreenShare');
+}
+
+// Linux runs natively on Wayland since Electron 38 (--ozone-platform defaults
+// to auto), so no Linux switches are needed.
 
 // Windows never blocks startup on an unresolved permission (see app.whenReady()
 // below), so launchApp() can already have run once by the time the user grants
@@ -132,6 +141,11 @@ app.whenReady().then(async () => {
   if (isWindows) {
     process.title = 'Onscreenly';
   }
+
+  // Before anything reads settings: load API keys from the encrypted store and
+  // move any plaintext keys from an older profile into it.
+  const keyStorage = await store.initSecureStorage(safeStorageBackend);
+  console.log(`[onscreenly] API key storage: ${keyStorage.mode}`);
 
   if (isMac) {
     const allGranted = await requestPermissions();

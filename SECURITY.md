@@ -51,7 +51,7 @@ There are **no owner-approved finding exclusions or accepted-risk waivers** in t
 
 ## Current limitations
 
-- Settings and their backups contain plaintext keys; POSIX file permissions are not encryption. Most saved BYO provider keys are available to the settings renderer; Publik has additional redaction.
+- API keys are encrypted with the OS key store (Electron `safeStorage`, async API) and removed from the settings file and its backup; the renderer only receives masked keys. On Linux without a keyring the keys are only obfuscated, and where no key store is available they stay in the settings file; Settings shows a warning in both cases.
 - Both windows run sandboxed with context isolation and no Node integration, and both pages forbid inline scripts. Every IPC message must come from the top frame of Onscreenly's own pages and its payload is type- and size-checked; navigation, `window.open` and webviews are refused; `open-pane` only opens the OS privacy panes; media permissions are granted only to Onscreenly's own pages. Settings patches are checked for shape and size, not field by field.
 - Screen-share exclusion is best effort and is not a confidentiality guarantee across meeting apps and operating systems.
 - Local app-link consent does not prove the requesting process's identity. Runtime overrides and caches require trust and further integrity review.
