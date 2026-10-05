@@ -2,13 +2,23 @@
 // Pure rules for which IPC senders and payloads the main process accepts.
 // Kept free of Electron so the rules are unit-tested directly.
 const path = require('path');
-const { fileURLToPath, pathToFileURL } = require('url');
+const { fileURLToPath } = require('url');
 
 // The only pages allowed to talk to the main process.
 const TRUSTED_PAGES = new Set(['index.html', 'permissions.html']);
 
+// Windows and macOS file systems are case-insensitive by default, and the
+// frame URL's drive letter or path case need not match __dirname exactly.
+const samePath =
+  process.platform === 'win32' || process.platform === 'darwin'
+    ? (a, b) => a.toLowerCase() === b.toLowerCase()
+    : (a, b) => a === b;
+
 /**
  * True when a frame URL is one of Onscreenly's own pages inside rendererDir.
+ * Compares decoded file paths, not URL text, so install paths with spaces,
+ * accents or other escaped characters still match. A #fragment is ignored: it
+ * cannot change which document is loaded.
  * @param {string} frameUrl
  * @param {string} rendererDir
  */
@@ -19,16 +29,17 @@ function isTrustedPageUrl(frameUrl, rendererDir) {
   } catch {
     return false;
   }
-  if (url.protocol !== 'file:' || url.search || url.hash) return false;
+  if (url.protocol !== 'file:' || url.search || url.host) return false;
   let filePath;
   try {
     filePath = fileURLToPath(url);
   } catch {
     return false;
   }
-  const rendererUrl = pathToFileURL(path.resolve(rendererDir) + path.sep).href;
-  if (!url.href.startsWith(rendererUrl)) return false;
-  return path.dirname(filePath) === path.resolve(rendererDir) && TRUSTED_PAGES.has(path.basename(filePath));
+  return (
+    samePath(path.dirname(filePath), path.resolve(rendererDir)) &&
+    TRUSTED_PAGES.has(path.basename(filePath).toLowerCase())
+  );
 }
 
 // System-settings panes the onboarding and permission screens link to. Anything

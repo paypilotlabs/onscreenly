@@ -23,11 +23,20 @@ test('only the overlay and permission pages inside renderer/ are trusted', () =>
   assert.equal(isTrustedPageUrl(pageUrl('js/main.js'), RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl(pathToFileURL(path.join(RENDERER_DIR, '..', 'index.html')).href, RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl(pageUrl('index.html') + '?x=1', RENDERER_DIR), false);
-  assert.equal(isTrustedPageUrl(pageUrl('index.html') + '#frag', RENDERER_DIR), false);
+  assert.equal(isTrustedPageUrl(pageUrl('index.html') + '#frag', RENDERER_DIR), true, 'a fragment keeps the same page');
+  assert.equal(isTrustedPageUrl('file://remote-host/share/renderer/index.html', RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl('https://example.com/index.html', RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl('about:blank', RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl('', RENDERER_DIR), false);
   assert.equal(isTrustedPageUrl('not a url', RENDERER_DIR), false);
+});
+
+test('install paths with spaces, accents and escaped characters still match', () => {
+  const dir = path.join(path.sep === '\\' ? 'C:\\' : '/', 'Users', 'Lohíth Kumar', 'Apps #1', 'Onscreenly', 'renderer');
+  const url = pathToFileURL(path.join(dir, 'index.html')).href;
+  assert.match(url, /%20/);
+  assert.equal(isTrustedPageUrl(url, dir), true);
+  assert.equal(isTrustedPageUrl(pathToFileURL(path.join(dir, 'other.html')).href, dir), false);
 });
 
 test('open-pane only reaches the OS privacy panes the app links to', () => {
