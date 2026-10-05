@@ -143,9 +143,9 @@ For release acceptance, inspect the packaged application name, bundle ID, permis
 
 ## Security policy and planned work
 
-Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: OS-backed key storage, stronger Electron/IPC isolation, data retention and deletion, dependency updates, and protected signed releases.
+Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: OS-backed key storage, data retention and deletion, a dependency update cadence, and protected signed releases.
 
-The dependency audit on **2026-10-05** reported **eight high-severity vulnerable package entries**, including Electron and transitive/build dependencies. These need triage and remediation; passing functional tests does not resolve them. The policy documents planned requirements and does not claim those controls are already implemented or that this build is production-hardened.
+On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed, and every IPC message is checked for its sender and payload. `npm audit` now reports no vulnerable packages. The policy documents planned requirements and does not claim this build is production-hardened.
 
 ## Privacy and local storage
 

@@ -52,10 +52,10 @@ There are **no owner-approved finding exclusions or accepted-risk waivers** in t
 ## Current limitations
 
 - Settings and their backups contain plaintext keys; POSIX file permissions are not encryption. Most saved BYO provider keys are available to the settings renderer; Publik has additional redaction.
-- Renderer context isolation and disabled Node integration are present, but renderer sandboxing is disabled. IPC, permission request, and external-link boundaries need further hardening.
+- Both windows run sandboxed with context isolation and no Node integration, and both pages forbid inline scripts. Every IPC message must come from the top frame of Onscreenly's own pages and its payload is type- and size-checked; navigation, `window.open` and webviews are refused; `open-pane` only opens the OS privacy panes; media permissions are granted only to Onscreenly's own pages. Settings patches are checked for shape and size, not field by field.
 - Screen-share exclusion is best effort and is not a confidentiality guarantee across meeting apps and operating systems.
 - Local app-link consent does not prove the requesting process's identity. Runtime overrides and caches require trust and further integrity review.
-- The dependency audit on 2026-10-05 reported eight high-severity vulnerable package entries. They remain unresolved; see the roadmap.
+- On 2026-10-05, after upgrading Electron to 44 and replacing `extract-zip` and `pdf-parse`, `npm audit` reports no vulnerable packages. Résumé PDFs are parsed with current pdf.js; the old `pdf-parse` bundled pdf.js 1.10, which is affected by CVE-2024-4367 and invisible to `npm audit`.
 - The verified Apple Silicon package is unsigned and excludes the local Whisper runtime. No production release or comprehensive penetration test is implied.
 
 Use the [Electron security checklist](https://www.electronjs.org/docs/latest/tutorial/security) alongside this repository-specific guidance. Planned controls, owner decisions, and acceptance evidence are tracked in [the roadmap](docs/security-roadmap.md).
