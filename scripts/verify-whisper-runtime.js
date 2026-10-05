@@ -2,7 +2,7 @@
 
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { locateWhisperRuntime } = require('../src/whisper-runtime');
+const { locateWhisperRuntime } = require('../src/whisper/whisper-runtime');
 
 function buildRuntimeEnvironment(runtimeDirectory) {
   const environment = { ...process.env };

@@ -23,8 +23,12 @@ systemPreferences.askForMediaAccess = async () => false;
 desktopCapturer.getSources = async () => [];
 globalShortcut.register = () => true;
 globalShortcut.unregisterAll = () => {};
-require('../src/applink').startAppLink = () => null;
-require('../src/publik').loadBuildConfig = () => ({ available: false, appToken: '', disclosureVersion: 1 });
+require('../src/integrations/applink').startAppLink = () => null;
+require('../src/integrations/publik').loadBuildConfig = () => ({
+  available: false,
+  appToken: '',
+  disclosureVersion: 1
+});
 let clickedQuit = false;
 let receivedQuit = false;
 const timeout = setTimeout(() => {

@@ -6,10 +6,10 @@ Onscreenly started as a fork of [Cue](https://github.com/Blueturboguy07/cue). Th
 
 | Shim | File | Why it stays |
 |---|---|---|
-| Legacy profile directories (`cue`, `Cue`, `MicrosoftEdgeUpdate`) and `cue-data.json` | `src/app-identity.js` | Reuses an existing Cue profile in place. |
-| `CUE_*` environment aliases | `src/environment.js` | Old scripts and CI keep working. |
+| Legacy profile directories (`cue`, `Cue`, `MicrosoftEdgeUpdate`) and `cue-data.json` | `src/platform/app-identity.js` | Reuses an existing Cue profile in place. |
+| `CUE_*` environment aliases | `src/platform/environment.js` | Old scripts and CI keep working. |
 | `window.cue` renderer alias | `preload.js` | Deprecated alias of `window.onscreenly`. |
-| Publik `cue` app slug | `src/publik.js`, `src/publik-build.json` | External registration owned by Publik; changing it needs their coordination. |
+| Publik `cue` app slug | `src/integrations/publik.js`, `src/integrations/publik-build.json` | External registration owned by Publik; changing it needs their coordination. |
 | `cue-data.json*` ignore rule | `.gitignore` | Stops a legacy settings file holding keys from being committed. |
 
 ## Upgrading from Cue
