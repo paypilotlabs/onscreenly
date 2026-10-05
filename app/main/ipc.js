@@ -1,11 +1,11 @@
 // IPC channels that do not belong to a single feature module: settings,
 // transcript, asking, profile documents, app-link consent and app plumbing.
-const { app, dialog, shell } = require('electron');
+const { app, clipboard, dialog, shell } = require('electron');
 const { handle, on } = require('./ipc-guard');
 const fs = require('fs');
 const path = require('path');
 const store = require('../../src/storage/store');
-const { parseDocumentFile } = require('../../src/context/resume');
+const { DOCUMENT_EXTENSIONS, parseDocumentFile } = require('../../src/context/resume');
 const { appLinkConsentState, revokeAppLinkCaller } = require('../../src/integrations/applink');
 const { WIN_BUILD, WIN_SUPPORTS_CONTENT_PROTECTION } = require('./platform');
 const { session, send } = require('./session');
@@ -16,20 +16,24 @@ const {
   isAllowedPaneUrl,
   isPlainObject,
   isValidAskPayload,
+  isShortString,
   isValidSettingsPatch,
-  MAX_ASK_TEXT_CHARS
+  MAX_ASK_TEXT_CHARS,
+  MAX_ANSWER_CHARS
 } = require('./ipc-policy');
 const slides = require('./slides');
 const { setCapturing } = require('./capture');
+const { configure: configureKnowledge, stopKnowledge } = require('./knowledge');
 
 // -------- resume / job-description file import --------
-// The dialog runs in MAIN and is filtered to pdf/docx; the renderer never supplies a path.
-// The parsed text is RETURNED to the renderer, which drops it into the existing
-// #resume-text / #job-description textareas so settings keep a single source of truth.
+// The dialog runs in MAIN and is filtered to PDF, DOCX, Markdown and text; the
+// renderer never supplies a path. The parsed text is RETURNED to the renderer,
+// which drops it into the Profile tab's résumé or job-description field so
+// settings keep a single source of truth.
 async function pickAndParseDocument() {
   const res = await dialog.showOpenDialog(getWin(), {
     properties: ['openFile'],
-    filters: [{ name: 'Resume / Job description', extensions: ['pdf', 'docx'] }]
+    filters: [{ name: 'Résumé / Job description', extensions: DOCUMENT_EXTENSIONS }]
   });
   if (res.canceled || !res.filePaths.length) return null;
   const filePath = res.filePaths[0];
@@ -52,6 +56,7 @@ async function deleteAllData() {
   });
   if (response !== 1) return { deleted: false };
   if (session.state.capturing) await setCapturing(false).catch(() => {});
+  stopKnowledge();
   session.transcript.splice(0, session.transcript.length);
   const userData = app.getPath('userData');
   for (const name of ['meetings.json', 'meetings.json.tmp', 'meetings.json.bak']) {
@@ -76,6 +81,8 @@ function registerAppIpc() {
     if (session.state.capturing) slides.startSlideLoop();
     // A changed key is on disk (encrypted) before Save reports success.
     await store.flushSecrets();
+    // Knowledge on/off or excluded folders changed: re-index in the background.
+    configureKnowledge().catch((e) => console.warn('[knowledge] configure failed:', e && e.message));
     return store.redactForRenderer(next);
   });
   handle('data:key-storage', () => store.keyStorageStatus());
@@ -114,6 +121,27 @@ function registerAppIpc() {
       return;
     }
     shell.openExternal(url).catch(() => {});
+  });
+  // Copy / Save as Markdown under an answer. Main writes the clipboard and the
+  // file, so the sandboxed window needs no clipboard or file access of its own.
+  handle('answer:copy', async (_e, text) => {
+    if (!isShortString(text, MAX_ANSWER_CHARS)) throw new Error('Refused: invalid answer text');
+    // Asynchronous since Electron 44.
+    await clipboard.writeText(text);
+    return true;
+  });
+  handle('answer:save-markdown', async (_e, payload) => {
+    if (!isPlainObject(payload) || !isShortString(payload.text, MAX_ANSWER_CHARS)) {
+      throw new Error('Refused: invalid answer text');
+    }
+    const defaultName = payload.kind === 'resume-analysis' ? 'Résumé analysis.md' : 'Onscreenly answer.md';
+    const res = await dialog.showSaveDialog(getWin(), {
+      defaultPath: path.join(app.getPath('documents'), defaultName),
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (res.canceled || !res.filePath) return { saved: false };
+    await fs.promises.writeFile(res.filePath, payload.text, 'utf8');
+    return { saved: true, fileName: path.basename(res.filePath) };
   });
   on('app:quit', () => app.quit());
   on('log', (_e, msg) => console.log('[renderer]', String(msg).slice(0, 2000)));

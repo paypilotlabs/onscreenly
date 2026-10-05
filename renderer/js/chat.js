@@ -19,18 +19,46 @@ function esc(s) {
   );
 }
 
-// minimal, safe markdown: fenced code, bullets, inline code, bold, paragraphs
+// "## Heading" → "Heading". A single "#" stays text ("# of users is n"), and a
+// closing run of #s only counts after a space, so "## C#" keeps its "#".
+// No backtracking regex: a long line from a model must not freeze the window.
+function headingText(line) {
+  const open = /^ {0,3}#{2,6}[ \t]/.exec(line);
+  if (!open) return '';
+  let text = line.slice(open[0].length).trim();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '#') end--;
+  if (end < text.length && (end === 0 || text[end - 1] === ' ' || text[end - 1] === '\t')) {
+    text = text.slice(0, end).trimEnd();
+  }
+  return text;
+}
+
+// minimal, safe markdown: fenced code, headings, bullet and numbered lists,
+// inline code, bold, paragraphs. Everything is escaped before tags are added.
 function renderMarkdown(text) {
   const lines = text.split('\n');
   let html = '',
     inCode = false,
-    inList = false,
+    list = null,
     buf = [];
   const flushP = () => {
     if (buf.length) {
       html += '<p>' + inline(buf.join(' ')) + '</p>';
       buf = [];
     }
+  };
+  const closeList = () => {
+    if (list) {
+      html += `</${list}>`;
+      list = null;
+    }
+  };
+  const openList = (tag) => {
+    if (list === tag) return;
+    closeList();
+    html += `<${tag}>`;
+    list = tag;
   };
   const inline = (s) =>
     esc(s)
@@ -41,10 +69,7 @@ function renderMarkdown(text) {
     if (/^```/.test(line.trim())) {
       if (!inCode) {
         flushP();
-        if (inList) {
-          html += '</ul>';
-          inList = false;
-        }
+        closeList();
         html += '<pre><code>';
         inCode = true;
       } else {
@@ -57,29 +82,52 @@ function renderMarkdown(text) {
       html += esc(line) + '\n';
       continue;
     }
-    if (/^\s*[-*]\s+/.test(line)) {
+    const heading = headingText(line);
+    if (heading) {
       flushP();
-      if (!inList) {
-        html += '<ul>';
-        inList = true;
-      }
-      html += '<li>' + inline(line.replace(/^\s*[-*]\s+/, '')) + '</li>';
+      closeList();
+      html += '<h3>' + inline(heading) + '</h3>';
+      continue;
+    }
+    if (/^\s*[-*•]\s+/.test(line)) {
+      flushP();
+      openList('ul');
+      html += '<li>' + inline(line.replace(/^\s*[-*•]\s+/, '')) + '</li>';
+      continue;
+    }
+    const numbered = /^\s*(\d{1,3})[.)]\s+/.exec(line);
+    if (numbered) {
+      flushP();
+      openList('ol');
+      // The item keeps its own number, so a list split by a blank line or a
+      // code block does not restart at 1.
+      html += `<li value="${Number(numbered[1])}">` + inline(line.slice(numbered[0].length)) + '</li>';
       continue;
     }
     if (line.trim() === '') {
       flushP();
-      if (inList) {
-        html += '</ul>';
-        inList = false;
-      }
+      closeList();
       continue;
     }
     buf.push(line.trim());
   }
   flushP();
-  if (inList) html += '</ul>';
+  closeList();
   if (inCode) html += '</code></pre>';
   return html;
+}
+
+// A structured answer (résumé analysis) shows each "## Section" as a card.
+function groupIntoCards(el) {
+  let card = null;
+  for (const node of [...el.childNodes]) {
+    if (node.nodeName === 'H3') {
+      card = document.createElement('section');
+      card.className = 'ai-card';
+      el.insertBefore(card, node);
+    }
+    if (card) card.appendChild(node);
+  }
 }
 
 function clearMessages() {
@@ -120,25 +168,86 @@ function appendToken(t) {
 }
 
 function finalizeAi() {
-  if (!state.aiEl) return;
-  const raw = state.aiEl.dataset.raw || '';
-  state.aiEl.innerHTML = renderMarkdown(raw);
+  const el = state.aiEl;
+  if (!el) return null;
+  el.innerHTML = renderMarkdown(el.dataset.raw || '');
+  if (el.classList.contains('cards')) groupIntoCards(el);
   state.aiEl = null;
   state.caretEl = null;
+  return el;
+}
+
+// Under a finished answer: Copy / Save as Markdown for a structured answer,
+// and the vault notes it drew on. Clicking a note opens it in Obsidian.
+function addAnswerExtras(el, sources) {
+  const raw = el.dataset.raw || '';
+  let anchor = el;
+  if (el.classList.contains('cards') && raw.trim()) {
+    const actions = document.createElement('div');
+    actions.className = 'ai-actions';
+    const copy = document.createElement('button');
+    copy.type = 'button';
+    copy.className = 'ai-action';
+    copy.textContent = 'Copy';
+    copy.addEventListener('click', () => {
+      onscreenly
+        .copyAnswer(raw)
+        .then(() => showToast('Copied to the clipboard', 1600))
+        .catch(() => showToast('Could not copy', 2000));
+    });
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.className = 'ai-action';
+    save.textContent = 'Save as Markdown…';
+    save.addEventListener('click', () => {
+      onscreenly
+        .saveAnswerMarkdown(raw, 'resume-analysis')
+        .then((result) => result && result.saved && showToast('Saved ' + result.fileName, 2200))
+        .catch(() => showToast('Could not save the file', 2200));
+    });
+    actions.append(copy, save);
+    anchor.after(actions);
+    anchor = actions;
+  }
+  if (Array.isArray(sources) && sources.length) {
+    const row = document.createElement('div');
+    row.className = 'ai-sources';
+    const label = document.createElement('span');
+    label.textContent = 'From your notes';
+    row.append(label);
+    for (const source of sources) {
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'ai-source';
+      link.textContent = source.title;
+      link.title = 'Open in Obsidian: ' + source.relPath;
+      link.addEventListener('click', () => onscreenly.knowledgeOpenNote(source.relPath).catch(() => {}));
+      row.append(link);
+    }
+    anchor.after(row);
+  }
 }
 
 let busyFailsafe = null;
+function armBusyFailsafe() {
+  clearTimeout(busyFailsafe);
+  busyFailsafe = setTimeout(() => {
+    busy = false;
+    $('#send-btn').classList.toggle('busy', false);
+  }, 40000);
+}
 function setBusy(v) {
   busy = v;
   $('#send-btn').classList.toggle('busy', v);
   clearTimeout(busyFailsafe);
   // Failsafe: main has a 25s stream watchdog that always sends llm:done/llm:error, but if a
   // terminal event is ever lost the whole UI stays frozen — self-clear after a generous window.
-  if (v)
-    busyFailsafe = setTimeout(() => {
-      busy = false;
-      $('#send-btn').classList.toggle('busy', false);
-    }, 40000);
+  if (v) armBusyFailsafe();
+}
+// Each streamed token restarts the failsafe window, so a long answer (a
+// résumé analysis can run past 40 s) is never marked idle while it streams.
+function noteStreamActivity() {
+  if (busy) armBusyFailsafe();
 }
 
 // ---- transcript helpers ------------------------------------------------
@@ -192,6 +301,7 @@ export function init() {
 
 export {
   MAX_RESPONSES,
+  addAnswerExtras,
   addUserBubble,
   appendToken,
   clearMessages,
@@ -199,6 +309,7 @@ export {
   esc,
   finalizeAi,
   messages,
+  noteStreamActivity,
   runMode,
   setBusy,
   showToast,

@@ -113,6 +113,8 @@
       <!-- Tab bar -->
       <div class="s-tabs">
         <button class="s-tab on" data-tab="keys">🔑 API Keys</button>
+        <button class="s-tab" data-tab="profile">👤 Profile</button>
+        <button class="s-tab" data-tab="knowledge">📚 Knowledge</button>
         <button class="s-tab" data-tab="transcription">🔉 Audio</button>
         <button class="s-tab" data-tab="style">✨ Style</button>
         <button class="s-tab" data-tab="appearance">🌗 Appearance</button>
@@ -203,6 +205,60 @@
         </div>
 
         <div class="s-status" id="s-status"></div>
+      </div>
+
+      <!-- Tab: Profile -->
+      <div class="s-body s-tab-pane hidden" data-pane="profile">
+        <label class="s-label" for="resume-text">Résumé <span class="s-hint">PDF, DOCX, Markdown or text · used in every answer</span></label>
+        <textarea id="resume-text" rows="8" spellcheck="false" placeholder="Paste your résumé here, or import a file."></textarea>
+        <div class="whisper-actions">
+          <button id="resume-import" class="s-action">Import file…</button>
+          <button id="resume-analyse" class="s-action primary">Analyse my résumé</button>
+        </div>
+
+        <label class="s-label" for="job-description">Target job <span class="s-hint">optional · the analysis scores your résumé against it</span></label>
+        <textarea id="job-description" rows="6" spellcheck="false" placeholder="Paste the job description."></textarea>
+        <div class="whisper-actions">
+          <button id="jd-import" class="s-action">Import file…</button>
+        </div>
+
+        <details class="s-details" id="prep-details">
+          <summary>Interview prep answers <span class="s-hint">used when the conversation calls for them</span></summary>
+          <label class="s-label" for="star-stories">STAR stories</label>
+          <textarea id="star-stories" rows="5" spellcheck="false" placeholder="3–5 stories: Situation, Task, Action, Result."></textarea>
+          <label class="s-label" for="why-company">Why this company</label>
+          <textarea id="why-company" rows="2" spellcheck="false"></textarea>
+          <label class="s-label" for="why-leaving">Why you're leaving</label>
+          <textarea id="why-leaving" rows="2" spellcheck="false"></textarea>
+          <label class="s-label" for="work-style">Work style and values</label>
+          <textarea id="work-style" rows="2" spellcheck="false"></textarea>
+          <label class="s-label" for="salary-target">Salary target</label>
+          <textarea id="salary-target" rows="1" spellcheck="false" placeholder="e.g. $150k–$180k base + equity"></textarea>
+          <label class="s-label" for="questions-to-ask">Questions to ask them</label>
+          <textarea id="questions-to-ask" rows="3" spellcheck="false"></textarea>
+        </details>
+        <div class="s-note">Stored on this computer. Sent only to your AI provider, as part of a question.</div>
+        <div class="s-status" id="profile-status"></div>
+      </div>
+
+      <!-- Tab: Knowledge -->
+      <div class="s-body s-tab-pane hidden" data-pane="knowledge">
+        <label class="s-label">Obsidian vault <span class="s-hint">read-only · Onscreenly never changes your notes</span></label>
+        <div class="s-note" id="vault-path">No vault chosen.</div>
+        <div class="whisper-actions">
+          <button id="vault-pick" class="s-action primary">Choose vault folder…</button>
+          <button id="vault-reindex" class="s-action">Re-index</button>
+          <button id="vault-forget" class="s-action danger">Remove</button>
+        </div>
+        <div class="s-field"><span>Use notes</span><label class="s-check"><input id="knowledge-enabled" type="checkbox" /> Search my notes for every answer</label></div>
+        <div class="s-field"><span>Skip folders</span><input id="knowledge-exclude" type="text" placeholder="templates, Daily, Archive" autocomplete="off" spellcheck="false" /></div>
+        <div class="s-note">Comma-separated folder names or paths. Hidden folders such as .obsidian and .trash are always skipped.</div>
+        <div class="s-note" id="knowledge-status"></div>
+
+        <label class="s-label" for="knowledge-test">Test search <span class="s-hint">see which notes a question would use</span></label>
+        <div class="s-field"><span>Question</span><input id="knowledge-test" type="text" placeholder="e.g. How did I scale the payments service?" autocomplete="off" spellcheck="false" /></div>
+        <div id="knowledge-results" class="k-results"></div>
+        <div class="s-note">With notes on, the best-matching excerpts (about 3,000 characters at most) are sent to your AI provider with each question. Recap and coding solves never use them.</div>
       </div>
 
       <!-- Tab: Transcription -->

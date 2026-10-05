@@ -5,6 +5,8 @@ import { addUserBubble, clearMessages, messages } from './chat.js';
 import { clampOpacity } from './toolbar.js';
 import { updateSmartTooltip } from './settings-panel.js';
 import { statusText } from './settings-form.js';
+import { readProfile } from './profile-settings.js';
+import { readKnowledge } from './knowledge-settings.js';
 
 async function saveSettings() {
   // Keys
@@ -52,6 +54,9 @@ async function saveSettings() {
     const v = Number.parseInt(slidesIntervalEl.value, 10) || 3000;
     state.settings.slides.intervalMs = Math.max(1500, Math.min(15000, v));
   }
+  // Profile and Knowledge tabs
+  readProfile();
+  readKnowledge();
   // Style tab
   state.settings.aiRules = $('#ai-rules').value.trim();
   // Appearance tab

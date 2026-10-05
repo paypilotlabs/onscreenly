@@ -76,6 +76,7 @@ function isShortString(value, maxLength) {
 const MAX_SETTINGS_PATCH_BYTES = 2 * 1024 * 1024; // résumé, job description and notes fit easily
 const MAX_ASK_TEXT_CHARS = 20000;
 const MAX_PCM_BYTES = 1024 * 1024; // a few seconds of 16 kHz mono PCM; chunks are far smaller
+const MAX_ANSWER_CHARS = 200000; // an answer copied or saved from the panel
 
 /** @param {unknown} patch */
 function isValidSettingsPatch(patch) {
@@ -114,5 +115,6 @@ module.exports = {
   isValidAskPayload,
   isValidPcmChunk,
   MAX_ASK_TEXT_CHARS,
+  MAX_ANSWER_CHARS,
   MAX_PCM_BYTES
 };

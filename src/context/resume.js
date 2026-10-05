@@ -1,8 +1,12 @@
 // @ts-check
-// Extracts plain text from a resume/job-description file (PDF or DOCX) so it can be
-// dropped into the existing Settings textareas. No OCR — text layer only.
+// Extracts plain text from a resume/job-description file (PDF, DOCX, Markdown
+// or plain text) so it can be dropped into the Settings › Profile fields. No
+// OCR — text layer only.
 const fs = require('fs');
 const path = require('path');
+
+const TEXT_EXTENSIONS = new Set(['.md', '.markdown', '.txt']);
+const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'md', 'markdown', 'txt'];
 
 // pdf.js requires this location to end in '/', and a Windows path joined with
 // path.sep ends in '\\', which it rejects. Forward slashes work for fs on every OS.
@@ -56,7 +60,13 @@ async function parseDocumentFile(filePath) {
     const res = await mammoth.extractRawText({ buffer: buf });
     return (res.value || '').trim();
   }
-  throw new Error('Unsupported file type: ' + (ext || '(none)') + '. Use a PDF or DOCX file.');
+  if (TEXT_EXTENSIONS.has(ext)) {
+    return buf
+      .toString('utf8')
+      .replace(/^\uFEFF/, '')
+      .trim();
+  }
+  throw new Error('Unsupported file type: ' + (ext || '(none)') + '. Use a PDF, DOCX, Markdown or text file.');
 }
 
-module.exports = { parseDocumentFile, standardFontDataUrl };
+module.exports = { DOCUMENT_EXTENSIONS, parseDocumentFile, standardFontDataUrl };
