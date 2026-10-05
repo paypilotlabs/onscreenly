@@ -5,8 +5,9 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const extractZip = require('extract-zip');
+const { pipeline } = require('stream/promises');
 const tar = require('tar');
+const yauzl = require('yauzl');
 const {
   WHISPER_CPP_VERSION,
   SOURCE_ARCHIVE_SHA256,
@@ -108,7 +109,7 @@ async function prepareArchiveTarget(target, temporaryDirectory, destinationDirec
   await downloadArtifact(target.url, archivePath, target.bytes, target.sha256);
 
   if (target.archiveType === 'zip') {
-    await extractZip(archivePath, { dir: extractionDirectory });
+    await extractZipWithMaterializedLinks(archivePath, extractionDirectory);
   } else {
     await extractTarWithMaterializedLinks(archivePath, extractionDirectory);
   }
@@ -171,6 +172,91 @@ async function extractTarWithMaterializedLinks(archivePath, extractionDirectory)
   }
 }
 
+// Zip counterpart of extractTarWithMaterializedLinks. Every entry path goes
+// through resolveArchivePath, and symbolic links are never created on disk:
+// a link is written as a copy of the file it points to inside the archive, so
+// no later entry can write through a link to somewhere outside the root.
+const S_IFMT = 0o170000;
+const S_IFDIR = 0o040000;
+const S_IFLNK = 0o120000;
+
+function openZip(archivePath) {
+  return new Promise((resolve, reject) => {
+    yauzl.open(archivePath, { lazyEntries: true, autoClose: false }, (error, zipFile) =>
+      error ? reject(error) : resolve(zipFile)
+    );
+  });
+}
+
+function openEntryStream(zipFile, entry) {
+  return new Promise((resolve, reject) => {
+    zipFile.openReadStream(entry, (error, stream) => (error ? reject(error) : resolve(stream)));
+  });
+}
+
+async function readStreamText(stream) {
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+async function extractZipWithMaterializedLinks(archivePath, extractionDirectory) {
+  const symbolicLinks = [];
+  const zipFile = await openZip(archivePath);
+  try {
+    await new Promise((resolve, reject) => {
+      zipFile.on('error', reject);
+      zipFile.on('end', resolve);
+      zipFile.on('entry', (entry) => {
+        handleEntry(entry).then(
+          () => zipFile.readEntry(),
+          (error) => reject(error)
+        );
+      });
+      zipFile.readEntry();
+    });
+  } finally {
+    zipFile.close();
+  }
+
+  async function handleEntry(entry) {
+    if (entry.fileName.startsWith('__MACOSX/')) return;
+    const mode = (entry.externalFileAttributes >>> 16) & 0xffff;
+    const isDirectory = (mode & S_IFMT) === S_IFDIR || entry.fileName.endsWith('/');
+    const destinationPath = resolveArchivePath(extractionDirectory, entry.fileName.replace(/\/+$/, ''));
+    if (isDirectory) {
+      await fs.promises.mkdir(destinationPath, { recursive: true });
+      return;
+    }
+    await fs.promises.mkdir(path.dirname(destinationPath), { recursive: true });
+    const stream = await openEntryStream(zipFile, entry);
+    if ((mode & S_IFMT) === S_IFLNK) {
+      symbolicLinks.push({ archivePath: entry.fileName, linkPath: await readStreamText(stream) });
+      return;
+    }
+    const fileMode = mode & 0o777 || 0o644;
+    await pipeline(stream, fs.createWriteStream(destinationPath, { mode: fileMode }));
+  }
+
+  const linkByArchivePath = new Map(symbolicLinks.map((link) => [link.archivePath, link]));
+  for (const link of symbolicLinks) {
+    let targetArchivePath = path.posix.normalize(path.posix.join(path.posix.dirname(link.archivePath), link.linkPath));
+    const visitedPaths = new Set([link.archivePath]);
+    while (linkByArchivePath.has(targetArchivePath)) {
+      if (visitedPaths.has(targetArchivePath)) throw new Error(`Cyclic archive link: ${link.archivePath}`);
+      visitedPaths.add(targetArchivePath);
+      const targetLink = linkByArchivePath.get(targetArchivePath);
+      targetArchivePath = path.posix.normalize(
+        path.posix.join(path.posix.dirname(targetLink.archivePath), targetLink.linkPath)
+      );
+    }
+
+    const sourcePath = resolveArchivePath(extractionDirectory, targetArchivePath);
+    const destinationPath = resolveArchivePath(extractionDirectory, link.archivePath);
+    await fs.promises.copyFile(sourcePath, destinationPath);
+  }
+}
+
 function runCMake(argumentsList, workingDirectory) {
   execFileSync('cmake', argumentsList, {
     cwd: workingDirectory,
@@ -190,7 +276,7 @@ async function prepareMacTarget(target, temporaryDirectory, destinationDirectory
   const buildDirectory = path.join(temporaryDirectory, 'build');
   await fs.promises.mkdir(sourceExtractionDirectory, { recursive: true });
   await downloadArtifact(target.url, sourceArchivePath, null, SOURCE_ARCHIVE_SHA256);
-  await extractZip(sourceArchivePath, { dir: sourceExtractionDirectory });
+  await extractZipWithMaterializedLinks(sourceArchivePath, sourceExtractionDirectory);
   const sourceDirectory = path.dirname(await findFile(sourceExtractionDirectory, 'CMakeLists.txt'));
 
   runCMake(
@@ -321,5 +407,6 @@ module.exports = {
   prepareWhisperRuntime,
   assertSafeManagedDirectory,
   shouldCopyRuntimeEntry,
-  extractTarWithMaterializedLinks
+  extractTarWithMaterializedLinks,
+  extractZipWithMaterializedLinks
 };

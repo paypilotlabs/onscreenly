@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <title>Onscreenly</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -195,6 +195,12 @@
 
         <label class="s-label">Assistant access <span class="s-hint">programs allowed to see what Onscreenly is doing</span></label>
         <div class="s-callers" id="applink-callers"></div>
+
+        <label class="s-label">Your data</label>
+        <div class="s-note" id="key-storage-note"></div>
+        <div class="whisper-actions">
+          <button id="delete-all-data" class="s-action danger">Delete all my data…</button>
+        </div>
 
         <div class="s-status" id="s-status"></div>
       </div>

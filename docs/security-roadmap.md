@@ -6,10 +6,10 @@ This is a prioritized implementation and policy backlog, dated **2026-10-05**. I
 
 | Area | Present | Still needed |
 |---|---|---|
-| Electron boundary | Context isolation, disabled renderer Node integration, named preload methods and an event allowlist. | Renderer sandboxing; consistent IPC sender/frame checks, schemas and payload limits; navigation/window-open restrictions. |
-| Permissions and links | macOS meeting-audio opt-in; OS grants; Publik link allowlist. | Bind media grants to trusted frames. Constrain generic `open-pane` URLs before `shell.openExternal`. |
-| Displayed content | Text rendering and escape-first limited markdown; main page restricts scripts to self. | Malicious-content regression coverage; remove inline scripts from the permissions page and tighten its CSP. |
-| Credentials and storage | Atomic settings writes, backup recovery, POSIX `0600`; Publik credentials redacted from renderer settings. | OS-backed secret storage, redacted/write-only BYO key UI, protected meeting files, and explicit handling of legacy plaintext backups. |
+| Electron boundary | Sandboxed renderers, context isolation, disabled renderer Node integration, named preload methods and an event allowlist. Every IPC channel goes through `app/main/ipc-guard.js` (top frame of Onscreenly's own pages only) with type and size checks per payload. Navigation, `window.open` and webviews are refused. | Field-level schema for settings patches (today: plain object, 2 MB cap). |
+| Permissions and links | macOS meeting-audio opt-in; OS grants; Publik link allowlist; media grants only for Onscreenly's own pages; `open-pane` limited to the OS privacy panes. | — |
+| Displayed content | Text rendering and escape-first limited markdown; both pages restrict scripts to self with no inline scripts, `object-src 'none'`, `base-uri 'none'` and `form-action 'none'`. | Malicious-content regression coverage. |
+| Credentials and storage | Atomic settings writes, backup recovery, POSIX `0600`; API keys encrypted with the OS key store in `secrets.bin`, migrated out of the settings file and its backup; the renderer sees masked keys only; Publik credentials redacted. | Protected meeting files; legacy `cue-data.json` files left by Cue in the same folder are not scrubbed. |
 | Capture and history | OS permissions, bounded meeting history, separate slide consent scoped to the application ID. | Defined retention/export/deletion behavior. The current Clear History action clears the active transcript, not saved meetings. |
 | Local app-link | Default-deny consent, timeout and revocation, minimal status data. | Review caller authentication and diagnostic redaction. Claimed Node-transport caller identity is not verified identity. |
 | Runtime downloads | SHA-256 checks for model/runtime downloads; bounded model downloads and size/SHA-256-verified imports; no runtime-code download at app launch. | Revalidate executable caches/overrides and use immutable source archives/provenance for macOS runtime preparation. |
@@ -19,21 +19,24 @@ Source anchors: `app/main/`, `preload.js`, `renderer/js/`, `renderer/permissions
 
 ## Priority 1: protect data and privileged operations
 
-- [ ] **Move provider keys to OS-backed storage.** Choose a supported credential-storage mechanism for macOS, Windows, and Linux; define behavior when it is unavailable. Migrate without losing keys and account for plaintext backups. Acceptance: secrets are absent from new settings files, renderer read responses, logs, and diagnostic exports; migration, failure, deletion, and rollback are tested with synthetic keys.
-- [ ] **Harden Electron IPC and permissions.** Enable sandboxing after adapting preload dependencies, validate sender/frame identity and each IPC payload, restrict permission grants, and allow only intended external schemes/destinations. Acceptance: hostile frames, malformed/oversized payloads, and unapproved URLs are denied while capture/settings flows still work.
-- [ ] **Define and implement the data lifecycle.** Specify what is stored, why, where, for how long, and what each clear/export/delete operation includes. Cover saved meetings, settings backups, imported context, diagnostics, screenshots, and models separately. Acceptance: a synthetic profile demonstrates documented deletion and restart behavior; UI labels match actual effects.
+- [x] **Move provider keys to OS-backed storage.** Done 2026-10-05: `src/storage/secrets.js` with Electron `safeStorage` (async API). Keys are written encrypted and read back before they are removed from the settings file and its backup; a failure keeps them where they were. Unavailable or weak key stores are reported in Settings. Evidence: synthetic-key tests for migration, restart, masking, unavailable and undecryptable stores, and deletion; a real-Electron run migrates a plaintext profile, saves a new key encrypted and reads both back after a restart.
+- [x] **Harden Electron IPC and permissions.** Done 2026-10-05: sandboxing, sender/frame checks on every channel, payload checks, media grants bound to Onscreenly's pages, `open-pane` allowlist, navigation/window-open/webview refusal. Evidence: in real Electron, a foreign page with the same preload is refused settings, capture, panes, quit, microphone and screen capture; malformed payloads and unapproved URLs are refused; navigation and pop-ups are blocked; capture/settings/UI flows give identical results before and after (IPC scenario and 42 DOM snapshots).
+- [ ] **Define and implement the data lifecycle.** Partly done: **Delete all my data** removes settings, keys and meeting history and restarts (verified in Electron). Still needed: Specify what is stored, why, where, for how long, and what each clear/export/delete operation includes. Cover saved meetings, settings backups, imported context, diagnostics, screenshots, and models separately. Acceptance: a synthetic profile demonstrates documented deletion and restart behavior; UI labels match actual effects.
 - [ ] **Review untrusted content and local callers.** Test malicious model text/imports, audit local app-link transport authorization, and redact sensitive error events. Acceptance: captured content cannot gain privileges, and revoked/new-identity callers cannot recover prior access.
 
 ## Priority 1: triage dependencies
 
-`npm audit --json --ignore-scripts` on 2026-10-05 reported **8 high**, **0 critical** vulnerable package entries in the current lockfile:
+`npm audit --json --ignore-scripts` on 2026-10-05 reported **8 high**, **0 critical** vulnerable package entries: `@xmldom/xmldom`, `brace-expansion`, `electron`, `extract-zip`, `fast-uri`, `http-cache-semantics`, `js-yaml`, and `undici`. The same day:
 
-`@xmldom/xmldom`, `brace-expansion`, `electron`, `extract-zip`, `fast-uri`, `http-cache-semantics`, `js-yaml`, and `undici`.
+- Electron moved from 33 to 44.5.1 after reviewing the 34–44 breaking changes (first-run binary download, Core Audio tap loopback on macOS needing `NSAudioCaptureUsageDescription`, native Wayland on Linux, `display-capture` permission name, macOS 13 minimum).
+- `extract-zip` has no fixed release, so the runtime preparation script uses a yauzl-based extractor that keeps every entry inside the target and writes archive links as copies.
+- Transitive advisories were resolved with non-breaking updates.
+- `pdf-parse` 1.x was replaced with `pdfjs-dist` 6: it bundled pdf.js 1.10, affected by CVE-2024-4367, which `npm audit` cannot see.
 
-These include transitive and development/build dependencies. They are not eight proven exploits in Onscreenly, and a development dependency may still affect shipped Electron or build integrity. Advisory data changes over time; rerun the audit when doing the remediation. The audit recommends a major Electron upgrade, so an automatic forced update has not been applied.
+`npm audit` now reports no vulnerable packages.
 
-- [ ] Triage reachability and exposure for each advisory and assign remediation owners.
-- [ ] Upgrade Electron and affected dependency paths; review breaking changes and rerun the capture/permission/packaging matrix on every supported OS.
+- [x] Triage reachability and exposure for each advisory and assign remediation owners.
+- [x] Upgrade Electron and affected dependency paths; review breaking changes. Re-run the capture/permission/packaging matrix on macOS and Windows hardware before a release (Linux checked under xvfb).
 - [ ] Establish an update cadence and severity-based response targets. Any temporary exception needs explicit owner approval and an expiry; none is granted here.
 
 Acceptance: no unresolved reachable high/critical finding ships without an explicit reviewed exception; record residual advisory findings rather than hiding them with audit suppression.

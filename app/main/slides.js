@@ -2,7 +2,8 @@
 // Cheap hash poll (32px thumbnail) every intervalMs; full-res VLM caption only
 // on stable change. Never blocks runFeature (own slideBusy flag). Images are
 // never stored — only hash + caption + transcript window.
-const { desktopCapturer, ipcMain } = require('electron');
+const { desktopCapturer } = require('electron');
+const { handle } = require('./ipc-guard');
 const store = require('../../src/storage/store');
 const { captureScreenshot } = require('../../src/capture/screen');
 const { createLLM } = require('../../src/llm/llm');
@@ -163,14 +164,14 @@ function listSlides() {
 }
 
 function registerSlidesIpc() {
-  ipcMain.handle('slides:list', () => slideStore.list());
-  ipcMain.handle('slides:state', () => ({
+  handle('slides:list', () => slideStore.list());
+  handle('slides:state', () => ({
     ...getSlidesConfig(),
     count: slideStore.count(),
     polling: !!slideTimer,
     disabled: slideDisabled
   }));
-  ipcMain.handle('slides:clear', () => {
+  handle('slides:clear', () => {
     resetSlidesSession();
     send('slides:update', { count: 0, last: null });
     return { ok: true };

@@ -43,7 +43,7 @@ Screen-share protection is **best effort, not a guarantee**. The app requests El
 
 See [Electron's content-protection documentation](https://www.electronjs.org/docs/latest/api/browser-window#winsetcontentprotectionenable-macos-windows). Check the actual share from another participant's view in the meeting application and OS version you use. No Zoom, Teams, or Meet capture mode is promised to hide Onscreenly universally.
 
-- **macOS:** microphone and Screen Recording permission are required for the corresponding features. System-audio loopback targets macOS 14.4+ and uses a screen-capture session; enabling meeting audio can display macOS's recording/sharing indicator.
+- **macOS:** requires macOS 13 or later (Electron 44). Microphone and Screen Recording permission are required for the corresponding features. System-audio loopback targets macOS 14.4+ and uses a screen-capture session; enabling meeting audio can display macOS's recording/sharing indicator.
 - **Windows:** microphone access depends on Windows privacy settings. Meeting audio uses loopback capture. Native window exclusion requires a supported local console session.
 - **Linux:** package targets exist for x64 and arm64; audio capture, window behavior, and global shortcuts depend on the desktop environment. Screen-share invisibility is not supported.
 
@@ -51,7 +51,7 @@ Use recording and assistance features in accordance with participants' consent a
 
 ## Run from source
 
-Use Node.js **22.12 or later** and npm. Repository access is required while this project is private:
+Use Node.js **22.13 or later** and npm. Repository access is required while this project is private:
 
 ```sh
 git clone https://github.com/squid-beast/onscreenly.git
@@ -60,7 +60,7 @@ npm ci
 npm start
 ```
 
-`npm ci` installs the normal Electron development runtime. The former Windows executable-renaming and Edge-icon scripts are retired; they no longer modify files. If an old checkout modified your Electron installation, a fresh `npm ci` restores it.
+`npm ci` installs the Electron package; Electron 42 and later download the runtime binary the first time `npm start` runs, so the first launch needs network access. The former Windows executable-renaming and Edge-icon scripts are retired; they no longer modify files. If an old checkout modified your Electron installation, a fresh `npm ci` restores it.
 
 On first launch:
 
@@ -143,13 +143,14 @@ For release acceptance, inspect the packaged application name, bundle ID, permis
 
 ## Security policy and planned work
 
-Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: OS-backed key storage, stronger Electron/IPC isolation, data retention and deletion, dependency updates, and protected signed releases.
+Read [SECURITY.md](SECURITY.md) for vulnerability reporting, security boundaries, and required protections. The [security roadmap](docs/security-roadmap.md) tracks the work still needed: retention rules for meeting history, a dependency update cadence, and protected signed releases.
 
-The dependency audit on **2026-10-05** reported **eight high-severity vulnerable package entries**, including Electron and transitive/build dependencies. These need triage and remediation; passing functional tests does not resolve them. The policy documents planned requirements and does not claim those controls are already implemented or that this build is production-hardened.
+On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed, and every IPC message is checked for its sender and payload. `npm audit` now reports no vulnerable packages. The policy documents planned requirements and does not claim this build is production-hardened.
 
 ## Privacy and local storage
 
-- Settings and API keys are stored as **plain JSON**, with owner-only file permissions where supported. This is not encrypted or Keychain-backed storage.
+- API keys are encrypted with the operating system's key store (macOS Keychain, Windows DPAPI, GNOME Keyring or KWallet on Linux) in `secrets.bin`; the settings JSON keeps blank key fields. Keys from an older profile are moved there on first launch, and Settings only ever shows a saved key masked to its last four characters. Without a key store, Settings says so: on Linux without a keyring the keys are only obfuscated, and where encryption is unavailable they stay in the settings file as before.
+- **Settings → API Keys → Delete all my data** removes settings, saved keys, résumé and profile text, and meeting history, then restarts Onscreenly. Downloaded Whisper models are kept and can be removed in Settings → Audio.
 - `meetings.json` stores transcript history and generated notes. The app retains a bounded number of recent meetings and may restore an interrupted session; it is not a lossless recording system.
 - Audio chunks are processed in memory. Downloaded Whisper models remain on disk until deleted through Settings.
 - Screen images, conversation context, profile text, and custom response rules can be sent to your selected answer provider. Cloud transcription sends audio to the selected speech provider. Optional Publik routes requests through its gateway.

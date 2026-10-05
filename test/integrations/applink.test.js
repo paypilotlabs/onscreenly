@@ -320,3 +320,52 @@ test('a publik API key is reported as a boolean only — the pk_ value never lea
   assert.equal(state.provider, 'publik');
   assert.doesNotMatch(JSON.stringify(state), /pk_/);
 });
+
+test('a consent answer only counts when it comes from the window that was asked', async () => {
+  const listeners = new Map();
+  const ipcMain = {
+    on: (channel, fn) => listeners.set(channel, fn),
+    removeListener: (channel) => listeners.delete(channel),
+    handle() {},
+    handleOnce() {}
+  };
+  Module._load = function loadWithElectronStub(request, parent, isMain) {
+    if (request === 'electron') {
+      return {
+        app: { getPath: () => os.tmpdir(), getVersion: () => '0.0.0-test', focus: () => {} },
+        dialog: {},
+        ipcMain
+      };
+    }
+    return originalModuleLoad.call(this, request, parent, isMain);
+  };
+  const id = require.resolve('../../src/integrations/applink');
+  delete require.cache[id];
+  const applink = require('../../src/integrations/applink');
+  Module._load = originalModuleLoad;
+
+  const sent = [];
+  const win = {
+    webContents: { send: (channel, payload) => sent.push(payload) },
+    isDestroyed: () => false,
+    isVisible: () => true,
+    show() {},
+    focus() {},
+    once() {},
+    removeListener() {}
+  };
+  try {
+    const answer = applink.requestConsent(
+      { callerName: 'Iris', scope: 'status', verification: 'none' },
+      { getWindow: () => win }
+    );
+    const { id: consentId } = sent[0];
+    const respond = listeners.get('applink:consent-response');
+    respond({ sender: { send() {} } }, { id: consentId, allowed: true }); // another page
+    assert.ok(listeners.has('applink:consent-response'), 'an answer from another sender is ignored');
+    respond({ sender: win.webContents }, { id: consentId, allowed: true });
+    assert.equal(await answer, true);
+  } finally {
+    delete require.cache[id];
+  }
+});

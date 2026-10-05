@@ -391,7 +391,7 @@ test('copy rule: the CTA copy says "publik API", dollars, never "credits", never
     .readdirSync(mainDir)
     .map((f) => fs.readFileSync(path.join(mainDir, f), 'utf8'))
     .join('\n');
-  assert.match(main, /ipcMain\.handle\('publik:card-seen'/);
+  assert.match(main, /\bhandle\('publik:card-seen'/);
   assert.match(main, /publik\.resolveOpenTarget\(url, s\.publik\.claimUrl\)/);
   assert.match(main, /!settings\.publik\.cardShown/, 'runFeature gates the starter on the card having been shown');
 });

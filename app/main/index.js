@@ -27,23 +27,20 @@ const {
 const { registerShortcuts } = require('./shortcuts');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
+const { safeStorageBackend } = require('./secure-storage');
 
-// macOS system-audio loopback (the "them" channel via getDisplayMedia) does not
-// start on Electron 31–38 unless these Chromium features are enabled; without
-// them getDisplayMedia rejects with "Error starting capture" and meeting audio
-// silently never works. Electron 39+ wires this up itself, where this is a
-// harmless no-op. Must run before app is ready.
+// Since Electron 39, macOS meeting audio goes through Core Audio taps, which
+// need a separate "System Audio Recording" permission; without it the stream
+// is silent and nothing reports an error. Electron 39-44 can keep the
+// ScreenCaptureKit path that the Screen Recording grant already covers, which
+// is what Onscreenly used before. The switch does nothing from Electron 45, so
+// revisit this with the next major upgrade. Must run before app is ready.
 if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('enable-features', 'MacLoopbackAudioForScreenShare,MacSckSystemAudioLoopbackOverride');
+  app.commandLine.appendSwitch('disable-features', 'MacCatapLoopbackAudioForScreenShare');
 }
 
-// Linux Wayland / Ozone native rendering configuration. Without this, Electron
-// falls back to XWayland even on a native Wayland session; 'auto' picks Wayland
-// when available and X11 otherwise. Harmless no-op on X11-only sessions.
-if (process.platform === 'linux') {
-  app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform,WaylandWindowDecorations');
-  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-}
+// Linux runs natively on Wayland since Electron 38 (--ozone-platform defaults
+// to auto), so no Linux switches are needed.
 
 // Windows never blocks startup on an unresolved permission (see app.whenReady()
 // below), so launchApp() can already have run once by the time the user grants
@@ -53,6 +50,15 @@ if (process.platform === 'linux') {
 // global shortcuts and re-starts the applink server -- a real, reachable
 // regression, not a hypothetical.
 let appLaunched = false;
+
+// Onscreenly's pages never navigate, open windows or embed webviews. Refusing
+// all three means injected content cannot replace a page that holds the
+// preload bridge, or open one.
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  contents.on('will-navigate', (event) => event.preventDefault());
+  contents.on('will-attach-webview', (event) => event.preventDefault());
+});
 
 registerAppIpc();
 registerPublikIpc();
@@ -135,6 +141,11 @@ app.whenReady().then(async () => {
   if (isWindows) {
     process.title = 'Onscreenly';
   }
+
+  // Before anything reads settings: load API keys from the encrypted store and
+  // move any plaintext keys from an older profile into it.
+  const keyStorage = await store.initSecureStorage(safeStorageBackend);
+  console.log(`[onscreenly] API key storage: ${keyStorage.mode}`);
 
   if (isMac) {
     const allGranted = await requestPermissions();

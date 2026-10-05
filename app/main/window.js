@@ -1,6 +1,7 @@
 // The overlay window: creation, screen-share protection, position memory,
 // dragging and click-through.
-const { BrowserWindow, ipcMain, screen } = require('electron');
+const { BrowserWindow, screen } = require('electron');
+const { on } = require('./ipc-guard');
 const store = require('../../src/storage/store');
 const { readEnvironment } = require('../../src/platform/environment');
 const { recordEvent } = require('../../src/integrations/applink');
@@ -79,7 +80,7 @@ function createWindow() {
       preload: PRELOAD_PATH,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: true
     }
   };
 
@@ -183,10 +184,10 @@ function stopWindowDrag() {
 }
 
 function registerWindowIpc() {
-  ipcMain.on('mouse:ignore', (_e, v) => {
+  on('mouse:ignore', (_e, v) => {
     if (win) win.setIgnoreMouseEvents(!!v, { forward: true });
   });
-  ipcMain.on('window:drag-start', () => {
+  on('window:drag-start', () => {
     if (!win || win.isDestroyed()) return;
     stopWindowDrag();
     const cursor = screen.getCursorScreenPoint();
@@ -203,7 +204,7 @@ function registerWindowIpc() {
       win.setBounds({ x: x - offsetX, y: y - offsetY, width: bounds.width, height: bounds.height });
     }, 16);
   });
-  ipcMain.on('window:drag-end', () => {
+  on('window:drag-end', () => {
     if (!windowDrag) return;
     stopWindowDrag();
     saveWindowPosition();
