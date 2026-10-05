@@ -47,7 +47,7 @@
     "yauzl": "^3.4.0"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -55,7 +55,7 @@
     "lucide-static": "^0.468.0",
     "mammoth": "^1.8.0",
     "openai": "^4.73.0",
-    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^6.4.299",
     "ws": "^8.18.0"
   },
   "contributors": [

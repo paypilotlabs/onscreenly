@@ -51,7 +51,7 @@ Use recording and assistance features in accordance with participants' consent a
 
 ## Run from source
 
-Use Node.js **22.12 or later** and npm. Repository access is required while this project is private:
+Use Node.js **22.13 or later** and npm. Repository access is required while this project is private:
 
 ```sh
 git clone https://github.com/squid-beast/onscreenly.git
