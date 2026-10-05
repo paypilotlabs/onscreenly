@@ -1,0 +1,12 @@
+node_modules
+dist
+vendor
+whisper-runtime
+docs
+package-lock.json
+*.md
+*.html
+*.json
+*.yml
+*.css
+*.plist

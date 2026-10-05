@@ -29,7 +29,12 @@ test('Deepgram accumulates is_final segments into one turn at speech_final', () 
   const d = new DeepgramStreamingSTT('k', { onTranscript: (t) => finals.push(t) });
   d._handleMessage({ type: 'Results', is_final: true, channel: { alternatives: [{ transcript: 'Tell me about' }] } });
   d._handleMessage({ type: 'Results', is_final: true, channel: { alternatives: [{ transcript: 'your experience' }] } });
-  d._handleMessage({ type: 'Results', is_final: true, speech_final: true, channel: { alternatives: [{ transcript: 'with Kubernetes.' }] } });
+  d._handleMessage({
+    type: 'Results',
+    is_final: true,
+    speech_final: true,
+    channel: { alternatives: [{ transcript: 'with Kubernetes.' }] }
+  });
   assert.deepEqual(finals, ['Tell me about your experience with Kubernetes.']);
 });
 
@@ -46,6 +51,11 @@ test('Deepgram flushes pending segments on UtteranceEnd when speech_final never 
 test('Deepgram drops hallucinated finals', () => {
   const finals = [];
   const d = new DeepgramStreamingSTT('k', { onTranscript: (t) => finals.push(t) });
-  d._handleMessage({ type: 'Results', is_final: true, speech_final: true, channel: { alternatives: [{ transcript: 'Thank you.' }] } });
+  d._handleMessage({
+    type: 'Results',
+    is_final: true,
+    speech_final: true,
+    channel: { alternatives: [{ transcript: 'Thank you.' }] }
+  });
   assert.deepEqual(finals, []);
 });

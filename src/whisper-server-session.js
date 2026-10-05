@@ -37,11 +37,7 @@ function buildMultipartBody(wav) {
   ];
   return {
     boundary,
-    body: Buffer.concat([
-      Buffer.from(fields.join(''), 'utf8'),
-      wav,
-      Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8')
-    ])
+    body: Buffer.concat([Buffer.from(fields.join(''), 'utf8'), wav, Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8')])
   };
 }
 
@@ -185,11 +181,16 @@ class WhisperServerSession {
 
   _buildArguments(port, requestPath) {
     const argumentsList = [
-      '--model', this.modelPath,
-      '--host', LOOPBACK_HOST,
-      '--port', String(port),
-      '--request-path', requestPath,
-      '--language', this.language,
+      '--model',
+      this.modelPath,
+      '--host',
+      LOOPBACK_HOST,
+      '--port',
+      String(port),
+      '--request-path',
+      requestPath,
+      '--language',
+      this.language,
       '--no-timestamps',
       '--suppress-nst'
     ];
@@ -216,7 +217,9 @@ class WhisperServerSession {
     };
     child.stdout?.on('data', collectLog);
     child.stderr?.on('data', collectLog);
-    child.once('error', (error) => { this.exitError = error; });
+    child.once('error', (error) => {
+      this.exitError = error;
+    });
     child.once('exit', (code, signal) => {
       if (this.child === child) {
         this.exitError = new Error(`whisper-server exited (${code ?? signal}). ${this.logTail.slice(-800)}`);

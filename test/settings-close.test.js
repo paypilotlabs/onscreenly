@@ -17,7 +17,7 @@ test('renderer defines closeSettings once', () => {
 });
 
 test('closeSettings awaits saveSettings before hiding the modal', () => {
-  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n  \}/);
+  const match = source.match(/async function closeSettings\(\) \{([\s\S]*?)\n {2}\}/);
   assert.ok(match, 'could not find async closeSettings body');
   const body = match[1];
   assert.match(body, /await saveSettings\(\)/);
@@ -30,10 +30,7 @@ test('closeSettings awaits saveSettings before hiding the modal', () => {
 });
 
 test('Done, scrim-click, and Escape all go through closeSettings', () => {
-  assert.match(source, /\$\('#s-close'\)\.addEventListener\('click',\s*\(\) => \{ void closeSettings\(\); \}\)/);
+  assert.match(source, /\$\('#s-close'\)\.addEventListener\('click',\s*\(\) => \{\s*void closeSettings\(\);\s*\}\)/);
   assert.match(source, /if \(e\.target === scrim\) void closeSettings\(\)/);
-  assert.match(
-    source,
-    /if \(e\.key === 'Escape' && !scrim\.classList\.contains\('hidden'\)\) void closeSettings\(\)/
-  );
+  assert.match(source, /if \(e\.key === 'Escape' && !scrim\.classList\.contains\('hidden'\)\) void closeSettings\(\)/);
 });

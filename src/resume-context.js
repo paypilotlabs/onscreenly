@@ -1,3 +1,4 @@
+// @ts-check
 // resume-context.js — thin re-export shim.
 // All logic now lives in interview-context.js.
 // This file is kept only for backward compatibility with tests.

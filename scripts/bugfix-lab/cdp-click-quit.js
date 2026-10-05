@@ -36,17 +36,25 @@ const TIMEOUT_MS = 20000;
 
 function httpGetJson(url) {
   return new Promise((resolve, reject) => {
-    http.get(url, (res) => {
-      let body = '';
-      res.on('data', (c) => (body += c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
-      });
-    }).on('error', reject);
+    http
+      .get(url, (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on('error', reject);
   });
 }
 
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function findPageTarget() {
   const deadline = Date.now() + TIMEOUT_MS;
@@ -72,7 +80,11 @@ function cdpClient(wsUrl) {
   const pending = new Map();
   ws.on('message', (raw) => {
     let msg;
-    try { msg = JSON.parse(raw.toString()); } catch (_) { return; }
+    try {
+      msg = JSON.parse(raw.toString());
+    } catch (_) {
+      return;
+    }
     if (msg.id && pending.has(msg.id)) {
       const { resolve, reject } = pending.get(msg.id);
       pending.delete(msg.id);
@@ -95,7 +107,15 @@ function cdpClient(wsUrl) {
       }
     });
   }
-  return { ready, send, close: () => { try { ws.close(); } catch (_) {} } };
+  return {
+    ready,
+    send,
+    close: () => {
+      try {
+        ws.close();
+      } catch (_) {}
+    }
+  };
 }
 
 async function main() {
@@ -115,7 +135,7 @@ async function main() {
         if (skip && scrim && !scrim.classList.contains('hidden')) { skip.click(); return true; }
         return false;
       })()
-    `,
+    `
   });
   await sleep(400);
 
@@ -134,7 +154,7 @@ async function main() {
         return JSON.stringify({ found: true, x, y, obstructed, title: el.title, ariaLabel: el.getAttribute('aria-label') });
       })()
     `,
-    returnByValue: true,
+    returnByValue: true
   });
   const rect = JSON.parse(rectResult.result.value);
   if (!rect.found) {
@@ -145,8 +165,20 @@ async function main() {
   // 3. Real click via CDP Input — carries transient user activation, the same
   //    input path as a genuine OS-delivered click.
   await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rect.x, y: rect.y });
-  await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rect.x, y: rect.y, button: 'left', clickCount: 1 });
-  await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rect.x, y: rect.y, button: 'left', clickCount: 1 });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: rect.x,
+    y: rect.y,
+    button: 'left',
+    clickCount: 1
+  });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: rect.x,
+    y: rect.y,
+    button: 'left',
+    clickCount: 1
+  });
 
   const evidence = {
     ok: true,
@@ -154,7 +186,7 @@ async function main() {
     buttonFound: true,
     buttonObstructed: rect.obstructed,
     buttonTitle: rect.title,
-    buttonAriaLabel: rect.ariaLabel,
+    buttonAriaLabel: rect.ariaLabel
   };
 
   // 4. Best-effort screenshot right after the click. If the click actually
@@ -166,7 +198,7 @@ async function main() {
     evidence.stillConnectedAfterClick = true;
   } catch (e) {
     evidence.stillConnectedAfterClick = false;
-    evidence.screenshotError = String(e && e.message || e);
+    evidence.screenshotError = String((e && e.message) || e);
   }
 
   console.log(JSON.stringify(evidence));
@@ -175,6 +207,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.log(JSON.stringify({ ok: false, could_not_run: true, reason: String(err && err.stack || err) }));
+  console.log(JSON.stringify({ ok: false, could_not_run: true, reason: String((err && err.stack) || err) }));
   process.exit(3);
 });

@@ -51,7 +51,7 @@ async function downloadArtifact(url, destinationPath, expectedBytes, expectedSha
       }
     }
   } finally {
-    await new Promise((resolve, reject) => output.end((error) => error ? reject(error) : resolve()));
+    await new Promise((resolve, reject) => output.end((error) => (error ? reject(error) : resolve())));
   }
 
   const fileStats = await fs.promises.stat(destinationPath);
@@ -77,11 +77,13 @@ async function findFile(rootDirectory, filename) {
 }
 
 function shouldCopyRuntimeEntry(filename, executableName) {
-  return filename === executableName ||
+  return (
+    filename === executableName ||
     filename === 'LICENSE' ||
     filename.endsWith('.dll') ||
     filename.endsWith('.dylib') ||
-    filename.includes('.so');
+    filename.includes('.so')
+  );
 }
 
 async function copyRuntimeDependencies(sourceDirectory, executableName, destinationDirectory) {
@@ -158,7 +160,9 @@ async function extractTarWithMaterializedLinks(archivePath, extractionDirectory)
       if (visitedPaths.has(targetArchivePath)) throw new Error(`Cyclic archive link: ${link.archivePath}`);
       visitedPaths.add(targetArchivePath);
       const targetLink = linkByArchivePath.get(targetArchivePath);
-      targetArchivePath = path.posix.normalize(path.posix.join(path.posix.dirname(targetLink.archivePath), targetLink.linkPath));
+      targetArchivePath = path.posix.normalize(
+        path.posix.join(path.posix.dirname(targetLink.archivePath), targetLink.linkPath)
+      );
     }
 
     const sourcePath = resolveArchivePath(extractionDirectory, targetArchivePath);
@@ -189,34 +193,52 @@ async function prepareMacTarget(target, temporaryDirectory, destinationDirectory
   await extractZip(sourceArchivePath, { dir: sourceExtractionDirectory });
   const sourceDirectory = path.dirname(await findFile(sourceExtractionDirectory, 'CMakeLists.txt'));
 
-  runCMake([
-    '-S', sourceDirectory,
-    '-B', buildDirectory,
-    '-DCMAKE_BUILD_TYPE=Release',
-    `-DCMAKE_OSX_ARCHITECTURES=${target.sourceArchitecture}`,
-    '-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0',
-    '-DBUILD_SHARED_LIBS=OFF',
-    '-DGGML_NATIVE=OFF',
-    '-DWHISPER_BUILD_TESTS=OFF',
-    '-DWHISPER_BUILD_EXAMPLES=ON',
-    '-DWHISPER_BUILD_SERVER=ON',
-    '-DWHISPER_BUILD_TOOLS=OFF'
-  ], temporaryDirectory);
-  runCMake([
-    '--build', buildDirectory,
-    '--config', 'Release',
-    '--target', 'whisper-server',
-    '--parallel', String(Math.max(1, Math.min(os.cpus().length, 6)))
-  ], temporaryDirectory);
+  runCMake(
+    [
+      '-S',
+      sourceDirectory,
+      '-B',
+      buildDirectory,
+      '-DCMAKE_BUILD_TYPE=Release',
+      `-DCMAKE_OSX_ARCHITECTURES=${target.sourceArchitecture}`,
+      '-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0',
+      '-DBUILD_SHARED_LIBS=OFF',
+      '-DGGML_NATIVE=OFF',
+      '-DWHISPER_BUILD_TESTS=OFF',
+      '-DWHISPER_BUILD_EXAMPLES=ON',
+      '-DWHISPER_BUILD_SERVER=ON',
+      '-DWHISPER_BUILD_TOOLS=OFF'
+    ],
+    temporaryDirectory
+  );
+  runCMake(
+    [
+      '--build',
+      buildDirectory,
+      '--config',
+      'Release',
+      '--target',
+      'whisper-server',
+      '--parallel',
+      String(Math.max(1, Math.min(os.cpus().length, 6)))
+    ],
+    temporaryDirectory
+  );
 
   const executablePath = await findFile(buildDirectory, target.executable);
   await copyRuntimeDependencies(path.dirname(executablePath), target.executable, destinationDirectory);
 }
 
 async function hasCurrentRuntime(runtimeDirectory, target) {
-  const executablePath = getRuntimeExecutablePath(runtimeDirectory, target.key.split('-')[0], target.key.split('-').slice(1).join('-'));
+  const executablePath = getRuntimeExecutablePath(
+    runtimeDirectory,
+    target.key.split('-')[0],
+    target.key.split('-').slice(1).join('-')
+  );
   try {
-    const metadata = JSON.parse(await fs.promises.readFile(path.join(runtimeDirectory, RUNTIME_MANIFEST_FILENAME), 'utf8'));
+    const metadata = JSON.parse(
+      await fs.promises.readFile(path.join(runtimeDirectory, RUNTIME_MANIFEST_FILENAME), 'utf8')
+    );
     await fs.promises.access(executablePath, fs.constants.X_OK);
     return metadata.version === WHISPER_CPP_VERSION && metadata.target === target.key;
   } catch {
@@ -250,11 +272,18 @@ async function prepareWhisperRuntime({
       } else {
         await prepareMacTarget(target, temporaryDirectory, preparedDirectory);
       }
-      await fs.promises.writeFile(path.join(preparedDirectory, RUNTIME_MANIFEST_FILENAME), JSON.stringify({
-        name: 'whisper.cpp',
-        version: WHISPER_CPP_VERSION,
-        target: target.key
-      }, null, 2));
+      await fs.promises.writeFile(
+        path.join(preparedDirectory, RUNTIME_MANIFEST_FILENAME),
+        JSON.stringify(
+          {
+            name: 'whisper.cpp',
+            version: WHISPER_CPP_VERSION,
+            target: target.key
+          },
+          null,
+          2
+        )
+      );
       await replaceManagedDirectory(preparedDirectory, cachedRuntimeDirectory, cacheRoot);
     } finally {
       const resolvedTemporaryDirectory = path.resolve(temporaryDirectory);

@@ -7,10 +7,7 @@ const {
 } = require('../src/openai-compatible');
 
 test('normalizes whitespace and trailing slashes in a compatible base URL', () => {
-  assert.equal(
-    normalizeBaseUrl('  http://127.0.0.1:18789/v1///  '),
-    'http://127.0.0.1:18789/v1'
-  );
+  assert.equal(normalizeBaseUrl('  http://127.0.0.1:18789/v1///  '), 'http://127.0.0.1:18789/v1');
   assert.equal(normalizeBaseUrl(''), '');
 });
 
@@ -23,17 +20,17 @@ test('rejects unsafe or unsupported base URLs', () => {
 });
 
 test('builds SDK options with an explicit API key', () => {
-  assert.deepEqual(
-    createCompatibleClientOptions(' gateway-token ', 'https://gateway.example/v1/'),
-    { apiKey: 'gateway-token', baseURL: 'https://gateway.example/v1' }
-  );
+  assert.deepEqual(createCompatibleClientOptions(' gateway-token ', 'https://gateway.example/v1/'), {
+    apiKey: 'gateway-token',
+    baseURL: 'https://gateway.example/v1'
+  });
 });
 
 test('uses a non-secret placeholder when a local endpoint needs no API key', () => {
-  assert.deepEqual(
-    createCompatibleClientOptions('', 'http://127.0.0.1:11434/v1'),
-    { apiKey: OPTIONAL_API_KEY_PLACEHOLDER, baseURL: 'http://127.0.0.1:11434/v1' }
-  );
+  assert.deepEqual(createCompatibleClientOptions('', 'http://127.0.0.1:11434/v1'), {
+    apiKey: OPTIONAL_API_KEY_PLACEHOLDER,
+    baseURL: 'http://127.0.0.1:11434/v1'
+  });
 });
 
 test('requires a base URL for an OpenAI-compatible client', () => {

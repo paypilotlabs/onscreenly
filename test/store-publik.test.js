@@ -28,7 +28,8 @@ function openStoreAt(dir) {
 function loadStore(fileContents) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-store-'));
   const file = path.join(dir, 'onscreenly-data.json');
-  if (fileContents !== undefined) fs.writeFileSync(file, typeof fileContents === 'string' ? fileContents : JSON.stringify(fileContents, null, 2));
+  if (fileContents !== undefined)
+    fs.writeFileSync(file, typeof fileContents === 'string' ? fileContents : JSON.stringify(fileContents, null, 2));
   return openStoreAt(dir);
 }
 
@@ -36,7 +37,13 @@ const AVAILABLE = { available: true, appToken: 'pat_cue_x', disclosureVersion: 1
 const UNAVAILABLE = { available: false, appToken: '', disclosureVersion: 1 };
 
 test('never overwrites a user key: an OpenAI user stays on OpenAI, file otherwise unchanged', () => {
-  const fixture = { provider: 'openai', apiKeys: { openai: 'sk-proj-user-typed-this' }, models: { openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' } }, onboarded: true, aiRules: 'no em-dashes' };
+  const fixture = {
+    provider: 'openai',
+    apiKeys: { openai: 'sk-proj-user-typed-this' },
+    models: { openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' } },
+    onboarded: true,
+    aiRules: 'no em-dashes'
+  };
   const { store, read } = loadStore(fixture);
 
   assert.equal(store.applyPublikDefault(AVAILABLE), false);
@@ -68,7 +75,11 @@ test('first run (no file) with a token switches to publik; without a token it st
 });
 
 test('a Custom provider with a base URL is untouched', () => {
-  const { store, read } = loadStore({ provider: 'custom', baseUrl: 'http://127.0.0.1:18789/v1', apiKeys: { custom: '' } });
+  const { store, read } = loadStore({
+    provider: 'custom',
+    baseUrl: 'http://127.0.0.1:18789/v1',
+    apiKeys: { custom: '' }
+  });
   assert.equal(store.applyPublikDefault(AVAILABLE), false);
   assert.equal(read().provider, 'custom');
   assert.equal(read().baseUrl, 'http://127.0.0.1:18789/v1');
@@ -90,12 +101,22 @@ test('the switch happens once per settings file, even if the user later clears t
 
 test('stripRendererPatch drops the publik key and block, keeps everything else', () => {
   const { store } = loadStore();
-  const out = store.stripRendererPatch({ provider: 'publik', apiKeys: { publik: 'pk_live_x', openai: 'sk-y' }, publik: { claimUrl: 'https://evil.example', disclosureAccepted: 9 }, aiRules: 'x' });
+  const out = store.stripRendererPatch({
+    provider: 'publik',
+    apiKeys: { publik: 'pk_live_x', openai: 'sk-y' },
+    publik: { claimUrl: 'https://evil.example', disclosureAccepted: 9 },
+    aiRules: 'x'
+  });
   assert.deepEqual(out, { provider: 'publik', apiKeys: { openai: 'sk-y' }, aiRules: 'x' });
 
   // Through setSettings, the way main.js wires settings:set.
   store.setPublik({ apiKey: 'pk_live_real', claimUrl: 'https://publikhq.com/claim/A' });
-  store.setSettings(store.stripRendererPatch({ apiKeys: { publik: 'pk_live_forged', openai: 'sk-y' }, publik: { claimUrl: 'https://evil.example' } }));
+  store.setSettings(
+    store.stripRendererPatch({
+      apiKeys: { publik: 'pk_live_forged', openai: 'sk-y' },
+      publik: { claimUrl: 'https://evil.example' }
+    })
+  );
   assert.equal(store.getSettings().apiKeys.publik, 'pk_live_real');
   assert.equal(store.getSettings().publik.claimUrl, 'https://publikhq.com/claim/A');
   assert.equal(store.getSettings().apiKeys.openai, 'sk-y');
@@ -115,7 +136,12 @@ test('redactForRenderer never returns the publik key, and reports connected', ()
 
 test('setPublik writes only apiKeys.publik and publik.*', () => {
   const { store, read } = loadStore({ provider: 'openai', apiKeys: { openai: 'sk-keep' } });
-  store.setPublik({ apiKey: 'pk_test_key', installId: 'u-1', balanceMicros: 250000, wallet: { claimState: 'anonymous', balanceMicros: 250000 } });
+  store.setPublik({
+    apiKey: 'pk_test_key',
+    installId: 'u-1',
+    balanceMicros: 250000,
+    wallet: { claimState: 'anonymous', balanceMicros: 250000 }
+  });
   const after = read();
   assert.equal(after.apiKeys.openai, 'sk-keep');
   assert.equal(after.apiKeys.publik, 'pk_test_key');
@@ -199,7 +225,11 @@ test('writes are atomic and a crash-corrupted file recovers from the previous ge
   const { store: reloaded } = openStoreAt(dir);
   const recovered = reloaded.getSettings();
   assert.equal(recovered.apiKeys.openai, 'sk-previous', 'recovered from the .bak generation, not defaulted to blank');
-  assert.equal(recovered.apiKeys.anthropic, '', 'the .bak generation predates the anthropic key — correctly the older value, not a crash artifact');
+  assert.equal(
+    recovered.apiKeys.anthropic,
+    '',
+    'the .bak generation predates the anthropic key — correctly the older value, not a crash artifact'
+  );
 });
 
 test('a failed save is reported via lastSaveError instead of being silently swallowed', () => {

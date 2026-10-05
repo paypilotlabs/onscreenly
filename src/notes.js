@@ -41,14 +41,31 @@ function parseNotes(text) {
   for (const raw of lines) {
     const line = raw.trim();
     const matched = HEADERS.find(([, re]) => re.test(line));
-    if (matched) { cur = matched[0]; continue; }
+    if (matched) {
+      cur = matched[0];
+      continue;
+    }
     if (!cur) continue;
-    if (!line) { cur = null; continue; } // blank line ends a section
+    if (!line) {
+      cur = null;
+      continue;
+    } // blank line ends a section
     buckets[cur].push(line);
   }
   for (const [k, arr] of Object.entries(buckets)) {
-    if (k === 'summary') { out.summary = arr.join(' ').trim(); continue; }
-    out[k] = arr.map((l) => l.replace(/^[-*•]\s*/, '').replace(/^\[[ x]\]\s*/, '').replace(/^[0-9]+[.)]\s*/, '').trim()).filter(Boolean);
+    if (k === 'summary') {
+      out.summary = arr.join(' ').trim();
+      continue;
+    }
+    out[k] = arr
+      .map((l) =>
+        l
+          .replace(/^[-*•]\s*/, '')
+          .replace(/^\[[ x]\]\s*/, '')
+          .replace(/^[0-9]+[.)]\s*/, '')
+          .trim()
+      )
+      .filter(Boolean);
   }
 
   // If the model didn't use any heading and nothing was captured, fall back.

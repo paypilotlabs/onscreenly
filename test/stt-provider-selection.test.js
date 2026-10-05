@@ -55,7 +55,10 @@ test('explicit Custom selection with a base URL and key is offered and usable fo
 
 test('explicit Custom selection without both a base URL and a key stays unavailable (no silent partial send)', () => {
   assert.equal(createSTT({ sttProvider: 'custom', apiKeys: { custom: 'test-custom-key' } }).available, false);
-  assert.equal(createSTT({ sttProvider: 'custom', baseUrl: 'http://127.0.0.1:18789/v1', apiKeys: {} }).available, false);
+  assert.equal(
+    createSTT({ sttProvider: 'custom', baseUrl: 'http://127.0.0.1:18789/v1', apiKeys: {} }).available,
+    false
+  );
 });
 
 test('auto mode still never reaches for the Custom chat key for STT (unchanged from before)', () => {

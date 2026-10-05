@@ -1,4 +1,15 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell, dialog, systemPreferences } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  globalShortcut,
+  screen,
+  session,
+  desktopCapturer,
+  shell,
+  dialog,
+  systemPreferences
+} = require('electron');
 const { bootstrapIdentity } = require('./src/app-identity');
 bootstrapIdentity(app);
 const { readEnvironment } = require('./src/environment');
@@ -140,14 +151,14 @@ const vad = {
   you: new AdaptiveVAD({
     onsetThreshold: 220,
     offsetThreshold: 130,
-    silenceFrames: 18,       // ~540ms silence before end
+    silenceFrames: 18, // ~540ms silence before end
     onSpeechStart: () => send('vad:state', { channel: 'you', speaking: true }),
     onSpeechEnd: (dur) => send('vad:state', { channel: 'you', speaking: false, durationMs: dur })
   }),
   them: new AdaptiveVAD({
     onsetThreshold: 200,
     offsetThreshold: 120,
-    silenceFrames: 20,       // ~600ms for remote audio (more forgiving)
+    silenceFrames: 20, // ~600ms for remote audio (more forgiving)
     onSpeechStart: () => send('vad:state', { channel: 'them', speaking: true }),
     onSpeechEnd: (dur) => send('vad:state', { channel: 'them', speaking: false, durationMs: dur })
   })
@@ -164,7 +175,9 @@ function pushTranscript(turn) {
   if (meetingMemory) meetingMemory.onTurn(turn);
 }
 
-function send(channel, data) { if (win && !win.isDestroyed()) win.webContents.send(channel, data); }
+function send(channel, data) {
+  if (win && !win.isDestroyed()) win.webContents.send(channel, data);
+}
 
 function getWhisperRuntime() {
   return locateWhisperRuntime({
@@ -206,7 +219,7 @@ async function startLocalWhisper(settings) {
         executablePath: runtime.executablePath,
         runtimeDirectory: runtime.runtimeDirectory,
         modelPath,
-        language: model.englishOnly ? 'en' : (localSettings.language || 'auto'),
+        language: model.englishOnly ? 'en' : localSettings.language || 'auto',
         threads: Number(localSettings.threads) || 0,
         tinydiarize: model.tinydiarize
       },
@@ -219,7 +232,9 @@ async function startLocalWhisper(settings) {
         sttDisabled = true;
         console.log('[local-whisper] error', error && error.message);
         send('stt:status', { provider: 'local', status: 'error' });
-        send('status', { message: `Local transcription error: ${error.message}. Audio was not sent to a cloud fallback.` });
+        send('status', {
+          message: `Local transcription error: ${error.message}. Audio was not sent to a cloud fallback.`
+        });
       }
     });
 
@@ -252,7 +267,8 @@ async function getWhisperOverview() {
 // The window has a transparent, click-through strip on each side of the main column so
 // the history sidebar can slide out left or right. Must match --main-w/--side-w in
 // styles.css. Saved windowX is the main column's x, not the window's.
-const MAIN_W = 700, SIDE_W = 300;
+const MAIN_W = 700,
+  SIDE_W = 300;
 
 function saveWindowPosition() {
   if (!win || win.isDestroyed()) return;
@@ -262,14 +278,18 @@ function saveWindowPosition() {
 
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const W = SIDE_W + MAIN_W + SIDE_W, H = 600;
+  const W = SIDE_W + MAIN_W + SIDE_W,
+    H = 600;
 
   const savedSettings = store.getSettings();
   let startX = Math.round(workArea.x + (workArea.width - MAIN_W) / 2);
   let startY = workArea.y + 6;
 
   if (savedSettings.windowX !== null && savedSettings.windowY !== null) {
-    const clampedX = Math.max(workArea.x - MAIN_W + 100, Math.min(savedSettings.windowX, workArea.x + workArea.width - 100));
+    const clampedX = Math.max(
+      workArea.x - MAIN_W + 100,
+      Math.min(savedSettings.windowX, workArea.x + workArea.width - 100)
+    );
     // Keep the whole window on screen, not just a 40px sliver of it. The old
     // `- 40` let a 600px-tall window sit at y=607 on a 960px display, pushing
     // the composer and action row off the bottom edge with no way to reach them.
@@ -323,15 +343,21 @@ function createWindow() {
       // setContentProtection has no effect on Linux (no windowing-system-level
       // capture-exclusion primitive it can map to) — skip the no-op call and
       // say so, rather than pretending the window is hidden from screen shares.
-      console.log('[onscreenly] Running on Linux: native screen protection (setContentProtection) is not supported and has been skipped.');
+      console.log(
+        '[onscreenly] Running on Linux: native screen protection (setContentProtection) is not supported and has been skipped.'
+      );
     } else if (WIN_SUPPORTS_CONTENT_PROTECTION) {
       win.setContentProtection(true);
     } else {
       // Will notify the renderer after it loads
-      console.log(`[onscreenly] Windows build ${WIN_BUILD} < 19041 — setContentProtection not supported. Window may appear in screen shares.`);
+      console.log(
+        `[onscreenly] Windows build ${WIN_BUILD} < 19041 — setContentProtection not supported. Window may appear in screen shares.`
+      );
     }
   } else if (isWindows && !WIN_IS_LOCAL_CONSOLE_SESSION && !readEnvironment('NO_PROTECT')) {
-    console.log(`[onscreenly] Windows session is not a local console session (SESSIONNAME=${process.env.SESSIONNAME}) — skipping setContentProtection so the window stays visible to you. Window may appear in screen shares.`);
+    console.log(
+      `[onscreenly] Windows session is not a local console session (SESSIONNAME=${process.env.SESSIONNAME}) — skipping setContentProtection so the window stays visible to you. Window may appear in screen shares.`
+    );
   }
 
   win.setAlwaysOnTop(true, 'screen-saver', 1);
@@ -370,13 +396,20 @@ function createWindow() {
     // session (RDP / Cloud PC / VM console) — see WIN_IS_LOCAL_CONSOLE_SESSION.
     if (isWindows && !readEnvironment('NO_PROTECT') && !WIN_IS_LOCAL_CONSOLE_SESSION) {
       send('status', {
-        message: 'Heads up: screen-share hiding is off for this session (remote desktop / cloud PC / VM sessions can render the window invisible to you as well when it is on). The window will be visible in screen shares here.'
+        message:
+          'Heads up: screen-share hiding is off for this session (remote desktop / cloud PC / VM sessions can render the window invisible to you as well when it is on). The window will be visible in screen shares here.'
       });
     }
   });
   win.webContents.on('render-process-gone', (_e, d) => {
     console.log('[onscreenly] renderer gone', JSON.stringify(d));
-    recordEvent({ level: 'fatal', event: 'renderer_gone', code: d && d.reason, msg: 'renderer process ended: ' + JSON.stringify(d), frame: 'BrowserWindow' });
+    recordEvent({
+      level: 'fatal',
+      event: 'renderer_gone',
+      code: d && d.reason,
+      msg: 'renderer process ended: ' + JSON.stringify(d),
+      frame: 'BrowserWindow'
+    });
   });
 }
 
@@ -395,7 +428,13 @@ async function flushChannel(channel) {
     const settings = store.getSettings();
     const stt = createSTT(settings);
     if (!stt.available) {
-      if (!sttDisabled) { sttDisabled = true; send('status', { message: 'No transcription key set. Add an OpenAI (Whisper) or Groq key in Settings to enable listening. Screen/LeetCode features work without it.' }); }
+      if (!sttDisabled) {
+        sttDisabled = true;
+        send('status', {
+          message:
+            'No transcription key set. Add an OpenAI (Whisper) or Groq key in Settings to enable listening. Screen/LeetCode features work without it.'
+        });
+      }
       return;
     }
     const res = await stt.transcribe(pcm);
@@ -410,7 +449,13 @@ async function flushChannel(channel) {
     }
   } catch (e) {
     console.log('[stt] error', e && e.message);
-    recordEvent({ level: 'error', event: 'stt_failed', msg: e && e.message ? e.message : String(e), frame: 'flushChannel', context: { channel } });
+    recordEvent({
+      level: 'error',
+      event: 'stt_failed',
+      msg: e && e.message ? e.message : String(e),
+      frame: 'flushChannel',
+      context: { channel }
+    });
   } finally {
     state.transcribing[channel] = false;
   }
@@ -426,14 +471,17 @@ function handleSttError(err, settings) {
     code: err.code || (err.status ? 'http_' + err.status : null),
     msg: err.message,
     frame: 'handleSttError',
-    context: { provider: err.provider, status: err.status || null, alreadyDisabled: sttDisabled },
+    context: { provider: err.provider, status: err.status || null, alreadyDisabled: sttDisabled }
   });
   if (sttDisabled) return;
-  const isQuota = err.status === 429 || err.code === 'RESOURCE_EXHAUSTED' || (err.message && err.message.includes('Quota exceeded'));
+  const isQuota =
+    err.status === 429 || err.code === 'RESOURCE_EXHAUSTED' || (err.message && err.message.includes('Quota exceeded'));
   const noAccess = err.status === 403 || err.status === 401 || err.code === 'model_not_found' || isQuota;
   sttDisabled = true; // stop hammering the API every few seconds
   if (noAccess) {
-    send('status', { message: `Transcription off: your ${err.provider} key was rejected or hit a quota limit. Update your key in Settings to resume.` });
+    send('status', {
+      message: `Transcription off: your ${err.provider} key was rejected or hit a quota limit. Update your key in Settings to resume.`
+    });
   } else {
     send('status', { message: 'Transcription error (' + err.provider + '): ' + err.message });
   }
@@ -441,9 +489,17 @@ function handleSttError(err, settings) {
 
 function startFlushLoop() {
   if (flushTimer) return;
-  flushTimer = setInterval(() => { flushChannel('you'); flushChannel('them'); }, FLUSH_MS);
+  flushTimer = setInterval(() => {
+    flushChannel('you');
+    flushChannel('them');
+  }, FLUSH_MS);
 }
-function stopFlushLoop() { if (flushTimer) { clearInterval(flushTimer); flushTimer = null; } }
+function stopFlushLoop() {
+  if (flushTimer) {
+    clearInterval(flushTimer);
+    flushTimer = null;
+  }
+}
 
 // -------- streaming STT setup --------
 function initStreamingSTT() {
@@ -474,11 +530,15 @@ function initStreamingSTT() {
         const batchFallbackAvailable = createSTT(settings).available;
         stopStreamingSTT(); // close WebSockets and clear keep-alive intervals
         if (batchFallbackAvailable) {
-          send('status', { message: `Streaming transcription (${err.provider}) error: ${err.message}. Falling back to batch mode.` });
+          send('status', {
+            message: `Streaming transcription (${err.provider}) error: ${err.message}. Falling back to batch mode.`
+          });
           startFlushLoop();
         } else if (!sttDisabled) {
           sttDisabled = true;
-          send('status', { message: `Transcription stopped (${err.provider}): ${err.message}. The selected provider has no batch fallback.` });
+          send('status', {
+            message: `Transcription stopped (${err.provider}): ${err.message}. The selected provider has no batch fallback.`
+          });
         }
         streamingMode = false;
       },
@@ -578,7 +638,6 @@ async function pollSlides() {
   });
   slideStableCount = decision.stableCount;
   if (!decision.emit) {
-    if (slideLastHash && decision.distance != null && decision.distance <= cfg.threshold) slideLastHash = slideLastHash;
     return;
   }
   slideLastHash = newHash;
@@ -591,7 +650,7 @@ async function pollSlides() {
     const txStart = slideTxCursor;
     const txEnd = transcript.length;
     const slice = transcript.slice(txStart, txEnd).slice(-8);
-    const caption = (await captionSlide(imageDataUrl, slice) || '').trim();
+    const caption = ((await captionSlide(imageDataUrl, slice)) || '').trim();
     if (!caption) return;
     const slide = slideStore.add({ hash: newHash, caption, txStart, txEnd });
     slideTxCursor = txEnd;
@@ -613,12 +672,17 @@ async function pollSlides() {
 function startSlideLoop() {
   stopSlideLoop();
   const cfg = getSlidesConfig();
-  slideTimer = setInterval(() => { pollSlides().catch(() => {}); }, cfg.intervalMs);
+  slideTimer = setInterval(() => {
+    pollSlides().catch(() => {});
+  }, cfg.intervalMs);
   if (slideTimer.unref) slideTimer.unref();
 }
 
 function stopSlideLoop() {
-  if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+  if (slideTimer) {
+    clearInterval(slideTimer);
+    slideTimer = null;
+  }
 }
 
 function resetSlidesSession() {
@@ -645,7 +709,9 @@ function noteAudioLevel(channel, buf) {
   if (now - audioLevels.lastLog < AUDIO_LEVEL_LOG_MS) return;
   audioLevels.lastLog = now;
   const fmt = (c) => `${c}: chunks=${audioLevels[c].chunks} peakRms=${Math.round(audioLevels[c].peakRms)}`;
-  console.log(`[audio] ${fmt('you')} | ${fmt('them')} (gate=${RMS_GATE}, mode=${localWhisperTranscriber ? 'local' : streamingMode ? 'streaming' : 'batch'})`);
+  console.log(
+    `[audio] ${fmt('you')} | ${fmt('them')} (gate=${RMS_GATE}, mode=${localWhisperTranscriber ? 'local' : streamingMode ? 'streaming' : 'batch'})`
+  );
   audioLevels.you = { chunks: 0, peakRms: 0 };
   audioLevels.them = { chunks: 0, peakRms: 0 };
 }
@@ -707,7 +773,9 @@ async function setCapturing(active) {
           return false;
         }
         send('stt:status', { provider: 'local', status: 'error' });
-        send('status', { message: `Local transcription could not start: ${error.message} No audio was sent to a cloud provider.` });
+        send('status', {
+          message: `Local transcription could not start: ${error.message} No audio was sent to a cloud provider.`
+        });
         send('capture:state', { active: false, streaming: false, mode: 'local' });
         return false;
       }
@@ -738,14 +806,20 @@ async function setCapturing(active) {
   if (meetingMemory) {
     // Write/refresh the notes for this meeting in the background so the
     // summary survives even if Onscreenly is closed before the meeting formally ends.
-    meetingMemory.refreshNotes().then((notes) => {
-      if (notes) send('status', { message: `Meeting notes saved (${transcript.length} turns).` });
-    }).catch(() => {});
+    meetingMemory
+      .refreshNotes()
+      .then((notes) => {
+        if (notes) send('status', { message: `Meeting notes saved (${transcript.length} turns).` });
+      })
+      .catch(() => {});
   }
   stopSlideLoop();
-  buffers.you = []; buffers.them = [];
-  vad.you.reset(); vad.them.reset();
-  ringBuffers.you.clear(); ringBuffers.them.clear();
+  buffers.you = [];
+  buffers.them = [];
+  vad.you.reset();
+  vad.them.reset();
+  ringBuffers.you.clear();
+  ringBuffers.them.clear();
   const stoppingLocalTranscriber = localWhisperTranscriber;
   localWhisperTranscriber = null;
   send('capture:state', { active: false, streaming: false, mode: stoppingLocalTranscriber ? 'local' : 'off' });
@@ -772,14 +846,21 @@ async function runFeature(mode, userText) {
   try {
     const settings = store.getSettings();
     const llm = createLLM(settings);
-    const userBubble = def.userBubble !== null
-      ? def.userBubble
-      : (mode === 'ask' ? userText : mode === 'answerThis' ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"` : null);
+    const userBubble =
+      def.userBubble !== null
+        ? def.userBubble
+        : mode === 'ask'
+          ? userText
+          : mode === 'answerThis'
+            ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"`
+            : null;
     const category = mode !== 'leetcode' ? detectCategory(transcript) : null;
     send('llm:start', { userBubble, small: !!def.small, category });
 
     if (!llm.ready) {
-      const message = llm.configurationError || ('Complete the ' + settings.provider + ' provider settings. Model: ' + (llm.model || 'unset') + '.');
+      const message =
+        llm.configurationError ||
+        'Complete the ' + settings.provider + ' provider settings. Model: ' + (llm.model || 'unset') + '.';
       if (settings.provider === publik.PUBLIK_PROVIDER) {
         // No key yet: either the disclosure was never accepted (open it — the
         // mint happens only on "Continue"), or the install was revoked or the
@@ -799,7 +880,10 @@ async function runFeature(mode, userText) {
     // right after provisioning; this gate catches a card that was never
     // acknowledged (e.g. an install provisioned by an earlier release).
     if (settings.provider === publik.PUBLIK_PROVIDER && settings.apiKeys.publik && !settings.publik.cardShown) {
-      send('llm:error', { message: 'publik API is set up. Take a look at the card, then ask again.', action: { kind: 'card' } });
+      send('llm:error', {
+        message: 'publik API is set up. Take a look at the card, then ask again.',
+        action: { kind: 'card' }
+      });
       return;
     }
 
@@ -808,14 +892,20 @@ async function runFeature(mode, userText) {
       try {
         imageDataUrl = await captureScreenshot();
         if (!imageDataUrl) throw new Error('No screen source was available.');
-      }
-      catch (e) {
-        recordEvent({ level: 'error', event: 'screen_capture_failed', msg: e && e.message ? e.message : String(e), frame: 'captureScreenshot', context: { mode } });
-        const message = process.platform === 'darwin'
-          ? 'Screen capture needs permission — grant Screen Recording to Onscreenly in System Settings.'
-          : process.platform === 'win32'
-            ? 'Screen capture failed. Make sure Onscreenly is not blocked by Windows privacy or security software, then try again.'
-            : 'Screen capture failed. Check your desktop capture permissions, then try again.';
+      } catch (e) {
+        recordEvent({
+          level: 'error',
+          event: 'screen_capture_failed',
+          msg: e && e.message ? e.message : String(e),
+          frame: 'captureScreenshot',
+          context: { mode }
+        });
+        const message =
+          process.platform === 'darwin'
+            ? 'Screen capture needs permission — grant Screen Recording to Onscreenly in System Settings.'
+            : process.platform === 'win32'
+              ? 'Screen capture failed. Make sure Onscreenly is not blocked by Windows privacy or security software, then try again.'
+              : 'Screen capture failed. Check your desktop capture permissions, then try again.';
         send('status', { message });
       }
     }
@@ -826,9 +916,11 @@ async function runFeature(mode, userText) {
     // every feature actually ran with.
     console.log(`[llm] mode=${mode} transcriptTurns=${transcript.length} capturing=${state.capturing}`);
     if (def.transcriptRequired && transcript.length === 0) {
-      send('llm:error', { message: state.capturing
-        ? 'Nothing has been transcribed yet — say something (or let the other side talk) and try again.'
-        : 'Nothing captured yet — press the listen button first so Onscreenly can hear the conversation.' });
+      send('llm:error', {
+        message: state.capturing
+          ? 'Nothing has been transcribed yet — say something (or let the other side talk) and try again.'
+          : 'Nothing captured yet — press the listen button first so Onscreenly can hear the conversation.'
+      });
       return;
     }
 
@@ -838,7 +930,7 @@ async function runFeature(mode, userText) {
     // has something to draw on. Never the current meeting, never leetcode.
     const memoryBlock = mode !== 'leetcode' && meetingMemory ? meetingMemory.memoryBlock() : null;
     if (memoryBlock) contextBlock = contextBlock ? contextBlock + '\n\n' + memoryBlock : memoryBlock;
-    const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : (def.system || '');
+    const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : def.system || '';
     const built = def.build({ transcript, userText: userText || '' });
 
     // Watchdog: a provider that stalls mid-stream would otherwise hang the await forever,
@@ -848,7 +940,10 @@ async function runFeature(mode, userText) {
     const stalled = new Promise((_res, reject) => {
       rearm = () => {
         clearTimeout(watchdog);
-        watchdog = setTimeout(() => reject(new Error('the model stopped responding (timed out). Please try again.')), STREAM_INACTIVITY_MS);
+        watchdog = setTimeout(
+          () => reject(new Error('the model stopped responding (timed out). Please try again.')),
+          STREAM_INACTIVITY_MS
+        );
       };
       rearm();
     });
@@ -858,8 +953,13 @@ async function runFeature(mode, userText) {
           system,
           turns: [{ role: 'user', text: built }],
           imageDataUrl,
-          onToken: (t) => { if (streamSettled) return; rearm(); send('llm:token', { text: t }); },
-          onResponse: settings.provider === publik.PUBLIK_PROVIDER ? (res) => publikNoteHeaders(res && res.headers) : undefined
+          onToken: (t) => {
+            if (streamSettled) return;
+            rearm();
+            send('llm:token', { text: t });
+          },
+          onResponse:
+            settings.provider === publik.PUBLIK_PROVIDER ? (res) => publikNoteHeaders(res && res.headers) : undefined
         }),
         stalled
       ]);
@@ -872,7 +972,13 @@ async function runFeature(mode, userText) {
     // GET /wallet shortly after the answer — one request per answer, debounced.
     if (settings.provider === publik.PUBLIK_PROVIDER) publikScheduleWalletRefresh();
   } catch (e) {
-    recordEvent({ level: 'error', event: 'llm_failed', msg: e && e.message ? e.message : String(e), frame: 'runFeature', context: { mode, provider: store.getSettings().provider } });
+    recordEvent({
+      level: 'error',
+      event: 'llm_failed',
+      msg: e && e.message ? e.message : String(e),
+      frame: 'runFeature',
+      context: { mode, provider: store.getSettings().provider }
+    });
     const action = e && e.action ? e.action : null;
     send('llm:error', { message: e && e.message ? e.message : String(e), action });
     if (action) publikHandleErrorAction(action);
@@ -903,8 +1009,18 @@ let publikProvisioning = null;
 
 function publikDevice() {
   let deviceName = '';
-  try { deviceName = os.hostname(); } catch { /* optional */ }
-  return { appVersion: app.getVersion(), platform: process.platform, osVersion: os.release(), arch: process.arch, deviceName };
+  try {
+    deviceName = os.hostname();
+  } catch {
+    /* optional */
+  }
+  return {
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    osVersion: os.release(),
+    arch: process.arch,
+    deviceName
+  };
 }
 
 function publikState() {
@@ -945,20 +1061,28 @@ function publikState() {
   view.lowStarter = publik.lowStarterNotice(view);
   return view;
 }
-function publikPush() { send('publik:state', publikState()); }
+function publikPush() {
+  send('publik:state', publikState());
+}
 
 async function publikProvision() {
   if (publikProvisioning) return publikProvisioning;
-  publikProvisioning = publik.provisionInstall({
-    build: publikBuild,
-    store,
-    device: publikDevice(),
-    log: (e) => recordEvent({ level: e.level, event: e.event, msg: e.msg, frame: 'publikProvision', context: e.context || {} })
-  }).then((r) => {
-    if (r.ok && r.minted) store.setPublik({ disconnected: false });
-    publikPush();
-    return publikState();
-  }).finally(() => { publikProvisioning = null; });
+  publikProvisioning = publik
+    .provisionInstall({
+      build: publikBuild,
+      store,
+      device: publikDevice(),
+      log: (e) =>
+        recordEvent({ level: e.level, event: e.event, msg: e.msg, frame: 'publikProvision', context: e.context || {} })
+    })
+    .then((r) => {
+      if (r.ok && r.minted) store.setPublik({ disconnected: false });
+      publikPush();
+      return publikState();
+    })
+    .finally(() => {
+      publikProvisioning = null;
+    });
   return publikProvisioning;
 }
 
@@ -991,19 +1115,34 @@ async function publikRefreshWallet() {
   try {
     const w = await publik.fetchWallet({ baseUrl: s.publik.baseUrl || publikBuild.baseUrl, apiKey: s.apiKeys.publik });
     store.setPublik({
-      wallet: w, balanceMicros: w.balanceMicros, balanceAt: Date.now(), claimState: w.claimState,
-      claimUrl: w.claimUrl || (w.claimState === 'claimed' ? '' : s.publik.claimUrl), revoked: false, disconnected: false, lastError: ''
+      wallet: w,
+      balanceMicros: w.balanceMicros,
+      balanceAt: Date.now(),
+      claimState: w.claimState,
+      claimUrl: w.claimUrl || (w.claimState === 'claimed' ? '' : s.publik.claimUrl),
+      revoked: false,
+      disconnected: false,
+      lastError: ''
     });
   } catch (e) {
     if (e.status === 401) publikHandleRevoked(e);
-    else recordEvent({ level: 'warn', event: 'publik_wallet_failed', msg: e.message, frame: 'publikRefreshWallet', context: { status: e.status || null } });
+    else
+      recordEvent({
+        level: 'warn',
+        event: 'publik_wallet_failed',
+        msg: e.message,
+        frame: 'publikRefreshWallet',
+        context: { status: e.status || null }
+      });
   }
   publikPush();
   return publikState();
 }
 function publikScheduleWalletRefresh() {
   clearTimeout(publikWalletTimer);
-  publikWalletTimer = setTimeout(() => { publikRefreshWallet().catch(() => {}); }, 1500);
+  publikWalletTimer = setTimeout(() => {
+    publikRefreshWallet().catch(() => {});
+  }, 1500);
 }
 
 // 401 key_revoked: reprovision:true (idle sweep) → re-mint on our own with the
@@ -1042,9 +1181,21 @@ ipcMain.handle('publik:refresh', () => publikRefreshWallet());
 ipcMain.handle('publik:disconnect', async () => {
   const s = store.getSettings();
   if (s.apiKeys.publik) {
-    try { await publik.revokeInstall({ baseUrl: s.publik.baseUrl || publikBuild.baseUrl, apiKey: s.apiKeys.publik }); } catch (e) { /* the key is dropped locally regardless */ }
+    try {
+      await publik.revokeInstall({ baseUrl: s.publik.baseUrl || publikBuild.baseUrl, apiKey: s.apiKeys.publik });
+    } catch (e) {
+      /* the key is dropped locally regardless */
+    }
   }
-  store.setPublik({ apiKey: '', keyId: '', revoked: false, disconnected: true, balanceMicros: null, wallet: null, lastError: '' });
+  store.setPublik({
+    apiKey: '',
+    keyId: '',
+    revoked: false,
+    disconnected: true,
+    balanceMicros: null,
+    wallet: null,
+    lastError: ''
+  });
   publikPush();
   return publikState();
 });
@@ -1052,7 +1203,17 @@ ipcMain.handle('publik:disconnect', async () => {
 // this starter grant. Touches publik.cardShown only — the key stays in place
 // and the balance is kept (§12.1).
 ipcMain.handle('publik:card-seen', () => {
-  try { publik.markCardSeen(store); } catch (e) { recordEvent({ level: 'error', event: 'publik_card_seen_failed', msg: e.message, frame: 'publik:card-seen', context: {} }); }
+  try {
+    publik.markCardSeen(store);
+  } catch (e) {
+    recordEvent({
+      level: 'error',
+      event: 'publik_card_seen_failed',
+      msg: e.message,
+      frame: 'publik:card-seen',
+      context: {}
+    });
+  }
   publikPush();
   return publikState();
 });
@@ -1062,7 +1223,10 @@ ipcMain.handle('publik:card-seen', () => {
 ipcMain.on('publik:open', (_e, url) => {
   const s = store.getSettings();
   const target = publik.resolveOpenTarget(url, s.publik.claimUrl);
-  if (!target) { recordEvent({ level: 'warn', event: 'publik_open_dropped', msg: '', frame: 'publik:open', context: {} }); return; }
+  if (!target) {
+    recordEvent({ level: 'warn', event: 'publik_open_dropped', msg: '', frame: 'publik:open', context: {} });
+    return;
+  }
   shell.openExternal(target).catch(() => {});
 });
 ipcMain.handle('capture:toggle', () => {
@@ -1071,9 +1235,7 @@ ipcMain.handle('capture:toggle', () => {
   if (!targetState && !state.capturing && localWhisperTranscriber) {
     localWhisperTranscriber.forceStop().catch(() => {});
   }
-  captureTransition = captureTransition
-    .catch(() => state.capturing)
-    .then(() => setCapturing(targetState));
+  captureTransition = captureTransition.catch(() => state.capturing).then(() => setCapturing(targetState));
   return captureTransition;
 });
 ipcMain.handle('capture:state', () => ({ active: state.capturing }));
@@ -1138,9 +1300,15 @@ ipcMain.handle('slides:clear', () => {
   return { ok: true };
 });
 ipcMain.on('ask', (_e, payload) => runFeature(payload.mode, payload.text));
-ipcMain.on('mic:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('you', arrayBuffer); });
-ipcMain.on('system:pcm', (_e, arrayBuffer) => { if (state.capturing) routeAudio('them', arrayBuffer); });
-ipcMain.on('mouse:ignore', (_e, v) => { if (win) win.setIgnoreMouseEvents(!!v, { forward: true }); });
+ipcMain.on('mic:pcm', (_e, arrayBuffer) => {
+  if (state.capturing) routeAudio('you', arrayBuffer);
+});
+ipcMain.on('system:pcm', (_e, arrayBuffer) => {
+  if (state.capturing) routeAudio('them', arrayBuffer);
+});
+ipcMain.on('mouse:ignore', (_e, v) => {
+  if (win) win.setIgnoreMouseEvents(!!v, { forward: true });
+});
 // Window dragging is done here rather than with CSS drag regions, which misbehave while the
 // renderer toggles click-through. The window follows the cursor until the renderer says stop.
 let windowDrag = null;
@@ -1149,9 +1317,13 @@ ipcMain.on('window:drag-start', () => {
   stopWindowDrag();
   const cursor = screen.getCursorScreenPoint();
   const bounds = win.getBounds();
-  const offsetX = cursor.x - bounds.x, offsetY = cursor.y - bounds.y;
+  const offsetX = cursor.x - bounds.x,
+    offsetY = cursor.y - bounds.y;
   windowDrag = setInterval(() => {
-    if (!win || win.isDestroyed()) { stopWindowDrag(); return; }
+    if (!win || win.isDestroyed()) {
+      stopWindowDrag();
+      return;
+    }
     const { x, y } = screen.getCursorScreenPoint();
     // setBounds with a fixed size: setPosition can resize the window when crossing mixed-DPI displays on Windows.
     win.setBounds({ x: x - offsetX, y: y - offsetY, width: bounds.width, height: bounds.height });
@@ -1166,7 +1338,9 @@ function stopWindowDrag() {
   clearInterval(windowDrag);
   windowDrag = null;
 }
-ipcMain.on('open-pane', (_e, url) => { shell.openExternal(url).catch(() => {}); });
+ipcMain.on('open-pane', (_e, url) => {
+  shell.openExternal(url).catch(() => {});
+});
 ipcMain.on('app:quit', () => app.quit());
 ipcMain.on('log', (_e, msg) => console.log('[renderer]', msg));
 // -------- resume / job-description file import --------
@@ -1192,7 +1366,6 @@ ipcMain.handle('profile:pickDocument', async () => {
     return { canceled: false, error: (e && e.message) || String(e) };
   }
 });
-ipcMain.on('app:quit', () => app.quit());
 ipcMain.handle('applink:state', () => appLinkConsentState());
 ipcMain.handle('applink:revoke', (_e, callerId) => {
   // Forgetting a caller also clears its separate slide-caption consent decision,
@@ -1208,7 +1381,10 @@ ipcMain.handle('permissions:request', () => requestPermissions());
 ipcMain.on('permissions:continue', async () => {
   const status = await getPermissionStatus();
   if (status.mic === 'granted' && status.screen === 'granted') {
-    if (permWin) { permWin.close(); permWin = null; }
+    if (permWin) {
+      permWin.close();
+      permWin = null;
+    }
     launchApp();
   }
 });
@@ -1222,7 +1398,13 @@ function registerShortcuts() {
   shortcutState.quit = globalShortcut.register('CommandOrControl+Shift+X', () => app.quit());
   for (const [name, wasRegistered] of Object.entries(shortcutState)) {
     if (!wasRegistered) {
-      recordEvent({ level: 'warn', event: 'shortcut_unavailable', msg: 'another application holds the ' + name + ' shortcut', frame: 'registerShortcuts', context: { shortcut: name } });
+      recordEvent({
+        level: 'warn',
+        event: 'shortcut_unavailable',
+        msg: 'another application holds the ' + name + ' shortcut',
+        frame: 'registerShortcuts',
+        context: { shortcut: name }
+      });
     }
   }
 }
@@ -1241,16 +1423,16 @@ async function verifyScreenAccess() {
   try {
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
-      thumbnailSize: { width: 16, height: 16 },
+      thumbnailSize: { width: 16, height: 16 }
     });
     if (sources.length > 0) {
       const bmp = sources[0].thumbnail.toBitmap();
       // toBitmap() returns raw RGBA bytes; any non-zero byte means real content
-      if (bmp && bmp.some(byte => byte !== 0)) return 'granted';
+      if (bmp && bmp.some((byte) => byte !== 0)) return 'granted';
     }
   } catch (_) {}
 
-  return sysStatus;  // return the original system status if fallback didn't help
+  return sysStatus; // return the original system status if fallback didn't help
 }
 
 async function getPermissionStatus() {
@@ -1262,7 +1444,7 @@ async function getPermissionStatus() {
   if (process.platform === 'darwin' || process.platform === 'win32') {
     return {
       mic: systemPreferences.getMediaAccessStatus('microphone'),
-      screen: await verifyScreenAccess(),
+      screen: await verifyScreenAccess()
     };
   }
   return { mic: 'granted', screen: 'granted' };
@@ -1283,7 +1465,9 @@ async function requestPermissions() {
     // sources via desktopCapturer will cause macOS to prompt the user.
     const screenStatus = await verifyScreenAccess();
     if (screenStatus !== 'granted') {
-      try { await desktopCapturer.getSources({ types: ['screen'] }); } catch (_) {}
+      try {
+        await desktopCapturer.getSources({ types: ['screen'] });
+      } catch (_) {}
     }
   }
   // Windows has no OS-level "ask" dialog (systemPreferences.askForMediaAccess is
@@ -1296,7 +1480,8 @@ async function requestPermissions() {
 
 function createPermissionsWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const W = 500, H = 540;
+  const W = 500,
+    H = 540;
   permWin = new BrowserWindow({
     width: W,
     height: H,
@@ -1312,7 +1497,7 @@ function createPermissionsWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: false
     }
   });
   permWin.loadFile(path.join(__dirname, 'renderer', 'permissions.html'));
@@ -1326,8 +1511,13 @@ function launchApp() {
     // even while the permission gate is still showing). Just dismiss the gate
     // and bring the existing main window forward instead of building a second
     // one on top of it.
-    if (permWin && !permWin.isDestroyed()) { permWin.close(); permWin = null; }
-    if (win && !win.isDestroyed()) { win.showInactive(); }
+    if (permWin && !permWin.isDestroyed()) {
+      permWin.close();
+      permWin = null;
+    }
+    if (win && !win.isDestroyed()) {
+      win.showInactive();
+    }
     return;
   }
   appLaunched = true;
@@ -1350,9 +1540,19 @@ function launchApp() {
   });
   restoredTurns = meetingMemory.resumeOpen();
   if (restoredTurns.length) transcript.push(...restoredTurns.slice(-MAX_TRANSCRIPT_TURNS));
-  meetingMemory.catchUp().then((n) => { if (n) console.log(`[meetings] wrote notes for ${n} earlier meeting(s)`); }).catch(() => {});
+  meetingMemory
+    .catchUp()
+    .then((n) => {
+      if (n) console.log(`[meetings] wrote notes for ${n} earlier meeting(s)`);
+    })
+    .catch(() => {});
 
-  const allowMedia = (permission) => permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture' || permission === 'screen';
+  const allowMedia = (permission) =>
+    permission === 'media' ||
+    permission === 'microphone' ||
+    permission === 'audioCapture' ||
+    permission === 'display-capture' ||
+    permission === 'screen';
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowMedia(permission)));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowMedia(permission));
 
@@ -1376,20 +1576,23 @@ function launchApp() {
   // indicator), so the honest answer is consent: never open that session on macOS
   // unless the user switched Meeting audio on in Settings > Audio. This guard is the
   // enforcement point and holds even if another renderer path calls getDisplayMedia.
-  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
-    // The macOS consent gate resolves to an empty source list instead of invoking the
-    // one-time reply itself, so this handler keeps exactly one invocation site.
-    // test/display-media-audio.test.js counts them, because a second site is how the
-    // "One-time callback was called more than once" bug happened before.
-    const allowed = !isMac || Boolean(store.getSettings().meetingAudio);
-    (allowed ? desktopCapturer.getSources({ types: ['screen'] }) : Promise.resolve([]))
-      .then((sources) => (sources.length ? { video: sources[0], audio: 'loopback' } : undefined))
-      .catch((err) => {
-        console.error('[main] system audio: desktopCapturer.getSources failed:', err);
-        return undefined;
-      })
-      .then((request) => callback(request));
-  }, { useSystemPicker: false });
+  session.defaultSession.setDisplayMediaRequestHandler(
+    (_request, callback) => {
+      // The macOS consent gate resolves to an empty source list instead of invoking the
+      // one-time reply itself, so this handler keeps exactly one invocation site.
+      // test/display-media-audio.test.js counts them, because a second site is how the
+      // "One-time callback was called more than once" bug happened before.
+      const allowed = !isMac || Boolean(store.getSettings().meetingAudio);
+      (allowed ? desktopCapturer.getSources({ types: ['screen'] }) : Promise.resolve([]))
+        .then((sources) => (sources.length ? { video: sources[0], audio: 'loopback' } : undefined))
+        .catch((err) => {
+          console.error('[main] system audio: desktopCapturer.getSources failed:', err);
+          return undefined;
+        })
+        .then((request) => callback(request));
+    },
+    { useSystemPicker: false }
+  );
 
   // Started before the shortcuts so their registration failures are recorded.
   startAppLink({
@@ -1400,7 +1603,7 @@ function launchApp() {
       sttDisabled,
       shortcuts: { ...shortcutState },
       windowAlive: !!(win && !win.isDestroyed()),
-      slides: slideStore.list(),
+      slides: slideStore.list()
     }),
     setCapturing,
     getSlides: () => slideStore.list(),
@@ -1408,7 +1611,7 @@ function launchApp() {
     setSlidesConsent: (callerId, decision) => store.setSlidesConsent(callerId, decision),
     // Looked up rather than captured: the window is recreated on 'activate',
     // so a reference taken at startup goes stale.
-    getWindow: () => win,
+    getWindow: () => win
   });
 
   createWindow();
@@ -1426,7 +1629,9 @@ app.whenReady().then(async () => {
     if (!allGranted) {
       // Show the permissions gate — the dock stays visible so the user can find the app
       createPermissionsWindow();
-      app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow(); });
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow();
+      });
       return;
     }
   } else if (isWindows) {
@@ -1444,7 +1649,9 @@ app.whenReady().then(async () => {
   }
 
   launchApp();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
 });
 
 app.on('will-quit', () => {
@@ -1466,6 +1673,9 @@ app.on('will-quit', () => {
 });
 app.on('window-all-closed', (e) => {
   // Don't quit while the permissions window is open — the user may be in System Settings
-  if (permWin) { e.preventDefault(); return; }
+  if (permWin) {
+    e.preventDefault();
+    return;
+  }
   app.quit();
 });

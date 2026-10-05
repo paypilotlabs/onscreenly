@@ -1,3 +1,4 @@
+// @ts-check
 const SUPPORTED_BASE_URL_PROTOCOLS = new Set(['http:', 'https:']);
 const OPTIONAL_API_KEY_PLACEHOLDER = 'not-required';
 

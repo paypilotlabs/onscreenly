@@ -14,7 +14,9 @@ class FakeWebSocket extends EventEmitter {
     this.sent = [];
     sockets.push(this);
   }
-  send(data) { this.sent.push(data); }
+  send(data) {
+    this.sent.push(data);
+  }
   close(code) {
     if (this.readyState === 0) {
       this.readyState = 3;
@@ -25,7 +27,10 @@ class FakeWebSocket extends EventEmitter {
     this.readyState = 3;
     this.emit('close', code);
   }
-  open() { this.readyState = 1; this.emit('open'); }
+  open() {
+    this.readyState = 1;
+    this.emit('open');
+  }
 }
 const wsPath = require.resolve('ws');
 require.cache[wsPath] = { id: wsPath, filename: wsPath, loaded: true, exports: FakeWebSocket };
@@ -42,7 +47,10 @@ function enableMockTimeout(t) {
   }
 }
 
-for (const [name, Ctor] of [['Deepgram', DeepgramStreamingSTT], ['OpenAI Realtime', OpenAIRealtimeSTT]]) {
+for (const [name, Ctor] of [
+  ['Deepgram', DeepgramStreamingSTT],
+  ['OpenAI Realtime', OpenAIRealtimeSTT]
+]) {
   test(`${name}: disconnect() during the handshake is not reported as a provider error and does not reconnect`, async (t) => {
     enableMockTimeout(t);
     sockets.length = 0;

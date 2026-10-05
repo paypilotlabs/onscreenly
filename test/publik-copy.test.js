@@ -47,6 +47,12 @@ test('the provider is labelled "publik API", never "Custom" or a vendor name', (
   // Policy 0059: a new install holds $0.00; the one free thing is $0.05 when this
   // computer is linked, once. The sheet never promises use before that.
   assert.match(publik.COPY.disclosure.cost, /A new computer starts at \$0\.00\./);
-  assert.match(publik.COPY.disclosure.cost, /Linking this computer to your publik account gives \$0\.05 of free use, once\./);
-  assert.doesNotMatch(JSON.stringify(publik.COPY.disclosure), /start right away|without an account|free balance|free starter|starts with/i);
+  assert.match(
+    publik.COPY.disclosure.cost,
+    /Linking this computer to your publik account gives \$0\.05 of free use, once\./
+  );
+  assert.doesNotMatch(
+    JSON.stringify(publik.COPY.disclosure),
+    /start right away|without an account|free balance|free starter|starts with/i
+  );
 });

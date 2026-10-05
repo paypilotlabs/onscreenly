@@ -1,3 +1,4 @@
+// @ts-check
 // Extracts plain text from a resume/job-description file (PDF or DOCX) so it can be
 // dropped into the existing Settings textareas. No OCR — text layer only.
 const fs = require('fs');

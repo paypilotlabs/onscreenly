@@ -1,3 +1,4 @@
+// @ts-check
 // Meeting memory — wires the meeting store (meetings.js) and notes (notes.js)
 // into the live transcript so onscreenly remembers what was said:
 //   • every transcript turn is persisted as it lands (survives a crash/restart)
@@ -18,9 +19,9 @@ const NOTES_SYSTEM =
 
 const DEFAULTS = {
   resumeWindowMs: 30 * 60 * 1000, // an open meeting whose last turn is older than this is treated as over
-  minTurnsForNotes: 4,             // fewer than this is a false start, not a meeting worth notes
-  maxMeetings: 50,                 // kept on disk; oldest are pruned
-  memoryCount: 3                   // summaries offered to prompts
+  minTurnsForNotes: 4, // fewer than this is a false start, not a meeting worth notes
+  maxMeetings: 50, // kept on disk; oldest are pruned
+  memoryCount: 3 // summaries offered to prompts
 };
 
 function createMeetingMemory(opts) {
@@ -28,8 +29,8 @@ function createMeetingMemory(opts) {
   const now = opts.now || Date.now;
   const log = opts.log || (() => {});
   const cfg = { ...DEFAULTS, ...opts };
-  let current = null;        // the meeting the live transcript is being written to
-  let notesTurnCount = 0;    // transcript length when notes were last written for `current`
+  let current = null; // the meeting the live transcript is being written to
+  let notesTurnCount = 0; // transcript length when notes were last written for `current`
   let notesInFlight = null;
 
   function lastTurnTs(m) {
@@ -56,7 +57,12 @@ function createMeetingMemory(opts) {
       });
       const notes = parseNotes(text);
       if (!notes.summary) return null;
-      store.update(m.id, { ...notes, title: titleFor(notes.summary, m.startedAt), notesAt: now(), notesTurns: m.transcript.length });
+      store.update(m.id, {
+        ...notes,
+        title: titleFor(notes.summary, m.startedAt),
+        notesAt: now(),
+        notesTurns: m.transcript.length
+      });
       log(`notes written for meeting ${m.id} (${m.transcript.length} turns)`);
       return notes;
     } catch (e) {
@@ -66,7 +72,9 @@ function createMeetingMemory(opts) {
   }
 
   return {
-    get current() { return current; },
+    get current() {
+      return current;
+    },
 
     // On launch: pick up a meeting that was still open (no endedAt) if its last
     // turn is recent enough to plausibly be the same conversation. Returns the
@@ -105,8 +113,14 @@ function createMeetingMemory(opts) {
       if (notesInFlight) return notesInFlight;
       const m = current;
       const count = m.transcript.length;
-      notesInFlight = writeNotes(m).then((notes) => { if (notes && current === m) notesTurnCount = count; return notes; })
-        .finally(() => { notesInFlight = null; });
+      notesInFlight = writeNotes(m)
+        .then((notes) => {
+          if (notes && current === m) notesTurnCount = count;
+          return notes;
+        })
+        .finally(() => {
+          notesInFlight = null;
+        });
       return notesInFlight;
     },
 
@@ -127,14 +141,17 @@ function createMeetingMemory(opts) {
     async catchUp() {
       const pending = store.all().filter((m) => m.endedAt && !m.summary && m.transcript.length >= cfg.minTurnsForNotes);
       let written = 0;
-      for (const m of pending) { if (await writeNotes(m)) written++; } // sequential: one provider call at a time
+      for (const m of pending) {
+        if (await writeNotes(m)) written++;
+      } // sequential: one provider call at a time
       return written;
     },
 
     // "Previous meetings" context for prompts — summaries only, never full
     // transcripts, and never the meeting that is happening right now.
     memoryBlock() {
-      const items = store.recentSummaries(cfg.memoryCount + 1)
+      const items = store
+        .recentSummaries(cfg.memoryCount + 1)
         .filter((m) => !current || m.id !== current.id)
         .slice(-cfg.memoryCount);
       if (!items.length) return null;
@@ -142,7 +159,9 @@ function createMeetingMemory(opts) {
       return 'Previous meetings (for background only; the live transcript is what matters now):\n' + lines.join('\n');
     },
 
-    flush() { store.flush(); }
+    flush() {
+      store.flush();
+    }
   };
 }
 

@@ -35,18 +35,21 @@ class LocalWhisperTranscriber {
     await this.session.start();
     for (const channel of CHANNELS) {
       const isRemoteAudio = channel === 'them';
-      this.segmenters.set(channel, this.segmenterFactory({
+      this.segmenters.set(
         channel,
-        vadOptions: {
-          onsetThreshold: isRemoteAudio ? 200 : 220,
-          offsetThreshold: isRemoteAudio ? 120 : 130,
-          silenceFrames: isRemoteAudio ? 20 : 18
-        },
-        onSpeechState: (speechChannel, speaking, durationMs) => {
-          this.onSpeechState(speechChannel, speaking, durationMs);
-        },
-        onUtterance: (utteranceChannel, pcm) => this._enqueue(utteranceChannel, pcm)
-      }));
+        this.segmenterFactory({
+          channel,
+          vadOptions: {
+            onsetThreshold: isRemoteAudio ? 200 : 220,
+            offsetThreshold: isRemoteAudio ? 120 : 130,
+            silenceFrames: isRemoteAudio ? 20 : 18
+          },
+          onSpeechState: (speechChannel, speaking, durationMs) => {
+            this.onSpeechState(speechChannel, speaking, durationMs);
+          },
+          onUtterance: (utteranceChannel, pcm) => this._enqueue(utteranceChannel, pcm)
+        })
+      );
     }
     this.acceptingAudio = true;
   }

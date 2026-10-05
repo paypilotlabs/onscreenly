@@ -33,17 +33,25 @@ const SETTLE_TIMEOUT_MS = 8000; // reporters describe a sub-second failure; 8s i
 
 function httpGetJson(url) {
   return new Promise((resolve, reject) => {
-    http.get(url, (res) => {
-      let body = '';
-      res.on('data', (c) => (body += c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
-      });
-    }).on('error', reject);
+    http
+      .get(url, (res) => {
+        let body = '';
+        res.on('data', (c) => (body += c));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      })
+      .on('error', reject);
   });
 }
 
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function findPageTarget() {
   const deadline = Date.now() + TIMEOUT_MS;
@@ -90,7 +98,9 @@ function cdpClient(wsUrl) {
       ws.send(JSON.stringify({ id: thisId, method, params }));
     });
   }
-  function onEvent(fn) { eventHandlers.push(fn); }
+  function onEvent(fn) {
+    eventHandlers.push(fn);
+  }
   return { ready, send, onEvent, close: () => ws.close() };
 }
 
@@ -105,7 +115,7 @@ async function main() {
   client.onEvent((method, params) => {
     if (method === 'Runtime.consoleAPICalled') {
       try {
-        const text = (params.args || []).map((a) => a.value !== undefined ? a.value : a.description).join(' ');
+        const text = (params.args || []).map((a) => (a.value !== undefined ? a.value : a.description)).join(' ');
         consoleLines.push(`[${params.type}] ${text}`);
       } catch (_) {}
     }
@@ -142,11 +152,13 @@ async function main() {
         return JSON.stringify(window.__oracle);
       })()
     `,
-    returnByValue: true,
+    returnByValue: true
   });
   const instrumented = JSON.parse(instrumentResult.result.value);
   if (!instrumented.supported) {
-    console.log(JSON.stringify({ ok: false, could_not_run: true, reason: 'getDisplayMedia not supported in this renderer' }));
+    console.log(
+      JSON.stringify({ ok: false, could_not_run: true, reason: 'getDisplayMedia not supported in this renderer' })
+    );
     process.exit(3);
   }
 
@@ -159,7 +171,7 @@ async function main() {
         if (skip && scrim && !scrim.classList.contains('hidden')) { skip.click(); return true; }
         return false;
       })()
-    `,
+    `
   });
   await sleep(300);
 
@@ -173,7 +185,7 @@ async function main() {
         return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
       })()
     `,
-    returnByValue: true,
+    returnByValue: true
   });
   if (!rectResult.result.value) {
     console.log(JSON.stringify({ ok: false, could_not_run: true, reason: '#stop-btn not found in DOM' }));
@@ -192,7 +204,7 @@ async function main() {
   while (Date.now() < deadline) {
     const r = await client.send('Runtime.evaluate', {
       expression: 'JSON.stringify(window.__oracle || {})',
-      returnByValue: true,
+      returnByValue: true
     });
     oracleState = JSON.parse(r.result.value);
     if (oracleState.settled) break;
@@ -207,7 +219,7 @@ async function main() {
         return el ? el.textContent : null;
       })()
     `,
-    returnByValue: true,
+    returnByValue: true
   });
   const statusText = statusResult.result.value;
 
@@ -231,11 +243,18 @@ async function main() {
     errorMessage: oracleState ? oracleState.errorMessage : null,
     statusText,
     consoleLines: consoleLines.slice(-40),
-    screenshotBase64,
+    screenshotBase64
   };
 
   if (!oracleState || !oracleState.called) {
-    console.log(JSON.stringify({ ...evidence, ok: false, could_not_run: true, reason: 'getDisplayMedia was never invoked after the click (button/handler not wired the way expected)' }));
+    console.log(
+      JSON.stringify({
+        ...evidence,
+        ok: false,
+        could_not_run: true,
+        reason: 'getDisplayMedia was never invoked after the click (button/handler not wired the way expected)'
+      })
+    );
     process.exit(3);
   }
 
@@ -244,6 +263,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.log(JSON.stringify({ ok: false, could_not_run: true, reason: String(err && err.stack || err) }));
+  console.log(JSON.stringify({ ok: false, could_not_run: true, reason: String((err && err.stack) || err) }));
   process.exit(3);
 });

@@ -1,3 +1,4 @@
+// @ts-check
 // Meeting history + memory — local JSON-file persistence.
 // Each meeting: { id, title, startedAt, endedAt, channels, transcript,
 //   summary, actionItems, followUp, notes, context }
@@ -5,7 +6,6 @@
 // never the full transcript of every meeting.
 
 const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
 function loadMeetingsFile(file) {
@@ -37,17 +37,28 @@ function createMeetingStore(opts = {}) {
   let saveTimer = null;
   function save() {
     if (!file) return;
-    if (!debounceMs) { saveMeetingsFile(file, meetings); return; }
+    if (!debounceMs) {
+      saveMeetingsFile(file, meetings);
+      return;
+    }
     if (saveTimer) return;
-    saveTimer = setTimeout(() => { saveTimer = null; saveMeetingsFile(file, meetings); }, debounceMs);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      saveMeetingsFile(file, meetings);
+    }, debounceMs);
   }
 
   return {
     file,
-    list() { return meetings; },
+    list() {
+      return meetings;
+    },
 
     flush() {
-      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
       if (file) saveMeetingsFile(file, meetings);
     },
 
@@ -125,7 +136,9 @@ function createMeetingStore(opts = {}) {
       return meetings.length < before;
     },
 
-    all() { return meetings.slice(); }
+    all() {
+      return meetings.slice();
+    }
   };
 }
 
@@ -133,7 +146,13 @@ function scoreMeeting(m, needle) {
   let score = 0;
   // followUp arrives as an array from parseNotes but as a string from older
   // records, so flatten before matching rather than assuming either shape.
-  const fields = [m.title, m.summary, ...[].concat(m.followUp || []), ...m.actionItems, ...m.transcript.map((t) => t.text)];
+  const fields = [
+    m.title,
+    m.summary,
+    ...[].concat(m.followUp || []),
+    ...m.actionItems,
+    ...m.transcript.map((t) => t.text)
+  ];
   for (const f of fields) {
     if (typeof f !== 'string' || !f) continue;
     if (f.toLowerCase().includes(needle)) score += 1;

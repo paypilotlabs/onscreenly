@@ -27,7 +27,8 @@ test('buildResumeContext still works with legacy (text, limit) signature', () =>
 
 // ── parseResume ───────────────────────────────────────────────────────────────
 test('parseResume detects structured sections', () => {
-  const resume = 'Jane Doe\n\nSummary\nExperienced engineer.\n\nSkills\nJavaScript, Node.js\n\nExperience\nAcme Corp 2020-2023';
+  const resume =
+    'Jane Doe\n\nSummary\nExperienced engineer.\n\nSkills\nJavaScript, Node.js\n\nExperience\nAcme Corp 2020-2023';
   const parsed = parseResume(resume);
   assert.ok(parsed.parsed, 'should detect structured resume');
   assert.ok(parsed.sections.name, 'should extract name');
@@ -59,7 +60,10 @@ test('detectCategory: compensation questions', () => {
 
 test('detectCategory: technical questions', () => {
   assert.equal(detectCategory([{ channel: 'them', text: 'How would you design a distributed cache?' }]), 'technical');
-  assert.equal(detectCategory([{ channel: 'them', text: 'What is the difference between SQL and NoSQL?' }]), 'technical');
+  assert.equal(
+    detectCategory([{ channel: 'them', text: 'What is the difference between SQL and NoSQL?' }]),
+    'technical'
+  );
 });
 
 test('detectCategory: returns general for empty transcript', () => {
@@ -86,24 +90,25 @@ const fullSettings = {
 };
 
 test('buildInterviewContext: behavioral injects STAR stories', () => {
-  const ctx = buildInterviewContext(fullSettings, 'say',
-    [{ channel: 'them', text: 'Tell me about a time you faced a major outage.' }]);
+  const ctx = buildInterviewContext(fullSettings, 'say', [
+    { channel: 'them', text: 'Tell me about a time you faced a major outage.' }
+  ]);
   assert.ok(ctx !== null);
   assert.ok(ctx.includes('STAR'), 'should include STAR stories');
   assert.ok(ctx.includes('PayCo'), 'should include resume');
 });
 
 test('buildInterviewContext: motivation injects why company / why leaving', () => {
-  const ctx = buildInterviewContext(fullSettings, 'say',
-    [{ channel: 'them', text: 'Why do you want to work here?' }]);
+  const ctx = buildInterviewContext(fullSettings, 'say', [{ channel: 'them', text: 'Why do you want to work here?' }]);
   assert.ok(ctx !== null);
   assert.ok(ctx.includes('Why This Company'), 'should include why company');
   assert.ok(ctx.includes('Why Leaving'), 'should include why leaving');
 });
 
 test('buildInterviewContext: compensation injects salary and questions', () => {
-  const ctx = buildInterviewContext(fullSettings, 'say',
-    [{ channel: 'them', text: 'What are your salary expectations?' }]);
+  const ctx = buildInterviewContext(fullSettings, 'say', [
+    { channel: 'them', text: 'What are your salary expectations?' }
+  ]);
   assert.ok(ctx !== null);
   assert.ok(ctx.includes('170k'), 'should include salary target');
   assert.ok(ctx.includes('success look like'), 'should include questions to ask');
@@ -114,7 +119,16 @@ test('buildInterviewContext: leetcode returns null', () => {
 });
 
 test('buildInterviewContext: returns null with no settings data', () => {
-  const empty = { resumeText: '', jobDescription: '', starStories: '', whyCompany: '', whyLeaving: '', workStyle: '', salaryTarget: '', questionsToAsk: '' };
+  const empty = {
+    resumeText: '',
+    jobDescription: '',
+    starStories: '',
+    whyCompany: '',
+    whyLeaving: '',
+    workStyle: '',
+    salaryTarget: '',
+    questionsToAsk: ''
+  };
   assert.equal(buildInterviewContext(empty, 'say', [{ channel: 'them', text: 'Tell me about yourself.' }]), null);
 });
 

@@ -80,7 +80,14 @@ const DEAD_DEEPSEEK_MODEL_RE = /^deepseek-(chat|reasoner)$/i;
 const CURRENT_DEEPSEEK_FAST_DEFAULT = 'deepseek-flash';
 const CURRENT_DEEPSEEK_SMART_DEFAULT = 'deepseek-v4-pro';
 
-const PROVIDER_LABELS = { azure: 'Azure AI Foundry', cerebras: 'Cerebras', openai: 'OpenAI', minimax: 'MiniMax', publik: publik.PROVIDER_LABEL, deepseek: 'DeepSeek' };
+const PROVIDER_LABELS = {
+  azure: 'Azure AI Foundry',
+  cerebras: 'Cerebras',
+  openai: 'OpenAI',
+  minimax: 'MiniMax',
+  publik: publik.PROVIDER_LABEL,
+  deepseek: 'DeepSeek'
+};
 
 // DeepSeek is OpenAI-compatible and reuses the OpenAI screenshot/streaming path via baseURL.
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
@@ -120,8 +127,13 @@ function hasRateLimitSignal({ code, upstreamType }) {
 function isQuotaError(error) {
   const signals = errorSignals(error);
   const { code, upstreamType, text } = signals;
-  if (code === 'insufficient_quota' || code === 'RESOURCE_EXHAUSTED' ||
-      upstreamType === 'insufficient_quota' || upstreamType === 'RESOURCE_EXHAUSTED') return true;
+  if (
+    code === 'insufficient_quota' ||
+    code === 'RESOURCE_EXHAUSTED' ||
+    upstreamType === 'insufficient_quota' ||
+    upstreamType === 'RESOURCE_EXHAUSTED'
+  )
+    return true;
   if (hasRateLimitSignal(signals)) return false;
   return /insufficient_quota|resource_exhausted|exceeded your current quota|\bquota\b|\bbilling\b/i.test(text);
 }
@@ -132,8 +144,9 @@ function isRateLimitError(error) {
   if (isQuotaError(error)) return false;
   const signals = errorSignals(error);
   const { status, code, text } = signals;
-  return status === 429 || code === 429 || hasRateLimitSignal(signals) ||
-    /\b429\b|too many requests|rate limit/i.test(text);
+  return (
+    status === 429 || code === 429 || hasRateLimitSignal(signals) || /\b429\b|too many requests|rate limit/i.test(text)
+  );
 }
 
 function isNotFoundError(error) {
@@ -171,8 +184,11 @@ function publikError(message, action) {
 function isConnectionError(error) {
   const name = error && error.name;
   const text = (error && (error.message || String(error))) || '';
-  return name === 'APIConnectionError' || name === 'APIConnectionTimeoutError' ||
-    /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|network|connection error|aborted/i.test(text);
+  return (
+    name === 'APIConnectionError' ||
+    name === 'APIConnectionTimeoutError' ||
+    /fetch failed|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET|network|connection error|aborted/i.test(text)
+  );
 }
 
 // publik gateway failures, mapped BEFORE isQuotaError: its regex matches
@@ -184,7 +200,11 @@ function describePublikError(error, model) {
   const status = error && (error.status || error.statusCode || error.response?.status);
   const body = error && (error.error || error.response?.data?.error || null);
   const headers = error && error.headers;
-  const retryAfter = headers ? (typeof headers.get === 'function' ? headers.get('retry-after') : (headers['retry-after'] || headers['Retry-After'])) : null;
+  const retryAfter = headers
+    ? typeof headers.get === 'function'
+      ? headers.get('retry-after')
+      : headers['retry-after'] || headers['Retry-After']
+    : null;
   if (!status && !isConnectionError(error)) return null;
   const described = publik.describeGatewayError({ status, body, model, retryAfter });
   return described ? publikError(described.message, described.action) : null;
@@ -221,7 +241,7 @@ function formatProviderErrorMessage(error, provider, model) {
 
 function sanitizeTurns(turns) {
   const valid = new Set(['user', 'assistant']);
-  return (turns || []).filter(t => valid.has(t.role)).map(t => ({ role: t.role, text: String(t.text || '') }));
+  return (turns || []).filter((t) => valid.has(t.role)).map((t) => ({ role: t.role, text: String(t.text || '') }));
 }
 
 // MiniMax is OpenAI-compatible and exposes two regional gateways. MiniMax-M3
@@ -244,7 +264,8 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
     const last = i === turns.length - 1;
     if (last && imageDataUrl && t.role === 'user') {
       messages.push({
-        role: 'user', content: [
+        role: 'user',
+        content: [
           { type: 'text', text: t.text },
           { type: 'image_url', image_url: { url: imageDataUrl } }
         ]
@@ -259,7 +280,11 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
     // The gateway stamps x-publik-* headers at admission; hand the raw
     // Response to the caller so the balance line can move before settlement.
     const { data, response } = await pending.withResponse();
-    try { onResponse(response); } catch { /* a display hook must never break the answer */ }
+    try {
+      onResponse(response);
+    } catch {
+      /* a display hook must never break the answer */
+    }
     stream = data;
   } else {
     stream = await pending;
@@ -267,7 +292,10 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
   let full = '';
   for await (const part of stream) {
     const d = part.choices && part.choices[0] && part.choices[0].delta && part.choices[0].delta.content;
-    if (d) { full += d; onToken(d); }
+    if (d) {
+      full += d;
+      onToken(d);
+    }
   }
   return full;
 }
@@ -275,7 +303,10 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
 // Azure AI Foundry Models API (cognitiveservices.azure.com hosts) lives under
 // {endpoint}/openai/v1 and authenticates with the `api-key` header.
 function normalizeAzureBaseURL(raw) {
-  let u = String(raw || '').trim().replace(/\/+$/, '').replace(/\/chat\/completions$/i, '');
+  let u = String(raw || '')
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/chat\/completions$/i, '');
   if (!u) return '';
   if (/cognitiveservices\.azure\.com/i.test(u) && !/\/openai\/v1$/i.test(u)) {
     u += '/openai/v1';
@@ -290,10 +321,13 @@ async function streamAzure({ apiKey, model, system, turns, imageDataUrl, maxToke
   turns.forEach((t, i) => {
     const last = i === turns.length - 1;
     if (last && imageDataUrl && t.role === 'user') {
-      messages.push({ role: 'user', content: [
-        { type: 'text', text: t.text },
-        { type: 'image_url', image_url: { url: imageDataUrl } }
-      ] });
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: t.text },
+          { type: 'image_url', image_url: { url: imageDataUrl } }
+        ]
+      });
     } else {
       messages.push({ role: t.role, content: t.text });
     }
@@ -313,11 +347,19 @@ async function streamAzure({ apiKey, model, system, turns, imageDataUrl, maxToke
     };
     client = new OpenAI({ baseURL: url, apiKey, fetch: azureFetch });
   }
-  const stream = await client.chat.completions.create({ model, messages, stream: true, max_completion_tokens: maxTokens });
+  const stream = await client.chat.completions.create({
+    model,
+    messages,
+    stream: true,
+    max_completion_tokens: maxTokens
+  });
   let full = '';
   for await (const part of stream) {
     const d = part.choices && part.choices[0] && part.choices[0].delta && part.choices[0].delta.content;
-    if (d) { full += d; onToken(d); }
+    if (d) {
+      full += d;
+      onToken(d);
+    }
   }
   return full;
 }
@@ -339,7 +381,10 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
   const stream = await client.messages.create({ model, max_tokens: maxTokens, system, messages, stream: true });
   let full = '';
   for await (const ev of stream) {
-    if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') { full += ev.delta.text; onToken(ev.delta.text); }
+    if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') {
+      full += ev.delta.text;
+      onToken(ev.delta.text);
+    }
   }
   return full;
 }
@@ -389,7 +434,10 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
   let full = '';
   for await (const chunk of stream) {
     const t = chunk && chunk.text;
-    if (t) { full += t; onToken(t); }
+    if (t) {
+      full += t;
+      onToken(t);
+    }
   }
   return full;
 }
@@ -455,7 +503,7 @@ async function streamOllama({ apiKey, model, system, turns, imageDataUrl, maxTok
         full += data.message.content;
         onToken(data.message.content);
       }
-    } catch (e) { }
+    } catch (e) {}
   }
   return full;
 }
@@ -519,12 +567,24 @@ function createLLM(settings) {
   const maxTokens = settings.smart ? 1400 : 700;
 
   return {
-    provider, model, apiKey, baseURL,
+    provider,
+    model,
+    apiKey,
+    baseURL,
     ready,
     configurationError,
     async stream(params) {
       if (!ready) throw new Error(configurationError || `Complete the ${provider} provider settings.`);
-      const args = { apiKey, baseURL, endpoint, model, maxTokens, thinking: !!settings.smart, ...params, turns: sanitizeTurns(params.turns) };
+      const args = {
+        apiKey,
+        baseURL,
+        endpoint,
+        model,
+        maxTokens,
+        thinking: !!settings.smart,
+        ...params,
+        turns: sanitizeTurns(params.turns)
+      };
       try {
         if (provider === 'openai') return await streamOpenAI(args);
         if (provider === CUSTOM_PROVIDER) return await streamOpenAI(args);
@@ -532,7 +592,11 @@ function createLLM(settings) {
         if (provider === 'ollama') return await streamOllama(args);
         if (provider === 'groq') return await streamOpenAI({ ...args, baseURL: 'https://api.groq.com/openai/v1' });
         if (provider === 'cerebras') return await streamOpenAI({ ...args, baseURL: CEREBRAS_BASE_URL });
-        if (provider === 'minimax') return await streamOpenAI({ ...args, baseURL: MINIMAX_BASE_URLS[minimaxRegion] || MINIMAX_BASE_URLS.global_en });
+        if (provider === 'minimax')
+          return await streamOpenAI({
+            ...args,
+            baseURL: MINIMAX_BASE_URLS[minimaxRegion] || MINIMAX_BASE_URLS.global_en
+          });
         if (provider === 'deepseek') return await streamOpenAI({ ...args, baseURL: DEEPSEEK_BASE_URL });
         if (provider === 'anthropic') return await streamAnthropic(args);
         if (provider === 'gemini') return await streamGemini(args);

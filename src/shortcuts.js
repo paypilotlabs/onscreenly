@@ -1,3 +1,4 @@
+// @ts-check
 // Configurable global shortcuts. Kept dependency-free so it is unit-testable.
 // Accelerator strings follow Electron's format, e.g. 'CommandOrControl+Return'.
 
@@ -41,7 +42,20 @@ function isValid(accel) {
   if (!accel || typeof accel !== 'string') return false;
   const parts = accel.split('+').map((s) => s.trim());
   if (parts.some((p) => !p)) return false;
-  const modifiers = new Set(['CommandOrControl', 'CmdOrCtrl', 'Command', 'Cmd', 'Control', 'Ctrl', 'Alt', 'Option', 'AltGr', 'Shift', 'Super', 'Meta']);
+  const modifiers = new Set([
+    'CommandOrControl',
+    'CmdOrCtrl',
+    'Command',
+    'Cmd',
+    'Control',
+    'Ctrl',
+    'Alt',
+    'Option',
+    'AltGr',
+    'Shift',
+    'Super',
+    'Meta'
+  ]);
   const keys = parts.filter((p) => !modifiers.has(p));
   return keys.length >= 1;
 }

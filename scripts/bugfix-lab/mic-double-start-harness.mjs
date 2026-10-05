@@ -20,7 +20,6 @@
 // not extract or run the code (anchors moved, parse error, etc).
 
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
 const onscreenlyDir = process.argv[2];
 if (!onscreenlyDir) {
@@ -54,11 +53,15 @@ const handlerStart = findLine("onscreenly.on('capture:state'", micBlockEnd + 1);
 const handlerEnd = findLine('// ---- real-time transcript display', handlerStart + 1);
 
 if (micBlockStart === -1 || micBlockEnd === -1 || handlerStart === -1 || handlerEnd === -1) {
-  console.error('ORACLE_COULD_NOT_RUN: extraction anchors not found ' +
-    JSON.stringify({ micBlockStart, micBlockEnd, handlerStart, handlerEnd }));
-  console.error('The renderer.js structure around mic capture / capture:state moved enough that ' +
-    'this oracle cannot safely extract the real code. Needs a human to update the anchors, not a ' +
-    'silent pass/fail.');
+  console.error(
+    'ORACLE_COULD_NOT_RUN: extraction anchors not found ' +
+      JSON.stringify({ micBlockStart, micBlockEnd, handlerStart, handlerEnd })
+  );
+  console.error(
+    'The renderer.js structure around mic capture / capture:state moved enough that ' +
+      'this oracle cannot safely extract the real code. Needs a human to update the anchors, not a ' +
+      'silent pass/fail.'
+  );
   process.exit(2);
 }
 
@@ -67,56 +70,107 @@ const handlerCode = lines.slice(handlerStart, handlerEnd).join('\n');
 
 // ---- minimal stub environment -------------------------------------------
 let getUserMediaCalls = 0;
-let micPcmMessages = 0;
+let _micPcmMessages = 0;
 const trackLog = [];
 
 class FakeTrack {
-  constructor(id) { this.id = id; this.label = 'Fake Windows Mic'; this.muted = false; this._stopped = false; }
-  stop() { this._stopped = true; }
+  constructor(id) {
+    this.id = id;
+    this.label = 'Fake Windows Mic';
+    this.muted = false;
+    this._stopped = false;
+  }
+  stop() {
+    this._stopped = true;
+  }
 }
 class FakeMediaStream {
-  constructor(id) { this.id = id; this._track = new FakeTrack(id); }
-  getAudioTracks() { return [this._track]; }
-  getTracks() { return [this._track]; }
+  constructor(id) {
+    this.id = id;
+    this._track = new FakeTrack(id);
+  }
+  getAudioTracks() {
+    return [this._track];
+  }
+  getTracks() {
+    return [this._track];
+  }
 }
 const navigatorStub = {
   mediaDevices: {
     getUserMedia: async (constraints) => {
       getUserMediaCalls++;
-      trackLog.push(`getUserMedia call #${getUserMediaCalls} constraints.audio.sampleRate=${constraints && constraints.audio && constraints.audio.sampleRate}`);
+      trackLog.push(
+        `getUserMedia call #${getUserMediaCalls} constraints.audio.sampleRate=${constraints && constraints.audio && constraints.audio.sampleRate}`
+      );
       // Resolve on a real microtask hop, same as a real getUserMedia promise --
       // this does NOT change the outcome: both concurrent startMic() calls
       // still each invoke getUserMedia() synchronously before either's
       // `await` continuation can run.
       return new FakeMediaStream(getUserMediaCalls);
     },
-    getDisplayMedia: async () => { throw new Error('not exercised by this harness'); },
-  },
+    getDisplayMedia: async () => {
+      throw new Error('not exercised by this harness');
+    }
+  }
 };
 
 class FakeAudioWorkletApi {
-  async addModule(_path) { /* succeeds, like a packaged Electron build */ }
+  async addModule(_path) {
+    /* succeeds, like a packaged Electron build */
+  }
 }
 class FakeAudioContext {
-  constructor(opts) { this.opts = opts; this.audioWorklet = new FakeAudioWorkletApi(); this.destination = {}; this._closed = false; }
-  createMediaStreamSource(_stream) { return { connect() {}, disconnect() {} }; }
-  createScriptProcessor() { return { connect() {}, disconnect() {}, onaudioprocess: null }; }
-  createGain() { return { gain: { value: 0 }, connect() {}, disconnect() {} }; }
-  close() { this._closed = true; }
+  constructor(opts) {
+    this.opts = opts;
+    this.audioWorklet = new FakeAudioWorkletApi();
+    this.destination = {};
+    this._closed = false;
+  }
+  createMediaStreamSource(_stream) {
+    return { connect() {}, disconnect() {} };
+  }
+  createScriptProcessor() {
+    return { connect() {}, disconnect() {}, onaudioprocess: null };
+  }
+  createGain() {
+    return { gain: { value: 0 }, connect() {}, disconnect() {} };
+  }
+  close() {
+    this._closed = true;
+  }
 }
 class FakeAudioWorkletNode {
-  constructor(_ctx, _name) { this.port = { onmessage: null }; this._disconnected = false; }
+  constructor(_ctx, _name) {
+    this.port = { onmessage: null };
+    this._disconnected = false;
+  }
   connect() {}
-  disconnect() { this._disconnected = true; }
+  disconnect() {
+    this._disconnected = true;
+  }
 }
 
 function genericEl() {
-  const cl = { toggle() {}, add() {}, remove() {}, contains() { return false; } };
+  const cl = {
+    toggle() {},
+    add() {},
+    remove() {},
+    contains() {
+      return false;
+    }
+  };
   return {
     classList: cl,
-    get textContent() { return this._t || ''; },
-    set textContent(v) { this._t = v; },
-    closest() { return null; },
+    get textContent() {
+      return this._t || '';
+    },
+    set textContent(v) {
+      this._t = v;
+    },
+    closest() {
+      return null;
+    }
   };
 }
 const documentStub = { getElementById: () => genericEl(), createElement: () => genericEl() };
@@ -127,12 +181,18 @@ const registered = {};
 const onscreenlyStub = {
   platform: 'win32',
   log: (_msg) => {},
-  micPcm: (_buf) => { micPcmMessages++; },
-  on: (channel, cb) => { registered[channel] = cb; },
+  micPcm: (_buf) => {
+    _micPcmMessages++;
+  },
+  on: (channel, cb) => {
+    registered[channel] = cb;
+  }
 };
 
 let showStatusCalls = 0;
-const showStatusStub = (_msg) => { showStatusCalls++; };
+const showStatusStub = (_msg) => {
+  showStatusCalls++;
+};
 const updateSttStatusStub = (_args) => {};
 const setLiveDotStateStub = (_state) => {};
 const isWindowsStub = true;
@@ -149,8 +209,17 @@ ${handlerCode}
 let buildFn;
 try {
   buildFn = new Function(
-    'navigator', 'onscreenly', 'AudioContext', 'AudioWorkletNode', 'document',
-    'showStatus', 'isWindows', '$', 'composer', 'updateSttStatus', 'setLiveDotState',
+    'navigator',
+    'onscreenly',
+    'AudioContext',
+    'AudioWorkletNode',
+    'document',
+    'showStatus',
+    'isWindows',
+    '$',
+    'composer',
+    'updateSttStatus',
+    'setLiveDotState',
     fnSource
   );
 } catch (e) {
@@ -162,8 +231,17 @@ try {
 
 try {
   buildFn(
-    navigatorStub, onscreenlyStub, FakeAudioContext, FakeAudioWorkletNode, documentStub,
-    showStatusStub, isWindowsStub, $stub, composerStub, updateSttStatusStub, setLiveDotStateStub
+    navigatorStub,
+    onscreenlyStub,
+    FakeAudioContext,
+    FakeAudioWorkletNode,
+    documentStub,
+    showStatusStub,
+    isWindowsStub,
+    $stub,
+    composerStub,
+    updateSttStatusStub,
+    setLiveDotStateStub
   );
 } catch (e) {
   console.error('ORACLE_COULD_NOT_RUN: registering the extracted handler threw: ' + e.message);
@@ -190,17 +268,21 @@ console.log(`extracted mic-block lines: ${micBlockStart + 1}-${micBlockEnd}`);
 console.log(`extracted capture:state handler lines: ${handlerStart + 1}-${handlerEnd}`);
 console.log(trackLog.join('\n'));
 console.log(`getUserMedia call count for ONE capture:state{active:true} event: ${getUserMediaCalls}`);
-console.log(`onscreenly.micPcm() messages wired up (post-settle, not counting async worklet emissions): n/a (checked via call count above)`);
+console.log(
+  `onscreenly.micPcm() messages wired up (post-settle, not counting async worklet emissions): n/a (checked via call count above)`
+);
 console.log(`showStatus() calls: ${showStatusCalls}`);
 
 if (getUserMediaCalls === 1) {
   console.log('RESULT: single mic capture pipeline started -- bug ABSENT');
   process.exit(0);
 } else if (getUserMediaCalls > 1) {
-  console.log(`RESULT: ${getUserMediaCalls} concurrent mic capture pipelines started from ONE activation -- ` +
-    'bug PRESENT (two AudioWorklet/AudioContext pipelines both feed the "you" channel; the interleaved, ' +
-    'doubled PCM this produces is exactly what onscreenly PR #69 diagnosed as "meeting audio transcribed, the ' +
-    "user's own voice didn't\" -- i.e. \"microphone input not detected\" during a session).");
+  console.log(
+    `RESULT: ${getUserMediaCalls} concurrent mic capture pipelines started from ONE activation -- ` +
+      'bug PRESENT (two AudioWorklet/AudioContext pipelines both feed the "you" channel; the interleaved, ' +
+      'doubled PCM this produces is exactly what onscreenly PR #69 diagnosed as "meeting audio transcribed, the ' +
+      'user\'s own voice didn\'t" -- i.e. "microphone input not detected" during a session).'
+  );
   process.exit(1);
 } else {
   console.error(`ORACLE_COULD_NOT_RUN: getUserMedia was never called (expected startMic() to call it at least once)`);

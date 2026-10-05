@@ -31,21 +31,29 @@ function displayMediaHandlerSource() {
 test('the display-media handler never hands Electron a boolean for `audio`', () => {
   const block = displayMediaHandlerSource();
   const booleanAudio = /\baudio\s*[:=]\s*(true|false)\b/.exec(block);
-  assert.equal(booleanAudio, null,
+  assert.equal(
+    booleanAudio,
+    null,
     `setDisplayMediaRequestHandler passes ${booleanAudio && booleanAudio[0]}; Electron requires ` +
-    "'loopback' or 'loopbackWithMute' and throws on a boolean");
+      "'loopback' or 'loopbackWithMute' and throws on a boolean"
+  );
 });
 
 test('the display-media handler requests system-audio loopback', () => {
   const block = displayMediaHandlerSource();
-  assert.ok(/audio\s*[:=]\s*'(loopback|loopbackWithMute)'/.test(block),
-    'setDisplayMediaRequestHandler no longer asks for loopback audio, so meeting audio will not be captured');
+  assert.ok(
+    /audio\s*[:=]\s*'(loopback|loopbackWithMute)'/.test(block),
+    'setDisplayMediaRequestHandler no longer asks for loopback audio, so meeting audio will not be captured'
+  );
 });
 
 test('the display-media handler invokes its one-time callback exactly once', () => {
   const block = displayMediaHandlerSource();
   const invocations = block.match(/\bcallback\s*\(/g) || [];
-  assert.equal(invocations.length, 1,
+  assert.equal(
+    invocations.length,
+    1,
     `callback( appears ${invocations.length} times in the handler; a one-time callback must be invoked from ` +
-    'exactly one place or Electron reports "One-time callback was called more than once"');
+      'exactly one place or Electron reports "One-time callback was called more than once"'
+  );
 });

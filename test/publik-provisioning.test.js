@@ -15,13 +15,32 @@ function fakeStore(initial = {}) {
     provider: 'openai',
     apiKeys: { openai: '', publik: '' },
     models: { publik: { fast: 'publik-fast', smart: 'publik-balanced' } },
-    publik: { installId: '', keyId: '', baseUrl: '', claimUrl: '', claimCode: '', claimState: '', starterMicros: 0, balanceMicros: null, balanceAt: 0, wallet: null, disclosureAccepted: 0, defaultApplied: false, revoked: false, disconnected: false, lastError: '' },
+    publik: {
+      installId: '',
+      keyId: '',
+      baseUrl: '',
+      claimUrl: '',
+      claimCode: '',
+      claimState: '',
+      starterMicros: 0,
+      balanceMicros: null,
+      balanceAt: 0,
+      wallet: null,
+      disclosureAccepted: 0,
+      defaultApplied: false,
+      revoked: false,
+      disconnected: false,
+      lastError: ''
+    },
     ...initial
   };
   return {
     data,
     getSettings: () => data,
-    setSettings(patch) { if (patch.models) data.models = { ...data.models, ...patch.models }; return data; },
+    setSettings(patch) {
+      if (patch.models) data.models = { ...data.models, ...patch.models };
+      return data;
+    },
     setPublik(patch) {
       const { apiKey, ...rest } = patch;
       if (typeof apiKey === 'string') data.apiKeys.publik = apiKey;
@@ -39,7 +58,9 @@ function startFakeGateway() {
   let mintCounter = 0;
   const server = http.createServer((req, res) => {
     let raw = '';
-    req.on('data', (c) => { raw += c; });
+    req.on('data', (c) => {
+      raw += c;
+    });
     req.on('end', () => {
       const body = raw ? JSON.parse(raw) : null;
       requests.push({ method: req.method, url: req.url, headers: req.headers, body });
@@ -49,44 +70,79 @@ function startFakeGateway() {
       };
       if (req.method === 'POST' && req.url === '/api/v1/installs') {
         const bearer = (req.headers.authorization || '').replace(/^Bearer /, '');
-        if (bearer !== TOKEN && body.app_token !== TOKEN) return send(401, { error: { type: 'invalid_app_token', message: 'Unknown app token.' } });
-        if (body.app_slug !== 'cue' || !body.install_id || !(body.disclosure_version >= 1)) return send(400, { error: { type: 'invalid_field', message: 'bad field', field: 'app_slug' } });
+        if (bearer !== TOKEN && body.app_token !== TOKEN)
+          return send(401, { error: { type: 'invalid_app_token', message: 'Unknown app token.' } });
+        if (body.app_slug !== 'cue' || !body.install_id || !(body.disclosure_version >= 1))
+          return send(400, { error: { type: 'invalid_field', message: 'bad field', field: 'app_slug' } });
         const existing = installs.get(body.install_id);
         if (existing && !existing.revoked) {
-          return send(200, { install_id: body.install_id, key: null, key_id: existing.keyId, starter_micros: 0, claim_state: 'anonymous', base_url: `http://127.0.0.1:${server.address().port}/api/v1` });
+          return send(200, {
+            install_id: body.install_id,
+            key: null,
+            key_id: existing.keyId,
+            starter_micros: 0,
+            claim_state: 'anonymous',
+            base_url: `http://127.0.0.1:${server.address().port}/api/v1`
+          });
         }
         mintCounter += 1;
-        const keyId = String(mintCounter).padStart(12, '0').replace(/\d/g, (d) => 'abcdefghijkl'[Number(d)]);
+        const keyId = String(mintCounter)
+          .padStart(12, '0')
+          .replace(/\d/g, (d) => 'abcdefghijkl'[Number(d)]);
         const key = `pk_test_${keyId}_${KEY_SECRET}`;
         installs.set(body.install_id, { keyId, key, revoked: false });
         return send(201, {
-          install_id: body.install_id, key, key_id: keyId,
+          install_id: body.install_id,
+          key,
+          key_id: keyId,
           base_url: `http://127.0.0.1:${server.address().port}/api/v1`,
           models: { fast: 'publik-fast', balanced: 'publik-balanced', smart: 'publik-smart' },
-          claim_code: 'HK7F-2QWD', claim_url: 'https://publikhq.com/claim/HK7F-2QWD',
+          claim_code: 'HK7F-2QWD',
+          claim_url: 'https://publikhq.com/claim/HK7F-2QWD',
           // Policy 0059: an install is minted at $0.00. None of these fixtures
           // mint an install already bound to a signed-in account, so starter
           // stays 0 whether or not the install_id was seen before.
-          starter_micros: 0, balance_micros: 0, starting_credit_micros: 0,
-          wallet: { claim_state: 'anonymous', balance_micros: 0, starter: { remaining_micros: 0 }, week: { used_micros: 0, budget_micros: null, resets_at: '2026-09-25T17:04:11Z' }, claim_url: 'https://publikhq.com/claim/HK7F-2QWD' }
+          starter_micros: 0,
+          balance_micros: 0,
+          starting_credit_micros: 0,
+          wallet: {
+            claim_state: 'anonymous',
+            balance_micros: 0,
+            starter: { remaining_micros: 0 },
+            week: { used_micros: 0, budget_micros: null, resets_at: '2026-09-25T17:04:11Z' },
+            claim_url: 'https://publikhq.com/claim/HK7F-2QWD'
+          }
         });
       }
       if (req.method === 'GET' && req.url === '/api/v1/wallet') {
         const bearer = (req.headers.authorization || '').replace(/^Bearer /, '');
         const row = [...installs.values()].find((r) => r.key === bearer);
         if (!row) return send(401, { error: { type: 'invalid_api_key', message: 'Invalid API key.' } });
-        if (row.revoked) return send(401, { error: { type: 'key_revoked', message: 'This key was revoked.', reprovision: true } });
-        return send(200, { claim_state: 'anonymous', balance_micros: 209000, starter: { remaining_micros: 209000 }, week: { used_micros: 41000, budget_micros: null, resets_at: '2026-09-25T17:04:11Z' }, daily_cap_micros: 250000, spent_today_micros: 41000, claim_url: 'https://publikhq.com/claim/HK7F-2QWD' });
+        if (row.revoked)
+          return send(401, { error: { type: 'key_revoked', message: 'This key was revoked.', reprovision: true } });
+        return send(200, {
+          claim_state: 'anonymous',
+          balance_micros: 209000,
+          starter: { remaining_micros: 209000 },
+          week: { used_micros: 41000, budget_micros: null, resets_at: '2026-09-25T17:04:11Z' },
+          daily_cap_micros: 250000,
+          spent_today_micros: 41000,
+          claim_url: 'https://publikhq.com/claim/HK7F-2QWD'
+        });
       }
       send(404, { error: { type: 'not_found', message: 'no route' } });
     });
   });
   return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () => resolve({
-      server, installs, requests,
-      baseUrl: `http://127.0.0.1:${server.address().port}/api/v1`,
-      close: () => new Promise((r) => server.close(r))
-    }));
+    server.listen(0, '127.0.0.1', () =>
+      resolve({
+        server,
+        installs,
+        requests,
+        baseUrl: `http://127.0.0.1:${server.address().port}/api/v1`,
+        close: () => new Promise((r) => server.close(r))
+      })
+    );
   });
 }
 
@@ -96,7 +152,18 @@ test('provisionInstall mints once, stores only apiKeys.publik + publik.*, then G
     const build = { appToken: TOKEN, appSlug: 'cue', baseUrl: gw.baseUrl, disclosureVersion: 1, available: true };
     const store = fakeStore({ provider: 'openai', apiKeys: { openai: 'sk-user-typed-this', publik: '' } });
     const events = [];
-    const r = await publik.provisionInstall({ build, store, device: { appVersion: '0.2.3', platform: process.platform, osVersion: '1', arch: process.arch, deviceName: 'CI box' }, log: (e) => events.push(e) });
+    const r = await publik.provisionInstall({
+      build,
+      store,
+      device: {
+        appVersion: '0.2.3',
+        platform: process.platform,
+        osVersion: '1',
+        arch: process.arch,
+        deviceName: 'CI box'
+      },
+      log: (e) => events.push(e)
+    });
 
     assert.equal(r.ok, true);
     assert.equal(r.minted, true);
@@ -128,7 +195,9 @@ test('provisionInstall mints once, stores only apiKeys.publik + publik.*, then G
     assert.equal(wallet.balanceMicros, 209000);
     assert.equal(wallet.weekUsedMicros, 41000);
     assert.equal(wallet.topUpUrl, 'https://publikhq.com/claim/HK7F-2QWD');
-  } finally { await gw.close(); }
+  } finally {
+    await gw.close();
+  }
 });
 
 test('a 200 replay with no credential on disk mints a fresh install_id exactly once', async () => {
@@ -142,13 +211,19 @@ test('a 200 replay with no credential on disk mints a fresh install_id exactly o
     const store = fakeStore();
     store.data.publik.installId = orphanId;
 
-    const r = await publik.provisionInstall({ build, store, device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' } });
+    const r = await publik.provisionInstall({
+      build,
+      store,
+      device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' }
+    });
     assert.equal(r.ok, true);
     assert.notEqual(store.data.publik.installId, orphanId);
     assert.match(store.data.apiKeys.publik, publik.KEY_RE);
     const bodies = gw.requests.filter((q) => q.url === '/api/v1/installs').map((q) => q.body.install_id);
     assert.deepEqual(bodies, [orphanId, orphanId, store.data.publik.installId]);
-  } finally { await gw.close(); }
+  } finally {
+    await gw.close();
+  }
 });
 
 test('a revoked key (401 key_revoked, reprovision:true) re-provisions with the same install_id', async () => {
@@ -161,29 +236,50 @@ test('a revoked key (401 key_revoked, reprovision:true) re-provisions with the s
     const installId = store.data.publik.installId;
     gw.installs.get(installId).revoked = true;
 
-    await assert.rejects(publik.fetchWallet({ baseUrl: gw.baseUrl, apiKey: firstKey }), (e) => e.status === 401 && e.type === 'key_revoked' && e.reprovision === true);
+    await assert.rejects(
+      publik.fetchWallet({ baseUrl: gw.baseUrl, apiKey: firstKey }),
+      (e) => e.status === 401 && e.type === 'key_revoked' && e.reprovision === true
+    );
     store.setPublik({ revoked: true });
-    const r = await publik.provisionInstall({ build, store, device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' } });
+    const r = await publik.provisionInstall({
+      build,
+      store,
+      device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' }
+    });
     assert.equal(r.ok, true);
     assert.equal(store.data.publik.installId, installId);
     assert.notEqual(store.data.apiKeys.publik, firstKey);
     assert.equal(store.data.publik.revoked, false);
     assert.equal(store.data.publik.starterMicros, 0, 'a re-mint gets no second starter');
-  } finally { await gw.close(); }
+  } finally {
+    await gw.close();
+  }
 });
 
 test('a rejected mint records lastError and leaves the store without a key', async () => {
   const gw = await startFakeGateway();
   try {
-    const build = { appToken: 'pat_cue_' + 'z'.repeat(32), appSlug: 'cue', baseUrl: gw.baseUrl, disclosureVersion: 1, available: true };
+    const build = {
+      appToken: 'pat_cue_' + 'z'.repeat(32),
+      appSlug: 'cue',
+      baseUrl: gw.baseUrl,
+      disclosureVersion: 1,
+      available: true
+    };
     const store = fakeStore();
-    const r = await publik.provisionInstall({ build, store, device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' } });
+    const r = await publik.provisionInstall({
+      build,
+      store,
+      device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' }
+    });
     assert.equal(r.ok, false);
     assert.equal(r.error.status, 401);
     assert.equal(store.data.apiKeys.publik, '');
     assert.match(store.data.publik.lastError, /Unknown app token/);
     assert.ok(store.data.publik.installId, 'the install id is kept so the retry is idempotent');
-  } finally { await gw.close(); }
+  } finally {
+    await gw.close();
+  }
 });
 
 test('an unreachable gateway fails closed with no key and no crash', async () => {
@@ -192,7 +288,11 @@ test('an unreachable gateway fails closed with no key and no crash', async () =>
   await gw.close();
   const build = { appToken: TOKEN, appSlug: 'cue', baseUrl, disclosureVersion: 1, available: true };
   const store = fakeStore();
-  const r = await publik.provisionInstall({ build, store, device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' } });
+  const r = await publik.provisionInstall({
+    build,
+    store,
+    device: { appVersion: '0.2.3', platform: 'linux', arch: 'x64' }
+  });
   assert.equal(r.ok, false);
   assert.equal(store.data.apiKeys.publik, '');
   assert.ok(store.data.publik.lastError);

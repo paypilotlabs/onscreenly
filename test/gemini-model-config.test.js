@@ -12,14 +12,17 @@ const { CURRENT_GEMINI_DEFAULT } = require('../src/llm');
 // Gemini model id (two still pointing at the dead one), so this scans every
 // source file that talks to the Gemini API and fails if a known-retired id
 // or a hardcoded id that has drifted from the shared default sneaks back in.
-const DEAD_MODEL_IDS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
-
-const FILES_THAT_CALL_GEMINI = [
-  'src/llm.js',
-  'src/store.js',
-  'src/stt.js',
-  'src/stt-streaming.js'
+const DEAD_MODEL_IDS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-pro',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-1.0-pro'
 ];
+
+const FILES_THAT_CALL_GEMINI = ['src/llm.js', 'src/store.js', 'src/stt.js', 'src/stt-streaming.js'];
 
 test('CURRENT_GEMINI_DEFAULT is not a known-retired Gemini model id', () => {
   assert.ok(!DEAD_MODEL_IDS.includes(CURRENT_GEMINI_DEFAULT), `${CURRENT_GEMINI_DEFAULT} is on the known-dead list`);
@@ -29,8 +32,10 @@ for (const relPath of FILES_THAT_CALL_GEMINI) {
   test(`${relPath} does not hardcode a retired Gemini model id`, () => {
     const source = fs.readFileSync(path.join(__dirname, '..', relPath), 'utf8');
     for (const deadId of DEAD_MODEL_IDS) {
-      assert.ok(!source.includes(`'${deadId}'`) && !source.includes(`"${deadId}"`),
-        `${relPath} still references retired model ${deadId}`);
+      assert.ok(
+        !source.includes(`'${deadId}'`) && !source.includes(`"${deadId}"`),
+        `${relPath} still references retired model ${deadId}`
+      );
     }
   });
 }

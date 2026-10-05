@@ -1,3 +1,4 @@
+// @ts-check
 const DEFAULT_MODEL_ID = 'base.en';
 const STANDARD_MODEL_REPOSITORY = 'ggerganov/whisper.cpp';
 const TINYDIARIZE_MODEL_REPOSITORY = 'akashmjn/tinydiarize-whisper.cpp';
@@ -60,9 +61,7 @@ function getHardwareTier(family) {
 }
 
 function buildArtifact([id, bytes, sha256]) {
-  const repository = id === 'small.en-tdrz'
-    ? TINYDIARIZE_MODEL_REPOSITORY
-    : STANDARD_MODEL_REPOSITORY;
+  const repository = id === 'small.en-tdrz' ? TINYDIARIZE_MODEL_REPOSITORY : STANDARD_MODEL_REPOSITORY;
   const filename = `ggml-${id}.bin`;
   const family = getFamily(id);
 

@@ -1,3 +1,4 @@
+// @ts-check
 const path = require('path');
 
 const WHISPER_CPP_VERSION = '1.9.1';

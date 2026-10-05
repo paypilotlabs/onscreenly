@@ -13,9 +13,17 @@ const r2 = clearDefPos !== -1 && finalHandlerPos !== -1 && clearDefPos < finalHa
 console.log('2. clearTranscriptInterim defined before stt:final:', r2);
 
 const toastDefPos = src.indexOf('function showToast');
-const clearBtnHandlerPos = src.indexOf("clearTranscriptBtn.addEventListener");
+const clearBtnHandlerPos = src.indexOf('clearTranscriptBtn.addEventListener');
 const r3 = toastDefPos !== -1 && clearBtnHandlerPos !== -1 && toastDefPos < clearBtnHandlerPos;
-console.log('3. showToast defined before clear btn addEventListener:', r3, '(toast:', toastDefPos, 'handler:', clearBtnHandlerPos, ')');
+console.log(
+  '3. showToast defined before clear btn addEventListener:',
+  r3,
+  '(toast:',
+  toastDefPos,
+  'handler:',
+  clearBtnHandlerPos,
+  ')'
+);
 
 const llmStartIdx = src.indexOf("onscreenly.on('llm:start'");
 const llmTokenIdx = src.indexOf("onscreenly.on('llm:token'");
