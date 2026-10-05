@@ -3,7 +3,7 @@
   "version": "0.2.4",
   "description": "Onscreenly: an open-source AI overlay for screen context, microphone transcription, and meeting assistance.",
   "license": "GPL-3.0-or-later",
-  "author": "cue",
+  "author": "Lohith Kumar <lkneerukonda@gmail.com>",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -48,6 +48,7 @@
     "ws": "^8.18.0"
   },
   "contributors": [
-    "Onscreenly contributors"
+    "Onscreenly contributors",
+    "Cue contributors (upstream, https://github.com/Blueturboguy07/cue)"
   ]
 }

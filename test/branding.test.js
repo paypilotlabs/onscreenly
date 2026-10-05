@@ -21,7 +21,9 @@ test('package, lock, installers and local app-link use a consistent Onscreenly i
   assert.match(read('src/applink.js'), /appId: 'com\.onscreenly\.overlay'/);
   assert.match(read('src/applink.js'), /appSlug: 'onscreenly'/);
   assert.equal(pkg.license, 'GPL-3.0-or-later');
-  assert.equal(pkg.author, 'cue', 'retain upstream attribution');
+  assert.equal(pkg.author, 'Lohith Kumar <lkneerukonda@gmail.com>');
+  assert.ok(pkg.contributors.some(c => c.includes('Cue contributors')), 'retain upstream attribution');
+  assert.match(read('NOTICE'), /Cue \(https:\/\/github\.com\/Blueturboguy07\/cue\)/);
 });
 
 test('both preload names retain the same IPC API and event allowlist', async () => {
