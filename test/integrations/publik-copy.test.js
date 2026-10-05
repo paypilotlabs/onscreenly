@@ -7,13 +7,14 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const { rendererModuleFiles } = require('../helpers/renderer-source');
 
 const FILES = [
   'src/integrations/publik.js',
   'src/llm/llm.js',
   'src/storage/store.js',
   ...fs.readdirSync(path.join(__dirname, '..', '..', 'app', 'main')).map((f) => `app/main/${f}`),
-  'renderer/renderer.js',
+  ...rendererModuleFiles(),
   'renderer/index.html'
 ];
 const FORBIDDEN = [

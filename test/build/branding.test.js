@@ -74,7 +74,7 @@ test('the renamed AudioWorklet is registered under the name used by both audio c
     registerProcessor: (name) => names.push(name)
   });
   assert.deepEqual(names, ['onscreenly-audio-processor']);
-  const consumers = [...read('renderer/renderer.js').matchAll(/new AudioWorkletNode\([^,]+, '([^']+)'\)/g)];
+  const consumers = [...read('renderer/js/audio.js').matchAll(/new AudioWorkletNode\([^,]+, '([^']+)'\)/g)];
   assert.equal(consumers.length, 2);
   assert.ok(consumers.every((match) => names.includes(match[1])));
 });

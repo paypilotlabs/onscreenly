@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Executes the REAL, unmodified startMic()/stopMic() functions and the REAL
-// onscreenly.on('capture:state', ...) handler straight out of renderer/renderer.js
+// onscreenly.on('capture:state', ...) handler straight out of renderer/js/audio.js
+// and renderer/js/events.js
 // (extracted verbatim between stable comment anchors, not retyped), in a
 // minimal stub DOM/Electron-preload environment. It then fires one
-// capture:state {active:true} event -- exactly what main.js's setCapturing()
-// sends exactly once per real toggle-to-active transition (confirmed by
-// reading main.js: a single `send('capture:state', ...)` call in that branch)
+// capture:state {active:true} event -- exactly what app/main/capture.js's setCapturing()
+// sends exactly once per real toggle-to-active transition (a single
+// `send('capture:state', ...)` call in that branch)
 // -- and counts how many times navigator.mediaDevices.getUserMedia() actually
 // runs as a result.
 //
@@ -27,17 +28,18 @@ if (!onscreenlyDir) {
   process.exit(2);
 }
 
-const rendererPath = `${onscreenlyDir}/renderer/renderer.js`;
-let src;
+const audioPath = `${onscreenlyDir}/renderer/js/audio.js`;
+const eventsPath = `${onscreenlyDir}/renderer/js/events.js`;
+let audioLines, eventLines;
 try {
-  src = readFileSync(rendererPath, 'utf8');
+  audioLines = readFileSync(audioPath, 'utf8').split('\n');
+  eventLines = readFileSync(eventsPath, 'utf8').split('\n');
 } catch (e) {
-  console.error(`ORACLE_COULD_NOT_RUN: cannot read ${rendererPath}: ${e.message}`);
+  console.error(`ORACLE_COULD_NOT_RUN: cannot read the renderer modules: ${e.message}`);
   process.exit(2);
 }
 
-const lines = src.split('\n');
-function findLine(needle, from = 0) {
+function findLine(lines, needle, from = 0) {
   for (let i = from; i < lines.length; i++) {
     if (lines[i].includes(needle)) return i;
   }
@@ -45,12 +47,12 @@ function findLine(needle, from = 0) {
 }
 
 // ---- extract the mic capture functions (startMic/stopMic), verbatim ----
-const micBlockStart = findLine('let audioCtx = null, micStream = null, micWorklet = null;');
-const micBlockEnd = findLine('// ---- capture: system/meeting audio', micBlockStart + 1);
+const micBlockStart = findLine(audioLines, 'let audioCtx = null');
+const micBlockEnd = findLine(audioLines, '// ---- capture: system/meeting audio', micBlockStart + 1);
 
 // ---- extract the capture:state event handler, verbatim ----
-const handlerStart = findLine("onscreenly.on('capture:state'", micBlockEnd + 1);
-const handlerEnd = findLine('// ---- real-time transcript display', handlerStart + 1);
+const handlerStart = findLine(eventLines, "onscreenly.on('capture:state'");
+const handlerEnd = findLine(eventLines, "onscreenly.on('stt:interim'", handlerStart + 1);
 
 if (micBlockStart === -1 || micBlockEnd === -1 || handlerStart === -1 || handlerEnd === -1) {
   console.error(
@@ -58,15 +60,15 @@ if (micBlockStart === -1 || micBlockEnd === -1 || handlerStart === -1 || handler
       JSON.stringify({ micBlockStart, micBlockEnd, handlerStart, handlerEnd })
   );
   console.error(
-    'The renderer.js structure around mic capture / capture:state moved enough that ' +
+    'The renderer modules around mic capture / capture:state moved enough that ' +
       'this oracle cannot safely extract the real code. Needs a human to update the anchors, not a ' +
       'silent pass/fail.'
   );
   process.exit(2);
 }
 
-const micBlockCode = lines.slice(micBlockStart, micBlockEnd).join('\n');
-const handlerCode = lines.slice(handlerStart, handlerEnd).join('\n');
+const micBlockCode = audioLines.slice(micBlockStart, micBlockEnd).join('\n');
+const handlerCode = eventLines.slice(handlerStart, handlerEnd).join('\n');
 
 // ---- minimal stub environment -------------------------------------------
 let getUserMediaCalls = 0;
@@ -195,12 +197,15 @@ const showStatusStub = (_msg) => {
 };
 const updateSttStatusStub = (_args) => {};
 const setLiveDotStateStub = (_state) => {};
+const noop = () => {};
 const isWindowsStub = true;
 
 // ---- compile + run the REAL extracted code in this stub environment -----
 const fnSource = `
 let interimEl = null;
 let sttState = 'off';
+const state = { settings: {} };
+const setSessionButton = noop, setSttState = noop, stopSystemAudio = noop;
 ${micBlockCode}
 
 ${handlerCode}
@@ -220,6 +225,7 @@ try {
     'composer',
     'updateSttStatus',
     'setLiveDotState',
+    'noop',
     fnSource
   );
 } catch (e) {
@@ -241,7 +247,8 @@ try {
     $stub,
     composerStub,
     updateSttStatusStub,
-    setLiveDotStateStub
+    setLiveDotStateStub,
+    noop
   );
 } catch (e) {
   console.error('ORACLE_COULD_NOT_RUN: registering the extracted handler threw: ' + e.message);
@@ -263,9 +270,8 @@ handler({ active: true, streaming: false, mode: 'batch' });
 for (let i = 0; i < 50; i++) await new Promise((r) => setTimeout(r, 5));
 
 console.log('--- evidence ---');
-console.log(`renderer.js: ${rendererPath}`);
-console.log(`extracted mic-block lines: ${micBlockStart + 1}-${micBlockEnd}`);
-console.log(`extracted capture:state handler lines: ${handlerStart + 1}-${handlerEnd}`);
+console.log(`extracted mic-block lines: ${audioPath}:${micBlockStart + 1}-${micBlockEnd}`);
+console.log(`extracted capture:state handler lines: ${eventsPath}:${handlerStart + 1}-${handlerEnd}`);
 console.log(trackLog.join('\n'));
 console.log(`getUserMedia call count for ONE capture:state{active:true} event: ${getUserMediaCalls}`);
 console.log(

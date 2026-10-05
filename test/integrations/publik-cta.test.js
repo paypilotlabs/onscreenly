@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const fs = require('node:fs');
 const path = require('node:path');
+const { rendererSource } = require('../helpers/renderer-source');
 
 const publik = require('../../src/integrations/publik');
 
@@ -379,7 +380,7 @@ test('copy rule: the CTA copy says "publik API", dollars, never "credits", never
   assert.match(html, /id="publik-link"[^>]*>Link this computer &amp; pick a plan</);
   assert.match(html, /id="publik-why-summary"[^>]*>Why it costs money</);
   assert.match(html, /id="publik-why-text"/);
-  const js = fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'renderer.js'), 'utf8');
+  const js = rendererSource();
   assert.match(js, /onscreenly\.publikCardSeen\(\)/);
   assert.match(js, /function showPublikCard\(\)/);
   assert.match(js, /action\.kind === 'card'/);
