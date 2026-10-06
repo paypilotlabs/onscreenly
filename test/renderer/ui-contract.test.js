@@ -219,3 +219,21 @@ test('--main-w and --side-w match MAIN_W and SIDE_W in app/main/window.js', () =
   }
   assert.ok(seen['--main-w'] > 0 && seen['--side-w'] > 0, 'no --main-w/--side-w declaration found');
 });
+
+// Both windows load their fonts from renderer/fonts only; font-src says so explicitly
+// rather than leaning on default-src.
+test('both windows allow fonts from the app itself and nowhere else', () => {
+  for (const page of [index, permissions]) {
+    const metas = querySelectorAll(page.root, 'meta[http-equiv="Content-Security-Policy"]');
+    assert.equal(metas.length, 1, `${relative(page.file)}: one CSP meta`);
+    const directives = Object.fromEntries(
+      metas[0].attrs.content
+        .split(';')
+        .map((d) => d.trim().split(/\s+/))
+        .filter((d) => d[0])
+        .map(([name, ...sources]) => [name, sources.join(' ')])
+    );
+    assert.equal(directives['default-src'], "'self'", relative(page.file));
+    assert.equal(directives['font-src'], "'self'", relative(page.file));
+  }
+});

@@ -1,3 +1,7 @@
+@import url('css/fonts.css') layer(fonts);
+/* An @import must come before every other rule. The imported sheets sit in cascade layers,
+   so the unlayered rules below keep winning until the styles move into layers too. */
+
 /* onscreenly — glassmorphism overlay. Tokens reconstructed from the Cluely screenshot. */
 
 :root {
