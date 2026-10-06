@@ -38,9 +38,10 @@ test('mac config never auto-publishes and only claims hardened runtime / notariz
     // publish:null is what stops electron-builder auto-publishing an
     // ad-hoc build over a real release asset just because GH_TOKEN is set.
     assert.equal(unsigned.publish, null);
-    // No cert -> must not claim hardened runtime or notarization (would
+    // No cert -> ad-hoc signature ('-'), which Apple Silicon needs to run the
+    // app at all, and no claim of hardened runtime or notarization (would
     // otherwise fail the build outright, or worse, silently no-op).
-    assert.equal(unsigned.mac.identity, null);
+    assert.equal(unsigned.mac.identity, '-');
     assert.equal(unsigned.mac.hardenedRuntime, false);
     assert.equal(unsigned.mac.notarize, false);
 
@@ -86,17 +87,32 @@ test('the committed src/publik-build.json carries an EMPTY app token and the pro
   assert.ok(Number.isInteger(cfg.disclosureVersion) && cfg.disclosureVersion >= 1);
 });
 
-test('release.yml embeds PUBLIK_APP_TOKEN (failing closed) before every dist step; ci.yml never needs it', () => {
+test('release.yml embeds PUBLIK_APP_TOKEN only when the secret is set, before every dist step; ci.yml never needs it', () => {
   const release = fs.readFileSync(path.join(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
-  const embedAt = release.indexOf('name: Embed publik app token');
+  const embedAt = release.indexOf('name: Embed the Publik app token');
   assert.ok(embedAt > 0, 'release.yml has the embed step');
   assert.match(release, /PUBLIK_APP_TOKEN: \$\{\{ secrets\.PUBLIK_APP_TOKEN \}\}/);
-  assert.match(release, /test -n "\$PUBLIK_APP_TOKEN" \|\| \{[^}]*exit 1/);
+  assert.match(release.slice(embedAt, embedAt + 400), /if: steps\.publik\.outputs\.configured == 'true'/);
+  assert.match(release, /src\/integrations\/publik-build\.json/);
   for (const m of release.matchAll(/run: npm run dist/g)) {
     assert.ok(m.index > embedAt, 'the embed step precedes every npm run dist');
   }
   const ci = fs.readFileSync(path.join(__dirname, '..', '..', '.github', 'workflows', 'ci.yml'), 'utf8');
   assert.doesNotMatch(ci, /PUBLIK_APP_TOKEN/, 'PR builds from forks must not need a secret');
+});
+
+test('release.yml tests before it builds, and publishes only from a version tag with checksums', () => {
+  const release = fs.readFileSync(path.join(__dirname, '..', '..', '.github', 'workflows', 'release.yml'), 'utf8');
+  const firstDist = release.indexOf('run: npm run dist');
+  assert.ok(release.indexOf('run: npm run check') < firstDist, 'checks run before packaging');
+  assert.ok(release.indexOf('npm run test:e2e') < firstDist, 'app tests run before packaging');
+  const publish = release.slice(release.indexOf('  publish:'));
+  assert.match(publish, /if: github\.event_name == 'push' && startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  assert.match(publish, /sha256sum Onscreenly-\* > SHA256SUMS/);
+  assert.match(publish, /actions\/attest-build-provenance/);
+  // Only the publish job can write to the repository.
+  assert.match(release, /^permissions:\n {2}contents: read$/m);
+  assert.equal((release.match(/contents: write/g) || []).length, 1);
 });
 
 test('the publik files ship: they live under src/, which the files allowlist packages', () => {

@@ -40,6 +40,15 @@ module.exports = [
     rules: { 'no-shadow': ['error', { builtinGlobals: false }] }
   },
   {
+    // App tests: Node code that also passes functions to run inside the app's
+    // windows, where the browser globals and the onscreenly bridge exist.
+    files: ['e2e/**/*.js'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser, onscreenly: 'readonly' } },
+    // Playwright reads a fixture's dependencies from its first parameter, so
+    // a fixture with none must still destructure an empty object.
+    rules: { 'no-empty-pattern': 'off' }
+  },
+  {
     files: ['renderer/*-processor.js'],
     languageOptions: {
       globals: {

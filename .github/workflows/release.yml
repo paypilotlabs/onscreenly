@@ -1,27 +1,45 @@
-name: Build and Release
+name: Release
 
+# Builds Onscreenly for macOS, Windows and Linux after the checks and the app
+# tests pass on each OS. A version tag (v1.2.3) publishes a GitHub release
+# with SHA256SUMS; a pull request that changes packaging, or a manual run,
+# builds the same files as downloadable workflow artifacts without
+# publishing anything.
 on:
   push:
     tags:
-      - 'v*' # Automatically trigger when you push a new version tag (e.g., v0.2.0)
+      - 'v*'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'electron-builder.cjs'
+      - 'build-resources/**'
+      - 'scripts/after-pack.js'
+      - 'scripts/prepare-whisper-runtime.js'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  release:
-    name: Build on ${{ matrix.os }}
+  build:
+    name: Build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
+      fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest, ubuntu-latest]
-
-    env:
-      # A runner with no certificate can only produce an ad-hoc macOS build, and
-      # macOS refuses those after a download. Publishing one would overwrite a
-      # signed release asset with an unopenable one, so the mac upload below is
-      # gated on this. Set CSC_LINK and the APPLE_* secrets to turn it on.
-      MAC_SIGNING_CONFIGURED: ${{ secrets.CSC_LINK != '' }}
+        include:
+          - name: macOS
+            os: macos-latest
+          - name: Windows
+            os: windows-latest
+          - name: Linux
+            os: ubuntu-latest
 
     steps:
       - name: Check out Git repository
@@ -31,67 +49,150 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: npm
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Embed publik app token
-        # The token is a publishable identifier (it ships in the binary); it lets
-        # the publik API gateway attribute this install to its registration (legacy "cue" slug) and rate-limit
-        # minting. It is NOT a pk_ key and holds no balance. Written into src/,
-        # which the electron-builder.cjs files allowlist already packages.
-        # Fails closed: a release without it would ship a build whose provider
-        # picker silently lacks the publik option.
+      - name: Check that the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          test "$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME does not match package.json ($version)"; exit 1; }
+
+      - name: Lint, format, type check and unit tests
+        run: npm run check
+
+      - name: App tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:e2e
+
+      - name: App tests
+        if: runner.os != 'Linux'
+        run: npm run test:e2e
+
+      - name: Check for a Publik app token
+        id: publik
+        shell: bash
+        env:
+          PUBLIK_APP_TOKEN: ${{ secrets.PUBLIK_APP_TOKEN }}
+        run: echo "configured=$([ -n "$PUBLIK_APP_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Embed the Publik app token
+        # Optional. The token is a publishable identifier that ships in the
+        # binary and lets the Publik gateway attribute and rate-limit installs;
+        # without it the Publik provider option is simply absent.
+        if: steps.publik.outputs.configured == 'true'
         shell: bash
         env:
           PUBLIK_APP_TOKEN: ${{ secrets.PUBLIK_APP_TOKEN }}
         run: |
           set -euo pipefail
-          test -n "$PUBLIK_APP_TOKEN" || { echo "PUBLIK_APP_TOKEN secret is not set"; exit 1; }
           node -e '
             const fs = require("fs"); const p = "src/integrations/publik-build.json";
             const cfg = JSON.parse(fs.readFileSync(p, "utf8"));
             cfg.appToken = process.env.PUBLIK_APP_TOKEN;
             fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + "\n");
           '
-          node -e 'const c = require("./src/publik-build.json"); if (!c.appToken) process.exit(1); console.log("publik app token embedded for", c.appSlug)'
+          node -e 'const c = require("./src/integrations/publik-build.json"); if (!c.appToken) process.exit(1); console.log("Publik app token embedded")'
 
-      - name: Build macOS
-        if: matrix.os == 'macos-latest'
-        run: npm run dist:mac:x64 && npm run dist:mac:arm64
+      - name: Build macOS (Intel and Apple Silicon)
+        if: runner.os == 'macOS'
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # electron-builder.cjs signs and notarizes only when MAC_SIGN=1; without
-          # these it still builds ad-hoc, so the job keeps working as a build check.
-          MAC_SIGN: ${{ secrets.CSC_LINK != '' && '1' || '' }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Ad-hoc signed unless a Developer ID certificate is configured (see
+          # electron-builder.cjs). electron-builder skips all signing on pull
+          # requests unless CSC_FOR_PULL_REQUEST is set, which would leave a
+          # broken signature; an ad-hoc signature uses no secret, so it is
+          # safe there. Pull requests never receive the certificate.
+          CSC_FOR_PULL_REQUEST: 'true'
+          CERT_LINK: ${{ github.event_name != 'pull_request' && secrets.CSC_LINK || '' }}
+          CERT_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.CSC_KEY_PASSWORD || '' }}
+          NOTARY_ID: ${{ github.event_name != 'pull_request' && secrets.APPLE_ID || '' }}
+          NOTARY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          NOTARY_TEAM: ${{ github.event_name != 'pull_request' && secrets.APPLE_TEAM_ID || '' }}
+        run: |
+          set -euo pipefail
+          # Only set the signing variables when there is a certificate:
+          # electron-builder treats an empty CSC_LINK as a path and fails.
+          if [ -n "$CERT_LINK" ]; then
+            export MAC_SIGN=1 CSC_LINK="$CERT_LINK" CSC_KEY_PASSWORD="$CERT_PASSWORD"
+            export APPLE_ID="$NOTARY_ID" APPLE_APP_SPECIFIC_PASSWORD="$NOTARY_PASSWORD" APPLE_TEAM_ID="$NOTARY_TEAM"
+          fi
+          npm run dist:mac
 
-      - name: Build Windows
-        if: matrix.os == 'windows-latest'
+      - name: Verify the macOS signatures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in dist/mac*/Onscreenly.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign --display --verbose=2 "$app" 2>&1 | grep -E '^(Identifier|Signature|Authority|TeamIdentifier)='
+          done
+
+      - name: Build Windows (installer and portable)
+        if: runner.os == 'Windows'
         run: npm run dist:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Linux x64 and arm64
-        if: matrix.os == 'ubuntu-latest'
+      - name: Build Linux (AppImage and .deb for x64, AppImage for arm64)
+        if: runner.os == 'Linux'
         run: npm run dist:linux && npm run dist:linux:arm64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload to GitHub Release
-        # Skipped on macOS until signing is configured, so an ad-hoc build can
-        # never replace a signed asset already attached to the release.
-        if: matrix.os != 'macos-latest' || env.MAC_SIGNING_CONFIGURED == 'true'
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: onscreenly-${{ matrix.name }}
+          path: |
+            dist/Onscreenly-*.zip
+            dist/Onscreenly-*.exe
+            dist/Onscreenly-*.AppImage
+            dist/Onscreenly-*.deb
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish the release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download the builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: onscreenly-*
+          path: release
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        working-directory: release
+        run: |
+          sha256sum Onscreenly-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        # Artifact attestations need a public repository (or GitHub Enterprise
+        # Cloud for a private one). Once the repository is public, every
+        # download can be checked with `gh attestation verify`.
+        if: ${{ !github.event.repository.private }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'release/Onscreenly-*'
+
+      - name: Create the GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.exe
-            dist/*.zip
-            dist/*.AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: release/*
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            **Install:** see the [install guide](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/install.md). These builds are not signed with an Apple or Microsoft certificate, so macOS and Windows ask once before the first launch; the guide shows how.
+
+            **Verify:** download `SHA256SUMS` next to your file and run `shasum -a 256 -c SHA256SUMS --ignore-missing` (macOS/Linux) or compare `Get-FileHash <file>` (Windows).

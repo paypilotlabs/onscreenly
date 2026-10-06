@@ -51,6 +51,10 @@ See [Electron's content-protection documentation](https://www.electronjs.org/doc
 
 Use recording and assistance features in accordance with participants' consent and the rules of your meeting or activity.
 
+## Install
+
+Download a build from the [Releases page](https://github.com/squid-beast/onscreenly/releases/latest) and follow the [install guide](docs/install.md). Builds are free and unsigned, so macOS and Windows ask once before the first launch; the guide shows where. Each release lists `SHA256SUMS` for checking a download.
+
 ## Run from source
 
 Use Node.js **22.13 or later** and npm. Repository access is required while this project is private:
@@ -101,11 +105,12 @@ Onscreenly can reuse an existing Cue profile in place. Quit Cue first, then see 
 npm test
 npm run pack              # unpacked application for the current platform
 npm run pack:win          # unpacked Windows x64 application
+npm run dist:mac          # Apple Silicon and Intel Mac zips
 npm run dist:mac:arm64    # Apple Silicon zip
 npm run dist:mac:x64      # Intel Mac zip
-npm run dist:win          # Windows x64 NSIS installer
-npm run dist:linux        # Linux x64 AppImage
-npm run dist:linux:arm64   # Linux arm64 AppImage
+npm run dist:win          # Windows x64 installer and portable exe
+npm run dist:linux        # Linux x64 AppImage and .deb
+npm run dist:linux:arm64  # Linux arm64 AppImage
 ```
 
 Expected artifacts under `dist/`:
@@ -113,9 +118,10 @@ Expected artifacts under `dist/`:
 | Target | Artifact |
 |---|---|
 | macOS | `Onscreenly-<version>-mac-<arch>.zip`, containing `Onscreenly.app` |
-| Windows installer | `Onscreenly-win-x64.exe` |
+| Windows installer | `Onscreenly-<version>-win-x64-setup.exe` |
+| Windows portable | `Onscreenly-<version>-win-x64-portable.exe` |
 | Windows unpacked | `win-unpacked/Onscreenly.exe` |
-| Linux | `Onscreenly-<version>-linux-<arch>.AppImage` |
+| Linux | `Onscreenly-<version>-linux-<arch>.AppImage`, `Onscreenly-<version>-linux-amd64.deb` |
 
 Whisper runtime bundling defaults **on for Windows/Linux** and **off for macOS**. To include it in a Mac build:
 
@@ -125,11 +131,23 @@ ONSCREENLY_BUNDLE_WHISPER=1 npm run dist:mac:arm64
 
 A Mac package built without the runtime cannot use local transcription unless you provide a prepared runtime using `ONSCREENLY_WHISPER_RUNTIME`. Model files are downloaded separately from the runtime.
 
-Signing is opt-in through `MAC_SIGN=1` and the existing signing/notarization configuration in `electron-builder.cjs`. Builds without configured signing are development/test artifacts; this rename does not supply a Developer ID certificate, notarization, or Windows signing. Packaging is separate from publishing; no new Onscreenly release is implied by these instructions.
+Mac builds are **ad-hoc signed** by default: every binary has a valid signature, which Apple silicon needs, but no developer identity, so Gatekeeper asks once after a download ([install guide](docs/install.md)). Developer ID signing and notarization stay available through `MAC_SIGN=1` and the configuration in `electron-builder.cjs`. Windows builds are unsigned.
+
+### Releases
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) builds every platform on its own runner after the checks and the app tests pass there:
+
+- **A version tag** (`git tag v0.2.5 && git push origin v0.2.5`, matching `package.json`) publishes a GitHub release with the Mac zips, Windows installer and portable exe, Linux AppImages and `.deb`, `SHA256SUMS`, and generated release notes. While the repository is public, each file also gets a build-provenance attestation.
+- **A pull request that changes packaging, or a manual run** (Actions → Release → Run workflow) builds the same files as downloadable workflow artifacts and publishes nothing.
+- The Publik app token (`PUBLIK_APP_TOKEN` secret) is optional; without it the Publik provider option is absent.
 
 ### Verification
 
 `npm test` covers provider routing, capture logic, persistence, profile/filename compatibility, environment aliases, preload compatibility, and package identity. Audio/provider tests use mocks or synthetic fixtures, so a passing suite does not prove actual OS audio access or screen-share exclusion.
+
+`npm run test:e2e` drives the real Electron app with Playwright (on Linux, run it under `xvfb-run -a`). Each test starts the app on a throwaway profile with OS permission prompts stubbed. It covers launch and sandboxing, encrypted keys across a restart, answers from a stand-in provider with Obsidian notes, résumé import and analysis with copy and save, and the IPC boundary against foreign pages, navigation and arbitrary URLs. CI runs it on Linux for every change; the release workflow runs it on macOS, Windows and Linux before building.
+
+What only real hardware can show (permissions, microphone and meeting audio, screen-share hiding, shortcuts, local Whisper) is in the [manual QA checklist](docs/qa-checklist.md).
 
 For an isolated Electron quit check after installing dependencies:
 

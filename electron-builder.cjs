@@ -1,18 +1,19 @@
 /* electron-builder configuration.
  *
  * Moved out of package.json so signing can be chosen by the environment rather
- * than hardcoded — the same shape NitroAI uses.
+ * than hardcoded.
+ *
+ *   • Ad-hoc signed (default, no Apple account) — identity '-'. Every binary in
+ *     the app carries a valid ad-hoc signature, which Apple Silicon requires to
+ *     run at all. macOS Gatekeeper still blocks it after a download until the
+ *     user allows it once (System Settings → Privacy & Security → Open Anyway,
+ *     or `xattr -dr com.apple.quarantine`); docs/install.md walks through it.
  *
  *   • Signed + notarized — set MAC_SIGN=1 with a "Developer ID Application"
  *     identity reachable in the keychain (or CSC_LINK in CI), plus
  *     APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID. electron-builder
  *     signs with the hardened runtime, notarizes, and staples. The app then
  *     opens on the first double-click with no warning at all.
- *
- *   • Ad-hoc fallback (no cert) — identity:null, so a fork or a secret-less CI
- *     run still produces a valid (not "damaged") build. It is NOT distributable:
- *     macOS refuses it after a download, and since macOS 15 the old
- *     right-click → Open escape hatch is gone.
  */
 
 // Gated on an explicit flag rather than on CSC_LINK: a bare .p12 carries only
@@ -50,9 +51,9 @@ module.exports = {
     target: [{ target: 'zip', arch: ['x64', 'arm64'] }],
     category: 'public.app-category.productivity',
     // With a real cert, let electron-builder discover it and apply the hardened
-    // runtime (notarization is refused without it). Without one, identity:null
-    // makes it skip signing rather than fail.
-    identity: hasCert ? undefined : null,
+    // runtime (notarization is refused without it). Without one, '-' signs
+    // ad-hoc: no identity, but a valid signature on every binary.
+    identity: hasCert ? undefined : '-',
     hardenedRuntime: hasCert,
     gatekeeperAssess: false,
     entitlements: 'build-resources/entitlements.mac.plist',
@@ -67,20 +68,35 @@ module.exports = {
       NSAudioCaptureUsageDescription: 'Onscreenly captures system audio to transcribe the other participant in a call.'
     }
   },
+  // Unsigned: Windows SmartScreen asks once ("More info" → "Run anyway").
   win: {
-    target: [{ target: 'nsis', arch: ['x64'] }],
-    artifactName: '${productName}-win-${arch}.${ext}'
+    target: [
+      { target: 'nsis', arch: ['x64'] },
+      { target: 'portable', arch: ['x64'] }
+    ]
+  },
+  portable: {
+    artifactName: '${productName}-${version}-win-${arch}-portable.${ext}'
   },
   // A per-user install with a visible directory step: onscreenly is a personal overlay,
   // not a machine-wide service, so it should never need an elevation prompt.
   nsis: {
+    artifactName: '${productName}-${version}-win-${arch}-setup.${ext}',
     oneClick: false,
     perMachine: false,
     allowToChangeInstallationDirectory: true,
     shortcutName: 'Onscreenly'
   },
   linux: {
-    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
-    category: 'Utility'
+    target: [
+      { target: 'AppImage', arch: ['x64', 'arm64'] },
+      { target: 'deb', arch: ['x64'] }
+    ],
+    category: 'Utility',
+    maintainer: 'Lohith Kumar <lkneerukonda@gmail.com>',
+    synopsis: 'AI overlay for screen context and meeting assistance'
+  },
+  deb: {
+    artifactName: '${productName}-${version}-linux-${arch}.${ext}'
   }
 };

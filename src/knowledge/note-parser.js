@@ -156,12 +156,14 @@ function parseNote(source, relPath) {
   // Every pattern below is bounded so a hostile or odd note cannot make the
   // regex engine backtrack for seconds.
   text = stripBetween(stripBetween(text, '%%', '%%'), '<!--', '-->')
-    .replace(/!\[\[[^\]\n]{0,500}\]\]/g, '')
-    .replace(/!\[[^\]\n]{0,500}\]\([^)\n]{0,2000}\)/g, '')
-    .replace(/\[\[([^\]|#\n]{0,300})(?:#[^\]|\n]{0,300})?(?:\|([^\]\n]{0,300}))?\]\]/g, (_m, target, label) =>
+    // No class below accepts "[" or "]": a link never contains them, and a run
+    // of brackets then fails at its first character instead of scanning ahead.
+    .replace(/!\[\[[^[\]\n]{0,500}\]\]/g, '')
+    .replace(/!\[[^[\]\n]{0,500}\]\([^()[\]\n]{0,2000}\)/g, '')
+    .replace(/\[\[([^[\]|#\n]{0,300})(?:#[^[\]|\n]{0,300})?(?:\|([^[\]\n]{0,300}))?\]\]/g, (_m, target, label) =>
       (label || target).trim()
     )
-    .replace(/\[([^\]\n]{1,500})\]\([^)\s]{1,2000}\)/g, '$1');
+    .replace(/\[([^[\]\n]{1,500})\]\([^()[\]\s]{1,2000}\)/g, '$1');
   const tags = new Set(meta.tags);
   for (const match of text.matchAll(/(?:^|[\s(])#([\p{L}\p{N}_/-]{1,100})/gu)) {
     if (/[\p{L}_/-]/u.test(match[1])) tags.add(match[1]);

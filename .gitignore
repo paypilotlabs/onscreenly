@@ -46,3 +46,7 @@ id_ed25519*
 *.sqlite*
 *.db*
 *.profraw
+
+# Playwright app-test output
+playwright-report/
+test-results/
