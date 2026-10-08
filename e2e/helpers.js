@@ -60,13 +60,14 @@ function consoleErrors(profile) {
  * A local OpenAI-compatible chat endpoint that streams `reply(request)` back
  * and records every request it receives. `status` (a number, or a function of
  * the request's 1-based number) makes it fail with that HTTP status instead.
+ * `reply` may return a promise, to hold the answer back until the test is ready.
  */
 async function startMockProvider(reply, { status = 200 } = {}) {
   const requests = [];
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (chunk) => (body += chunk));
-    req.on('end', () => {
+    req.on('end', async () => {
       const json = JSON.parse(body || '{}');
       requests.push(json);
       const code = typeof status === 'function' ? status(requests.length) : status;
@@ -75,7 +76,7 @@ async function startMockProvider(reply, { status = 200 } = {}) {
         res.end(JSON.stringify({ error: { message: 'Mock provider error', type: 'server_error' } }));
         return;
       }
-      const text = reply(json);
+      const text = await reply(json);
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       const chunk = (delta, finish) =>
         'data: ' +

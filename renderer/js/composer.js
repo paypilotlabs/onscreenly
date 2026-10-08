@@ -1,7 +1,7 @@
 // The question box: smart auto-fill from speech, question history, sending and keyboard shortcuts.
 import { state } from './state.js';
 import { $, combo, onscreenly } from './core.js';
-import { runMode, showToast } from './chat.js';
+import { isBusy, runMode, showToast } from './chat.js';
 
 const input = $('#input');
 const placeholder = $('#placeholder');
@@ -304,6 +304,12 @@ let lastSTTValue = '';
 
 function send() {
   const text = input.value.trim();
+  // While an answer is on its way runMode ignores a new one, so the question stays in the box
+  // instead of being cleared and lost.
+  if (isBusy()) {
+    if (text) showToast('Still answering · send again when it’s done', 2000);
+    return;
+  }
   if (!text) {
     runMode('assist', '');
     return;

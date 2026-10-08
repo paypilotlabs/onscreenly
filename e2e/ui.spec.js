@@ -111,7 +111,7 @@ test('twenty answers keep the composer in the window, and the sidebar only takes
     for (let i = 1; i <= 20; i++) {
       await ask(page, `Question ${i}?`);
       await expect.poll(() => mock.requests.length).toBe(i);
-      await expect(page.locator('#send-btn')).not.toHaveAttribute('aria-disabled', 'true');
+      await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'false');
     }
     const layout = await page.evaluate(() => {
       const send = document.querySelector('#send-btn').getBoundingClientRect();
@@ -129,6 +129,32 @@ test('twenty answers keep the composer in the window, and the sidebar only takes
     await page.click('#history-btn');
     await expect(sidebar).toHaveClass(/\bopen\b/);
     await expect.poll(() => sidebar.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('auto');
+  } finally {
+    await mock.close();
+  }
+});
+
+test('a question sent while an answer is on its way stays in the box until it can be sent', async ({ launch }) => {
+  let release = () => {};
+  const held = new Promise((resolve) => (release = resolve));
+  const mock = await startMockProvider(() => (mock.requests.length === 1 ? held.then(() => 'First') : 'Second'));
+  try {
+    const { page } = await launch({ settings: mock.settings });
+    await ask(page, 'First question?');
+    await expect.poll(() => mock.requests.length).toBe(1);
+    await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'true');
+
+    await ask(page, 'Second question?');
+    await expect(page.locator('#input')).toHaveValue('Second question?');
+    await expect(page.locator('#toast')).toContainText('Still answering');
+    expect(mock.requests.length).toBe(1);
+
+    release();
+    await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'false');
+    await page.press('#input', 'Enter');
+    await expect.poll(() => mock.requests.length).toBe(2);
+    await expect(page.locator('#input')).toHaveValue('');
+    await expect(page.locator('#messages')).toContainText('Second');
   } finally {
     await mock.close();
   }
