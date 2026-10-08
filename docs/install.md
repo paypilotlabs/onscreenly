@@ -31,7 +31,8 @@ xattr -dr com.apple.quarantine /Applications/Onscreenly.app
 Then grant the permissions Onscreenly asks for:
 
 - **Microphone**, to transcribe you.
-- **Screen & System Audio Recording**, for screenshots and, if you switch on Meeting audio in Settings → Audio, the other side of a call.
+- **Screen & System Audio Recording**, for screenshots.
+- **System Audio Recording Only** (in the same pane), only if you switch on Meeting audio in Settings → Audio, to hear the other side of a call. macOS asks the first time a session starts with it on.
 
 Grant them in **System Settings → Privacy & Security**, then quit and reopen Onscreenly. The builds are ad-hoc signed: the signature is valid but does not identify a developer. After an update, macOS may ask for these permissions again.
 

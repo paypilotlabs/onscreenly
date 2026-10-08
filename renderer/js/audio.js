@@ -3,6 +3,9 @@ import { state } from './state.js';
 import { isMac, isWindows, onscreenly } from './core.js';
 import { showAudioStatus, showStatus } from './events.js';
 
+// The Privacy & Security pane that holds Screen & System Audio Recording.
+const SYSTEM_AUDIO_PANE = 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture';
+
 // ---- capture: mic (renderer side) — uses AudioWorklet (modern, off-main-thread) ----
 let audioCtx = null,
   micStream = null,
@@ -143,13 +146,12 @@ async function startSystemAudio() {
   // capture:state handler. getDisplayMedia is async, so `if (sysStream) return` alone loses the
   // race and can open a second loopback stream that is then orphaned.
   if (sysStream || sysStarting) return;
-  // macOS: asking for meeting audio means asking for a display-capture session, and
-  // that session puts the OS screen-recording indicator on the menu bar for the whole
-  // call. Default to staying invisible; the user opts in in Settings > Audio.
+  // macOS: meeting audio needs its own System Audio Recording permission, so it is opt-in there
+  // (Settings > Audio).
   if (isMac && !(state.settings && state.settings.meetingAudio)) {
-    onscreenly.log('system audio: meeting audio is off on macOS -- no display-capture session opened');
+    onscreenly.log('system audio: meeting audio is off on macOS');
     showAudioStatus(
-      'Meeting audio is off. macOS shows a screen-recording indicator whenever an app captures system audio; turn Meeting audio on in Settings \u203a Audio if you want the other side transcribed.'
+      'Meeting audio is off. Turn it on in Settings \u203a Audio to transcribe the other side of the call.'
     );
     return;
   }
@@ -175,6 +177,30 @@ async function startSystemAudio() {
       return;
     }
     sysStream = stream;
+    // macOS ends the track at once, with no error, when System Audio Recording isn't allowed.
+    // A track stopped by stopSystemAudio() never fires 'ended', so this is always the OS.
+    const lost = () => {
+      if (sysStream !== stream) return;
+      onscreenly.log('system audio: the loopback track ended');
+      stopSystemAudio();
+      if (isMac) {
+        const button = document.createElement('button');
+        button.textContent = 'Open Privacy settings';
+        button.addEventListener('click', () => onscreenly.openPane(SYSTEM_AUDIO_PANE));
+        showStatus(
+          'Meeting audio stopped. Allow Onscreenly under System Audio Recording Only in Privacy & Security › Screen & System Audio Recording, then start the session again.',
+          button,
+          'warn'
+        );
+      } else {
+        showStatus('Meeting audio stopped. Start the session again to resume it.', null, 'warn');
+      }
+    };
+    tracks[0].addEventListener('ended', lost);
+    if (tracks[0].readyState === 'ended') {
+      lost();
+      return;
+    }
     sysCtx = new AudioContext({ sampleRate: 16000 });
 
     // Use AudioWorklet for system audio too
