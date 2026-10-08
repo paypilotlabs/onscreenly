@@ -55,6 +55,8 @@ Use recording and assistance features in accordance with participants' consent a
 
 Download a build from the [Releases page](https://github.com/squid-beast/onscreenly/releases/latest) and follow the [install guide](docs/install.md). Builds are free and unsigned, so macOS and Windows ask once before the first launch; the guide shows where. Each release lists `SHA256SUMS` for checking a download.
 
+The repository is private: the Releases page and its downloads are visible to collaborators only. Ask the owner for access, or build from source.
+
 ## Run from source
 
 Use Node.js **22.13 or later** and npm. Repository access is required while this project is private:
@@ -137,7 +139,7 @@ Mac builds are **ad-hoc signed** by default: every binary has a valid signature,
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) builds every platform on its own runner after the checks and the app tests pass there:
 
-- **A version tag** (`git tag v0.2.5 && git push origin v0.2.5`, matching `package.json`) publishes a GitHub release with the Mac zips, Windows installer and portable exe, Linux AppImages and `.deb`, `SHA256SUMS`, and generated release notes. While the repository is public, each file also gets a build-provenance attestation.
+- **A version tag** (`git tag v0.2.5 && git push origin v0.2.5`, matching `package.json`) publishes a GitHub release with the Mac zips, Windows installer and portable exe, Linux AppImages and `.deb`, `SHA256SUMS`, and generated release notes. Build-provenance attestations are skipped while the repository is private. Once it is public, each file also gets one.
 - **A pull request that changes packaging, or a manual run** (Actions → Release → Run workflow) builds the same files as downloadable workflow artifacts and publishes nothing.
 - The Publik app token (`PUBLIK_APP_TOKEN` secret) is optional; without it the Publik provider option is absent.
 
