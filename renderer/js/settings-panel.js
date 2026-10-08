@@ -99,12 +99,16 @@ function onTabKey(e) {
 }
 
 // closeSettings hides Settings only once a save succeeds, so what has to follow a close (focus going
-// back to the opener) watches the scrim rather than each way of closing.
+// back to the opener, onboarding resuming) watches the scrim rather than each way of closing.
+const closeHandlers = [() => restoreFocus(dialog)];
+function onSettingsClosed(handler) {
+  closeHandlers.push(handler);
+}
 function watchSettingsClose() {
   let open = !scrim.classList.contains('hidden');
   new MutationObserver(() => {
     const nowOpen = !scrim.classList.contains('hidden');
-    if (open && !nowOpen) restoreFocus(dialog);
+    if (open && !nowOpen) closeHandlers.forEach((handler) => handler());
     open = nowOpen;
   }).observe(scrim, { attributes: true, attributeFilter: ['class'] });
 }
@@ -151,4 +155,12 @@ export function init() {
   $('.s-tabs').addEventListener('keydown', onTabKey);
 }
 
-export { closeSettings, openSettings, scrim, updateAiRulesCounter, updateCustomProviderFields, updateSmartTooltip };
+export {
+  closeSettings,
+  onSettingsClosed,
+  openSettings,
+  scrim,
+  updateAiRulesCounter,
+  updateCustomProviderFields,
+  updateSmartTooltip
+};

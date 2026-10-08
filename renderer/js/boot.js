@@ -41,6 +41,12 @@ export function init() {
     const st = await onscreenly.captureState();
     setLiveDotState(st.active ? 'idle' : 'off');
     setSessionButton(st.active);
-    if (!state.settings.onboarded) showOnboard();
+    if (!state.settings.onboarded) {
+      // The welcome headline is set in EB Garamond, which nothing else has loaded yet. Give it a
+      // moment so the first frame shows it, but never hold onboarding up for long.
+      const garamond = document.fonts.load('500 48px "EB Garamond"').catch(() => {});
+      await Promise.race([garamond, new Promise((resolve) => setTimeout(resolve, 300))]);
+      showOnboard();
+    }
   })();
 }

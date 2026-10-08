@@ -86,4 +86,4 @@ export function init() {
   });
 }
 
-export { rememberOpener, restoreFocus, safeFocus };
+export { rememberOpener, restoreFocus, safeFocus, topDialog };

@@ -133,40 +133,51 @@ function setStatus(text, tone = null) {
   status.classList.toggle('is-error', tone === 'error');
 }
 
+const PROVIDER_NAMES = {
+  publik: 'publik API',
+  cerebras: 'Cerebras',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  gemini: 'Gemini',
+  custom: 'Custom',
+  ollama: 'Ollama',
+  groq: 'Groq',
+  minimax: 'MiniMax',
+  deepseek: 'DeepSeek',
+  azure: 'Azure AI Foundry'
+};
+
+function providerName(provider) {
+  return PROVIDER_NAMES[provider] || provider;
+}
+
+const STT_NAMES = {
+  local: 'Local model',
+  deepgram: 'Deepgram',
+  openai: 'OpenAI',
+  groq: 'Groq',
+  gemini: 'Gemini',
+  custom: 'Custom'
+};
+
+// The speech-to-text a session would use. 'auto' walks the same chain src/stt builds (Deepgram,
+// OpenAI Realtime, then the Groq and Gemini batch fallbacks); an explicit choice is named as it is.
+function sttName(settings) {
+  const k = settings.apiKeys || {};
+  const choice = settings.sttProvider || 'auto';
+  if (choice !== 'auto') return STT_NAMES[choice] || choice;
+  if (k.deepgram) return 'Deepgram';
+  if (k.openai) return 'OpenAI Realtime';
+  if (k.groq) return 'Groq Whisper';
+  return k.gemini ? 'Gemini' : 'none';
+}
+
 function statusText() {
-  const k = state.settings.apiKeys;
-  const labels = {
-    publik: 'publik API',
-    cerebras: 'Cerebras',
-    openai: 'OpenAI',
-    anthropic: 'Anthropic',
-    gemini: 'Gemini',
-    deepgram: 'Deepgram',
-    custom: 'Custom',
-    ollama: 'Ollama',
-    groq: 'Groq',
-    minimax: 'MiniMax',
-    deepseek: 'DeepSeek',
-    azure: 'Azure AI Foundry'
-  };
   const publikPart =
     state.settings.provider === 'publik' && state.publikState
       ? ` · ${state.publikState.connected ? (state.publikState.balanceLabel ? `balance ${state.publikState.balanceLabel}` : 'connected') : 'not set up'}`
       : '';
-  // 'auto' walks the same chain src/stt builds (Deepgram, OpenAI Realtime, then the Groq and Gemini
-  // batch fallbacks); an explicit choice is reported as-is so the status line matches what is used.
-  const selectedSttProvider = state.settings.sttProvider || 'auto';
-  const automaticStt = k.deepgram
-    ? 'Deepgram'
-    : k.openai
-      ? 'OpenAI Realtime'
-      : k.groq
-        ? 'Groq Whisper'
-        : k.gemini
-          ? 'Gemini'
-          : 'none';
-  const stt = selectedSttProvider === 'auto' ? automaticStt : selectedSttProvider;
-  return `${labels[state.settings.provider] || state.settings.provider}${publikPart} · STT: ${stt}`;
+  return `${providerName(state.settings.provider)}${publikPart} · STT: ${sttName(state.settings)}`;
 }
 
 // ---- readiness -------------------------------------------------------------
@@ -261,4 +272,13 @@ export function init() {
   );
 }
 
-export { fillSettings, listenReadiness, paintReadiness, providerLooksReady, setStatus, statusText };
+export {
+  fillSettings,
+  listenReadiness,
+  paintReadiness,
+  providerLooksReady,
+  providerName,
+  setStatus,
+  statusText,
+  sttName
+};

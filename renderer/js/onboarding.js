@@ -2,7 +2,9 @@
 import { state } from './state.js';
 import { $, isMac, isWindows, kbd, onscreenly, setButtonKind } from './core.js';
 import { esc } from './chat.js';
-import { openSettings } from './settings-panel.js';
+import { rememberOpener, restoreFocus, safeFocus, topDialog } from './a11y.js';
+import { onSettingsClosed, openSettings } from './settings-panel.js';
+import { listenReadiness, providerLooksReady, providerName, sttName } from './settings-form.js';
 import { renderPublikBlock, selectByoProvider } from './publik-settings.js';
 import { setIgnore } from './window-behaviour.js';
 
@@ -11,6 +13,7 @@ import { setIgnore } from './window-behaviour.js';
 // footer: Skip, "Step n of 4" with decorative dots, Back and Next. One blue button per view: when
 // the body has the primary action (bodyPrimary), Next is secondary.
 const obScrim = $('#onboard-scrim');
+const onboard = $('#onboard');
 const isLinux = !isMac && !isWindows;
 
 // Windows 10 has no screen-capture permission (its settings page exists only on Windows 11);
@@ -30,36 +33,96 @@ const PERMISSION_PANES = isWindows
       }
     : null;
 
-// A row in a Frost row group: a name, a line under it, and an "Open settings" button when the
-// platform has a settings page for it (the button names the page for assistive tech).
-function permissionRow(perm, name, sub, page) {
-  const open = PERMISSION_PANES
-    ? `<button type="button" class="btn btn-secondary compact ob-perm-open" data-open-pane="${PERMISSION_PANES[perm]}" aria-label="Open ${page} settings">Open settings</button>`
-    : '';
+// What the permissions step knows: { mic, screen } from permissions:check, or null until it answers
+// (Linux never asks; it has no such permissions).
+let permissions = null;
+
+async function checkPermissions() {
+  if (isLinux) return;
+  try {
+    permissions = await onscreenly.permissionsCheck();
+  } catch (_) {
+    permissions = null;
+  }
+  if (onPermissionsStep()) renderOnboard();
+}
+
+const MAC_NOTE =
+  'Meeting audio (the other side of a call) is off by default on macOS, because the system shows a recording indicator while it runs. Turn it on in Settings › Audio.';
+const WINDOWS_10_NOTE = 'Screen capture needs no permission on Windows 10.';
+const LINUX_NOTE =
+  'Linux doesn’t ask for these permissions. If your desktop blocks screen capture, allow it in its privacy settings.';
+
+// Each row is 'ok' (an "Allowed" tag), 'not' ("Not yet" and its "Open settings" button) or 'plain'
+// (no state: Linux, or before the check answers). Once everything is allowed the step only confirms.
+function permissionsView() {
+  if (isLinux) return { allOk: false, rows: { mic: 'plain', screen: 'plain' }, note: LINUX_NOTE };
+  const micOk = !!permissions && permissions.mic === 'granted';
+  const screenOk = windows10 || (!!permissions && permissions.screen === 'granted');
+  const view = (ok) => (!permissions ? 'plain' : ok ? 'ok' : 'not');
+  return {
+    allOk: micOk && screenOk,
+    rows: { mic: view(micOk), screen: view(screenOk) },
+    note: isMac ? MAC_NOTE : windows10 ? WINDOWS_10_NOTE : ''
+  };
+}
+
+// A row in a Frost row group: a name, a line under it, and the row's state on the right. The
+// button opens the system settings page it names (the label says which, for assistive tech).
+function permissionRow(perm, name, sub, page, view) {
+  const hide = (shown) => (shown ? '' : ' hidden');
+  const pane = PERMISSION_PANES ? ` data-open-pane="${PERMISSION_PANES[perm]}"` : '';
   return (
     `<div class="ws-row ob-perm-row" data-perm="${perm}"><div class="ws-row-info">` +
-    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div>${open}</div>`
+    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div>` +
+    `<span class="tag is-ok ob-perm-ok${hide(view === 'ok')}"><span class="dot" aria-hidden="true"></span>Allowed</span>` +
+    `<span class="tag ob-perm-not${hide(view === 'not')}">Not yet</span>` +
+    `<button type="button" class="btn btn-secondary compact ob-perm-open${hide(view === 'not')}"${pane} aria-label="Open ${page} settings">Open settings</button>` +
+    '</div>'
   );
 }
 
 function permissionsBody() {
-  const rows =
-    permissionRow('mic', 'Microphone', 'To hear you', 'Microphone') +
-    (windows10 ? '' : permissionRow('screen', 'Screen recording', 'To see your screen', 'Screen Recording'));
-  const note = isMac
-    ? 'Meeting audio (the other side of a call) is off by default on macOS, because the system shows a recording indicator while it runs. Turn it on in Settings › Audio.'
-    : windows10
-      ? 'Screen capture needs no permission on Windows 10.'
-      : isLinux
-        ? 'Linux doesn’t ask for these permissions. If your desktop blocks screen capture, allow it in its privacy settings.'
-        : '';
-  return `<div class="ob-rows ws-rows">${rows}</div>` + (note ? `<p class="ob-note">${note}</p>` : '');
+  const { rows, note } = permissionsView();
+  return (
+    '<div class="ob-rows ws-rows">' +
+    permissionRow('mic', 'Microphone', 'To hear you', 'Microphone', rows.mic) +
+    (windows10
+      ? ''
+      : permissionRow('screen', 'Screen recording', 'To see your screen', 'Screen Recording', rows.screen)) +
+    '</div>' +
+    (note ? `<p class="ob-note">${note}</p>` : '')
+  );
 }
 
-function needRow(need, name, sub) {
+// A row for what answers or listening need, with a tag saying what is connected.
+function needRow(need, name, sub, connected) {
+  const tag = connected
+    ? `<span class="tag is-ok" data-slot="${need}"><span class="dot" aria-hidden="true"></span>${esc(connected)}</span>`
+    : `<span class="tag" data-slot="${need}">Not set</span>`;
   return (
     `<div class="ws-row ob-need-row" data-need="${need}"><div class="ws-row-info">` +
-    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div></div>`
+    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div>${tag}</div>`
+  );
+}
+
+function providerBody() {
+  const listening = listenReadiness(state.settings, state.whisperOverview) !== 'none';
+  return (
+    '<div class="ob-rows ws-rows ob-needs">' +
+    needRow(
+      'answers',
+      'Answers',
+      'An API key for the provider you choose',
+      providerLooksReady() && `Connected · ${providerName(state.settings.provider)}`
+    ) +
+    needRow(
+      'listening',
+      'Listening',
+      'Speech-to-text: a Deepgram, OpenAI, Groq or Gemini key, or a free local model you download in Settings › Audio',
+      listening && sttName(state.settings)
+    ) +
+    '</div>'
   );
 }
 
@@ -90,34 +153,30 @@ const OB_STEPS = [
   },
   {
     eyebrow: 'Permissions',
-    title: 'Let Onscreenly see and hear',
-    lede: 'Onscreenly needs to hear the conversation and see your screen to answer.',
+    permissions: true,
+    get title() {
+      return permissionsView().allOk ? 'Microphone and screen recording are on' : 'Let Onscreenly see and hear';
+    },
+    get lede() {
+      return permissionsView().allOk ? '' : 'Onscreenly needs to hear the conversation and see your screen to answer.';
+    },
     body: permissionsBody
   },
   {
     eyebrow: 'AI provider',
     title: 'Connect an AI provider',
     lede: 'Answers come from the provider you choose, with your own API key.',
-    body: () =>
-      '<div class="ob-rows ws-rows ob-needs">' +
-      needRow('answers', 'Answers', 'An API key for the provider you choose') +
-      needRow(
-        'listening',
-        'Listening',
-        'Speech-to-text: a Deepgram, OpenAI, Groq or Gemini key, or a free local model you download in Settings › Audio'
-      ) +
-      '</div>',
-    bodyPrimary: true,
-    buttons: [
-      {
-        label: 'Open Settings',
-        kind: 'primary',
-        action: () => {
-          finishOnboard();
-          openSettings('keys');
-        }
-      }
-    ]
+    body: providerBody,
+    // Until a provider is connected, opening Settings is the step's primary action. Either way
+    // onboarding waits behind Settings and comes back at "You're all set".
+    get bodyPrimary() {
+      return !providerLooksReady();
+    },
+    get buttons() {
+      return providerLooksReady()
+        ? [{ label: 'Change provider', kind: 'secondary', action: () => suspendOnboard('keys') }]
+        : [{ label: 'Open Settings', kind: 'primary', action: () => suspendOnboard('keys') }];
+    }
   },
   {
     eyebrow: 'Shortcuts',
@@ -200,9 +259,12 @@ function publikStep() {
         label: c.decline,
         kind: 'secondary',
         action: () => {
-          if (obDialog) hideOnboardDialog();
-          else finishOnboard();
-          openSettings('keys');
+          if (obDialog) {
+            hideOnboardDialog();
+            openSettings('keys');
+          } else {
+            suspendOnboard('keys');
+          }
           selectByoProvider();
         }
       }
@@ -258,8 +320,8 @@ function showPublikDisclosure() {
   $('#onboard').classList.add('dialog');
   obIndex = idx;
   renderOnboard();
-  obScrim.classList.remove('hidden');
-  setIgnore(false);
+  showOnboardScrim();
+  safeFocus($('#ob-buttons .btn'));
 }
 // Show the card: inside onboarding it becomes the next step; afterwards it
 // is a dialog of its own (also reached from the "never a silent starter"
@@ -274,6 +336,7 @@ function showPublikCard() {
     OB_STEPS.splice(idx + 1, 0, publikCardStep());
     obIndex = idx + 1;
     renderOnboard();
+    safeFocus($('#ob-buttons .btn'));
     return;
   }
   OB_STEPS.push(publikCardStep());
@@ -281,13 +344,13 @@ function showPublikCard() {
   $('#onboard').classList.add('dialog');
   obIndex = OB_STEPS.length - 1;
   renderOnboard();
-  obScrim.classList.remove('hidden');
-  setIgnore(false);
+  showOnboardScrim();
+  safeFocus($('#ob-buttons .btn'));
 }
 function hideOnboardDialog() {
   obDialog = false;
   $('#onboard').classList.remove('dialog');
-  obScrim.classList.add('hidden');
+  hideOnboardScrim();
 }
 
 let obIndex = 0;
@@ -334,20 +397,55 @@ function renderOnboard() {
     dots.appendChild(d);
   });
 }
-function showOnboard() {
-  obDialog = false;
-  $('#onboard').classList.remove('dialog');
-  obIndex = 0;
-  renderOnboard();
+// The scrim remembers what had focus before it showed and gives focus back once it hides.
+function showOnboardScrim() {
+  if (obScrim.classList.contains('hidden')) rememberOpener(onboard);
   obScrim.classList.remove('hidden');
   setIgnore(false);
 }
+function hideOnboardScrim() {
+  obScrim.classList.add('hidden');
+  restoreFocus(onboard);
+}
+function onPermissionsStep() {
+  return !obScrim.classList.contains('hidden') && !obDialog && !!OB_STEPS[obIndex].permissions;
+}
+
+// Opening Settings from inside onboarding (step 3, or declining publik) suspends it: onboarding hides
+// and comes back at "You're all set" once Settings closes after a successful save.
+let obSuspended = false;
+function suspendOnboard(tab) {
+  obSuspended = true;
+  obScrim.classList.add('hidden');
+  openSettings(tab);
+}
+function resumeOnboard() {
+  if (!obSuspended) return;
+  obSuspended = false;
+  obIndex = OB_STEPS.length - 1;
+  renderOnboard();
+  obScrim.classList.remove('hidden');
+  setIgnore(false);
+  safeFocus($('#ob-next'));
+}
+
+function showOnboard() {
+  obDialog = false;
+  obSuspended = false;
+  $('#onboard').classList.remove('dialog');
+  obIndex = 0;
+  renderOnboard();
+  showOnboardScrim();
+  safeFocus($('#ob-next'));
+  checkPermissions();
+}
+
 async function finishOnboard() {
   if (obDialog) {
     hideOnboardDialog();
     return;
   }
-  obScrim.classList.add('hidden');
+  hideOnboardScrim();
   if (state.settings && !state.settings.onboarded) {
     state.settings.onboarded = true;
     await onscreenly.settingsSet({ onboarded: true });
@@ -360,21 +458,41 @@ export function init() {
     else {
       obIndex++;
       renderOnboard();
+      if (onPermissionsStep()) checkPermissions();
     }
   });
   $('#ob-back').addEventListener('click', () => {
     if (obIndex > 0) {
       obIndex--;
       renderOnboard();
+      if (onPermissionsStep()) checkPermissions();
     }
   });
   $('#ob-skip').addEventListener('click', finishOnboard);
   $('#logo-btn').addEventListener('click', showOnboard);
-  // The permissions step's "Open settings" buttons open the system settings page they name.
+  // The permissions step's "Open settings" buttons open the system settings page they name. Coming
+  // back to the window checks again, so a permission switched on there shows as allowed here.
   $('#ob-body').addEventListener('click', (e) => {
     const open = e.target.closest('[data-open-pane]');
     if (open) onscreenly.openPane(open.dataset.openPane);
   });
+  window.addEventListener('focus', () => {
+    if (onPermissionsStep()) checkPermissions();
+  });
+  onSettingsClosed(resumeOnboard);
+  // Escape skips onboarding, one layer per press: it runs in the capture phase and stops there, so
+  // Settings underneath stays open, and it waits while consent is on top. The publik card has no
+  // way out but its two buttons, so it ignores Escape.
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || topDialog() !== onboard) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!OB_STEPS[obIndex].publikCard) finishOnboard();
+    },
+    true
+  );
 }
 
 export { OB_STEPS, publikStep, setWindows10, showOnboard, showPublikCard, showPublikDisclosure };
