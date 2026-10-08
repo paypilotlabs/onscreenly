@@ -28,7 +28,7 @@
         ? 'Not yet requested'
         : 'Not granted — open Settings to allow';
     statusMic.className = 'perm-status ' + (micOk ? 'ok' : 'bad');
-    badgeMic.textContent = micOk ? '✓' : '✗';
+    badgeMic.textContent = micOk ? 'Allowed' : 'Not yet';
     badgeMic.className = 'perm-badge ' + (micOk ? 'ok' : 'bad');
     btnMic.classList.toggle('hidden', micOk);
 
@@ -40,7 +40,7 @@
         ? 'Not yet requested'
         : 'Not granted — open Settings to allow';
     statusScreen.className = 'perm-status ' + (screenOk ? 'ok' : 'bad');
-    badgeScreen.textContent = screenOk ? '✓' : '✗';
+    badgeScreen.textContent = screenOk ? 'Allowed' : 'Not yet';
     badgeScreen.className = 'perm-badge ' + (screenOk ? 'ok' : 'bad');
     btnScreen.classList.toggle('hidden', screenOk);
 

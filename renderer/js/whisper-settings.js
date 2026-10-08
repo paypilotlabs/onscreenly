@@ -56,7 +56,7 @@ async function refreshWhisperModels() {
     for (const model of state.whisperOverview.models) {
       const option = document.createElement('option');
       option.value = model.id;
-      option.textContent = `${model.label} — ${formatBytes(model.bytes)}${model.recommended ? ' (recommended)' : ''}${model.installed ? ' ✓' : ''}`;
+      option.textContent = `${model.label} — ${formatBytes(model.bytes)}${model.recommended ? ' (recommended)' : ''}${model.installed ? ' · downloaded' : ''}`;
       select.appendChild(option);
     }
     const selectionExists = state.whisperOverview.models.some((model) => model.id === previousSelection);

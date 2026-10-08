@@ -45,7 +45,6 @@
     }
     .no-drag { -webkit-app-region: no-drag; }
 
-    .perm-icon { font-size: 40px; line-height: 1; margin-bottom: 16px; }
     .perm-title { font-size: 22px; font-weight: 700; color: var(--tx-1); letter-spacing: -0.02em; margin-bottom: 8px; }
     .perm-desc { font-size: 14px; line-height: 1.6; color: var(--tx-2); margin-bottom: 24px; text-align: center; }
     .perm-desc strong { color: #fff; }
@@ -71,7 +70,6 @@
       border-color: rgba(255,100,70,0.30);
       background: rgba(255,100,70,0.05);
     }
-    .perm-emoji { font-size: 22px; flex-shrink: 0; }
     .perm-info { flex: 1; min-width: 0; }
     .perm-name { font-size: 14px; font-weight: 600; color: var(--tx-1); }
     .perm-status { font-size: 12px; color: var(--tx-mut); margin-top: 2px; }
@@ -79,13 +77,16 @@
     .perm-status.bad { color: #ff8a75; }
     .perm-badge {
       flex-shrink: 0;
-      width: 26px; height: 26px;
-      border-radius: 50%;
-      display: grid; place-items: center;
-      font-size: 14px;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 999px;
+      display: inline-flex; align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
     }
-    .perm-badge.ok { background: rgba(34,197,94,0.18); }
-    .perm-badge.bad { background: rgba(255,100,70,0.15); }
+    .perm-badge.ok { background: rgba(34,197,94,0.18); color: #4ade80; }
+    .perm-badge.bad { background: rgba(255,100,70,0.15); color: #ff8a75; }
     .perm-open-btn {
       flex-shrink: 0;
       padding: 6px 12px;
@@ -184,7 +185,6 @@
 <body>
   <div id="perm-root">
     <div class="perm-card">
-      <div class="perm-icon">🔐</div>
       <div class="perm-title">Onscreenly needs your permission</div>
       <div class="perm-desc">
         Grant <strong>Microphone</strong> and <strong>Screen Recording</strong> access so Onscreenly can hear your meetings and see your screen.
@@ -192,7 +192,6 @@
 
       <!-- Microphone -->
       <div class="perm-row no-drag" id="row-mic">
-        <span class="perm-emoji">🎙️</span>
         <div class="perm-info">
           <div class="perm-name">Microphone</div>
           <div class="perm-status" id="status-mic">Checking…</div>
@@ -203,7 +202,6 @@
 
       <!-- Screen Recording -->
       <div class="perm-row no-drag" id="row-screen">
-        <span class="perm-emoji">🖥️</span>
         <div class="perm-info">
           <div class="perm-name">Screen Recording</div>
           <div class="perm-status" id="status-screen">Checking…</div>
@@ -221,7 +219,7 @@
         <button class="perm-ghost" id="quit-btn">Quit</button>
         <div class="spacer"></div>
         <button class="perm-check-btn" id="check-btn">Check Again</button>
-        <button class="perm-continue-btn" id="continue-btn" disabled>Continue →</button>
+        <button class="perm-continue-btn" id="continue-btn" disabled>Continue</button>
       </div>
     </div>
   </div>
