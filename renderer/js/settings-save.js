@@ -1,7 +1,6 @@
-// Saving settings and the example conversation.
+// Saving settings.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
-import { addUserBubble, clearMessages, messages } from './chat.js';
 import { clampOpacity } from './toolbar.js';
 import { updateSmartTooltip } from './settings-panel.js';
 import { statusText } from './settings-form.js';
@@ -75,15 +74,4 @@ async function saveSettings() {
   }
 }
 
-// ---- example conversation (matches the reference screenshot) ------------
-function showExample() {
-  clearMessages();
-  addUserBubble('What should I say?');
-  const ai = document.createElement('div');
-  ai.className = 'ai-text';
-  ai.textContent =
-    '“A discounted cash flow model values a company by projecting future free cash flows and discounting them to present value using the weighted average cost of capital.”';
-  messages.appendChild(ai);
-}
-
-export { saveSettings, showExample };
+export { saveSettings };

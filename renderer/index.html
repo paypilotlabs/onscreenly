@@ -7,98 +7,127 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="app">
-    <!-- Dedicated drag handle / top bar -->
-    <div id="toolbar">
-      <div class="drag-pill" title="Drag to move window">
-        <span class="drag-dots" aria-hidden="true"></span>
-        <span class="drag-label">Drag</span>
-      </div>
-      <button class="tb-logo" id="logo-btn" title="How to use Onscreenly" aria-label="How to use Onscreenly"></button>
-      <button class="tb-settings" id="tb-settings-btn" title="Settings" aria-label="Settings"></button>
-      <div class="tb-divider"></div>
-      <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
-      <div class="tb-divider"></div>
-      <button class="tb-stop" id="stop-btn" title="Start session" aria-label="Start session">
-        <span class="ic"></span><span class="tb-stop-label">Start session</span>
+  <div id="app" class="theme-overlay">
+    <!-- Toolbar: a 36px pill of text buttons. Press anywhere that isn't a control to drag the window. -->
+    <div id="toolbar" role="group" aria-label="Onscreenly" title="Drag to move">
+      <button type="button" class="tb-btn tb-stop" id="stop-btn" title="Start session (⌘⇧L)" aria-label="Start session" aria-keyshortcuts="Meta+Shift+L">
+        <span class="tb-stop-row"><span class="tb-lead"><span id="live-dot" class="off"></span></span><span class="tb-stop-label">Start session</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift L">⌘⇧L</span></span>
+        <!-- Sizer: the widest state, "● End session" and its hint, kept invisible so every state has one width. -->
+        <span class="tb-stop-row tb-stop-sizer" aria-hidden="true"><span class="tb-sizer-dot"></span><span>End session</span><span class="tb-hint" data-combo="mod shift L">⌘⇧L</span></span>
       </button>
-      <div class="tb-divider"></div>
+      <button type="button" class="tb-btn tb-hide" id="hide-btn" title="Hide (⌘⇧/)" aria-label="Hide" aria-keyshortcuts="Meta+Shift+/" aria-expanded="true" aria-controls="panel-wrap">
+        <span class="tb-hide-label">Hide</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift /">⌘⇧/</span><span class="tb-unread" aria-hidden="true"></span>
+      </button>
+      <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-opacity-wrap">
-        <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
-          <span class="ic"></span>
-        </button>
-        <div id="opacity-popover" class="opacity-popover hidden">
-          <div class="opacity-label">Opacity</div>
-          <div class="opacity-row">
-            <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" />
-            <span id="tb-opacity-value">100%</span>
-          </div>
+        <button type="button" class="tb-btn tb-opacity" id="opacity-btn" title="Opacity" aria-expanded="false" aria-controls="opacity-popover">Opacity</button>
+        <div id="opacity-popover" class="opacity-popover hidden" role="group" aria-label="Opacity">
+          <span class="opacity-label" aria-hidden="true">Opacity</span>
+          <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" aria-label="Opacity" aria-valuetext="100%" />
+          <span id="tb-opacity-value">100%</span>
         </div>
       </div>
-      <div class="tb-divider"></div>
-      <button class="tb-quit" id="quit-btn" title="Quit Onscreenly" aria-label="Quit Onscreenly"></button>
+      <button type="button" class="tb-btn tb-logo" id="logo-btn" title="How to use Onscreenly">Help</button>
+      <button type="button" class="tb-btn tb-settings" id="tb-settings-btn" title="Settings">Settings</button>
+      <div class="tb-divider" aria-hidden="true"></div>
+      <button type="button" class="tb-btn tb-quit" id="quit-btn" title="Quit Onscreenly (⌘⇧X)" aria-label="Quit Onscreenly">Quit</button>
     </div>
 
-    <!-- Main assistant panel -->
+    <!-- Answer panel, with the transcript sidebar beside it. -->
     <div id="panel-wrap">
-      <span id="live-dot" class="off"></span>
-      <div id="stt-status" class="stt-status stt-disconnected">Transcription off</div>
-      <div id="panel" class="glass no-drag">
-
-        <!-- Two-column layout: responses (left) + live transcript sidebar (right) -->
+      <div id="panel" class="glass no-drag" data-setup="false" data-listen="ready" data-capture="off">
         <div id="panel-columns">
-
-          <!-- Left column: AI responses -->
           <div id="panel-main">
-            <div id="messages"></div>
+            <div id="messages" role="log" aria-live="polite" aria-label="Answers"></div>
+            <!-- Shown while #messages is empty. #panel[data-setup|data-listen|data-capture] picks the variant. -->
+            <div id="empty-state" class="empty-state">
+              <div class="es-variant es-setup">
+                <div class="es-copy">
+                  <p class="es-title">Connect an AI provider to get answers</p>
+                </div>
+                <button type="button" class="btn btn-primary compact es-action" id="empty-setup">Open settings</button>
+              </div>
+              <div class="es-variant es-audio">
+                <div class="es-copy">
+                  <p class="es-title">Answers work, but Onscreenly can’t transcribe yet</p>
+                  <p class="es-body">Add a speech-to-text key or download a local model to hear the conversation.</p>
+                </div>
+                <button type="button" class="btn btn-secondary compact es-action" id="empty-audio">Open Audio settings</button>
+              </div>
+              <div class="es-variant es-ready">
+                <div class="es-copy">
+                  <p class="es-title">Ready when you are</p>
+                  <p class="es-body">Start a session to listen, or ask anything below.</p>
+                </div>
+                <dl class="es-keys">
+                  <div class="es-key"><dt data-keys="mod shift L"></dt><dd>Start or end a session</dd></div>
+                  <div class="es-key"><dt data-keys="mod ↵"></dt><dd>What should I say?</dd></div>
+                  <div class="es-key"><dt data-keys="mod shift ↵"></dt><dd class="es-assist-label">Assist</dd></div>
+                  <div class="es-key"><dt data-keys="mod H"></dt><dd>Solve the coding problem on screen</dd></div>
+                  <div class="es-key"><dt data-keys="mod shift /"></dt><dd>Hide or show</dd></div>
+                </dl>
+              </div>
+              <div class="es-variant es-listening">
+                <span class="es-live-dot" aria-hidden="true"></span>
+                <div class="es-copy">
+                  <p class="es-body">Listening. The interviewer’s question will appear below; press <span data-combo="↵">↵</span> to answer.</p>
+                </div>
+              </div>
+              <div class="es-variant es-mic-only">
+                <span class="es-live-dot" aria-hidden="true"></span>
+                <div class="es-copy">
+                  <p class="es-body">Listening to your microphone only. Turn on Meeting audio in Settings › Audio to hear the other side.</p>
+                </div>
+              </div>
+            </div>
 
             <div id="action-row">
-              <button class="act act-primary" data-mode="say"
-                title="Suggests what to say next based on the conversation">
-                <span class="ic"></span><span>What should I say?</span>
-                <span class="shortcut-hint" id="say-shortcut-hint"></span>
+              <button type="button" class="act act-primary" data-mode="say" title="Suggests what to say next based on the conversation (⌘↵)">
+                <span class="act-label">What should I say?</span><span class="shortcut-hint" id="say-shortcut-hint" aria-hidden="true" data-combo="mod ↵">⌘↵</span>
               </button>
-              <span class="sep">•</span>
-              <button class="act act-secondary" data-mode="assist"
-                title="Scans your screen and conversation to decide what you need">
-                <span class="ic"></span><span>Smart assist</span>
-                <span class="shortcut-hint" id="assist-shortcut-hint"></span>
+              <button type="button" class="act act-secondary" data-mode="assist" title="Scans your screen and conversation to decide what you need (⌘⇧↵)">
+                <span class="act-label">Assist</span><span class="shortcut-hint" id="assist-shortcut-hint" aria-hidden="true" data-combo="mod shift ↵">⌘⇧↵</span>
               </button>
-              <span class="sep">•</span>
-              <button class="act" data-mode="recap"><span class="ic"></span><span>Recap</span></button>
+              <button type="button" class="act" data-mode="recap" title="Sums up the conversation so far">
+                <span class="act-label">Recap</span>
+              </button>
+              <div id="stt-status" class="stt-status stt-disconnected" role="status">
+                <span class="stt-dot" aria-hidden="true"></span><span class="stt-label"></span>
+              </div>
             </div>
 
             <div id="composer">
               <div id="input-area">
-                <div id="placeholder">Ask about your screen or conversation, or <span class="keycap">⌘</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist</div>
-                <textarea id="input" rows="1" spellcheck="false"></textarea>
+                <div id="placeholder">Ask about your screen or the conversation</div>
+                <div class="input-ghost hidden" aria-hidden="true"></div>
+                <textarea id="input" rows="1" spellcheck="false" aria-label="Ask about your screen or the conversation"></textarea>
               </div>
               <div id="composer-bottom">
-                <button id="smart-toggle" class="smart-pill"><span class="ic"></span><span>Smart</span></button>
-                <button id="history-btn" class="history-btn" title="Show everything said this session"><span class="ic"></span><span>Transcription history</span></button>
-                <button id="more-btn" class="more-btn" title="Settings"></button>
+                <button type="button" id="smart-toggle" class="chip smart-pill" aria-pressed="false">Smart</button>
+                <button type="button" id="history-btn" class="chip history-btn" aria-expanded="false" aria-controls="transcript-sidebar" title="Show everything said this session">Transcript</button>
+                <button type="button" id="more-btn" class="more-btn hidden" title="Settings">Settings</button>
                 <div class="spacer"></div>
-                <button id="send-btn" title="Send"></button>
+                <span class="composer-hint" aria-hidden="true">Ready · <span data-combo="↵">↵</span> to answer</span>
+                <button type="button" id="send-btn" title="Assist · looks at your screen (⌘⇧↵)"><span class="send-label">Send</span><span class="send-hint" aria-hidden="true" data-combo="↵">↵</span></button>
               </div>
             </div>
           </div>
-
         </div><!-- /panel-columns -->
       </div>
 
-      <!-- Transcript history sidebar — slides out from behind the panel's right edge -->
-      <div id="transcript-sidebar" class="transcript-sidebar">
+      <!-- Transcript sidebar: beside the panel (left of it with .left when the screen has no room on the right). Closed, it is click-through. -->
+      <aside id="transcript-sidebar" class="transcript-sidebar" aria-label="Transcript">
         <div class="ts-header">
-          <span class="ts-title">Transcription history</span>
-          <button class="ts-close-btn" id="close-sidebar-btn" title="Close history">✕</button>
+          <span class="ts-title">Transcript</span>
+          <button type="button" class="ts-close-btn" id="close-sidebar-btn" title="Close transcript" aria-label="Close transcript">Close</button>
         </div>
         <div id="ts-list" class="ts-list">
-          <div class="ts-placeholder">Conversation history will appear here when listening.</div>
+          <div class="ts-placeholder">Nothing yet. Start a session and the conversation shows up here.</div>
         </div>
         <div class="ts-footer">
-          <button class="ts-clear-btn" id="clear-transcript-btn" title="Clear all history">Clear History</button>
+          <button type="button" class="btn btn-ghost compact ts-clear-btn" id="clear-transcript-btn" title="Clear the transcript"><span class="ts-clear-label">Clear transcript</span></button>
         </div>
-      </div>
+      </aside>
     </div>
   </div>
 

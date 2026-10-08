@@ -1,0 +1,1452 @@
+/* Overlay: the dark glass toolbar, answer panel, composer and transcript sidebar (#app.theme-overlay).
+ * Colours are semantic tokens (tokens.css); geometry and the flex chain live in layout.css.
+ * Text only: no icons. Every control is a word; shortcuts show as quiet text beside it, and state is
+ * carried by the status dots (live, unread, ok) and the spinner.
+ * Spacing rhythm: toolbar padding 4 / gap 2, label–hint gap 8, panel 14/16, blocks 10, cards 12/14. */
+
+/* ------------------------------------------------------------------ Shared bits */
+#app {
+  color: var(--text-1);
+}
+
+/* ------------------------------------------------------------------ Toolbar */
+#toolbar {
+  position: relative;
+  z-index: var(--z-toolbar);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--toolbar-h);
+  padding: 3px; /* 4px less the 1px border */
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pills);
+  background: var(--bg-surface);
+  box-shadow: var(--frame);
+  cursor: grab;
+}
+
+#toolbar.dragging,
+#toolbar.dragging * {
+  cursor: grabbing;
+}
+
+/* Text buttons: one padding for all, so the pill reads as an even row of words. A shortcut hint follows
+ * its label after an 8px gap. */
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-8);
+  height: var(--control-h);
+  padding: 0 12px;
+  border-radius: var(--radius-pills);
+  color: var(--text-1);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    color var(--dur-fast) var(--ease-std);
+}
+
+.tb-btn:hover:not(:disabled) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+.tb-btn:active:not(:disabled) {
+  background: var(--bg-pressed);
+}
+
+/* The popover toggle shows its open state. (Not every [aria-expanded]: Hide carries it while expanded.) */
+#toolbar #opacity-btn:is(.on, [aria-expanded='true']) {
+  background: var(--bg-pressed);
+  color: var(--text-strong);
+}
+
+/* Quit stays neutral: no red. */
+#toolbar #quit-btn:hover:not(:disabled) {
+  background: var(--bg-pressed);
+  color: var(--text-strong);
+}
+
+/* Groups: session and visibility │ view and help │ quit. The 6px either side also leaves the toolbar
+ * some background to grab for dragging. */
+.tb-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 6px;
+  background: var(--line-strong);
+}
+
+/* Shortcut hints (toolbar and action row): quiet text in the meta role, tabular. The meta line box is
+ * 2px shorter than the control's, so centring alone would lift its baseline 1px above the label's:
+ * the 2px top margin puts both on one baseline. The same holds for Send's hint, the composer's
+ * "Ready" line and the speech status beside the action buttons. */
+.tb-hint,
+.shortcut-hint,
+.send-hint,
+.composer-hint,
+.stt-status {
+  margin-top: 2px;
+}
+
+.tb-hint,
+.shortcut-hint {
+  flex: none;
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tb-hint:empty,
+.shortcut-hint:empty {
+  display: none;
+}
+
+/* Session button: one row of [lead] label hint, 8px apart. The lead holds the live dot (live) or the
+ * spinner (starting) and takes no room while idle. A hidden sizer row, "● End session" and its hint,
+ * shares the grid cell, so idle, starting and live are one width and the toolbar never re-centres;
+ * the visible row centres in it, so the padding stays even and the hint gap stays 8px. */
+#stop-btn {
+  display: inline-grid;
+  place-items: center;
+}
+
+.tb-stop-row {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-8); /* room for the speaking ring (3px) beside the label */
+}
+
+.tb-stop-sizer {
+  visibility: hidden;
+}
+
+.tb-sizer-dot {
+  width: 8px;
+}
+
+/* Sized by what it holds: the 8px dot, or the 11px spinner. */
+.tb-lead {
+  display: inline-grid;
+  place-items: center;
+  height: 12px;
+}
+
+.tb-lead > *,
+.tb-lead::before {
+  grid-area: 1 / 1;
+}
+
+#stop-btn:not(.active, .is-pending) .tb-lead {
+  display: none;
+}
+
+#stop-btn.active:hover:not(:disabled) {
+  background: var(--bg-pressed);
+}
+
+/* Starting: a spinner in the lead ("Starting…", aria-busy). The hint keeps its place, so the width
+ * holds, but steps back: the shortcut waits until the session is up. */
+#stop-btn.is-pending .tb-hint {
+  color: var(--text-disabled);
+}
+
+#stop-btn.is-pending .tb-lead::before {
+  content: '';
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--text-1);
+  border-radius: var(--radius-pills);
+  animation: ui-spin var(--dur-spin) linear infinite;
+}
+
+/* Live dot: idle breathes, speaking adds a 3px ring, an error or a session with no speech-to-text
+ * is a hollow ring. Never red. */
+#live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pills);
+  background: var(--ok);
+}
+
+#live-dot.off {
+  display: none;
+}
+
+#live-dot.idle {
+  animation: ui-breathe var(--dur-breathe) var(--ease-std) infinite;
+}
+
+#live-dot.speaking {
+  outline: 3px solid var(--ok-line);
+  outline-offset: 0;
+}
+
+#live-dot.error {
+  background: transparent;
+  border: 1.5px solid var(--text-1);
+}
+
+/* Hide / Show, and the unread dot while collapsed. */
+.tb-hide {
+  position: relative;
+}
+
+/* "Hide" is about .5em narrower than "Show": the expanded button pads half of that each side, so the
+ * toolbar keeps its width when collapsing and the label–hint gap stays 8px. */
+.tb-hide:not(.collapsed) {
+  padding-inline: calc(12px + 0.26em);
+}
+
+/* A badge on the button's top-right corner, clear of the hint's last glyph; the 2px ring in the
+ * toolbar's own surface cuts it out of the hover fill. */
+.tb-unread {
+  display: none;
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+  background: var(--accent);
+  outline: 2px solid var(--bg-surface);
+  pointer-events: none;
+}
+
+.tb-hide.has-unread .tb-unread {
+  display: block;
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+/* Opacity popover: one 36px row above the toolbar (the 4px toolbar inset + an 8px gap). */
+.tb-opacity-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.opacity-popover {
+  position: absolute;
+  bottom: calc(100% + var(--spacing-12));
+  left: 50%;
+  translate: -50% 0;
+  z-index: var(--z-popover);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+  width: 200px;
+  height: var(--toolbar-h);
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cards);
+  background: var(--bg-popover);
+  box-shadow: var(--frame);
+  cursor: default;
+  animation: ui-fade-in var(--dur-fast) var(--ease-out);
+}
+
+.opacity-label {
+  flex: none;
+  color: var(--text-2);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+}
+
+#tb-opacity-value {
+  flex: none;
+  min-width: 32px;
+  color: var(--text-1);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Range slider: an achromatic track whose filled part follows --pct (set with the value). */
+.opacity-popover input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.opacity-popover input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-pills);
+  background: linear-gradient(
+    to right,
+    var(--text-2) 0 var(--pct, 100%),
+    var(--line-strong) var(--pct, 100%) 100%
+  );
+}
+
+.opacity-popover input[type='range']::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: var(--radius-pills);
+  background: var(--text-strong);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.opacity-popover input[type='range']:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Toast: centred under the toolbar, inside the main column, one line with an ellipsis (full text in title). */
+#toast {
+  display: none;
+  position: absolute;
+  top: calc(100% + var(--spacing-6));
+  left: 50%;
+  translate: -50% 0;
+  width: max-content;
+  max-width: 560px;
+  padding: 5px 13px; /* 16px line + 10px + 2px border = 28px */
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pills);
+  background: var(--bg-popover);
+  box-shadow: var(--frame);
+  color: var(--text-1);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  cursor: default;
+}
+
+#toast.show {
+  display: block;
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+/* While a toast shows, the panel moves down by the toast's height and gap (instantly, like the popover
+ * shift), so the toast never covers the question line or a card. --toast-h is the 28px pill. */
+#app {
+  --toast-h: 28px;
+}
+
+#app:has(#toast.show) > #panel-wrap {
+  margin-top: calc(var(--toast-h) + var(--spacing-6) * 2);
+}
+
+#toast[data-tone='ok']::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  vertical-align: 1px;
+  border-radius: var(--radius-pills);
+  background: var(--ok);
+}
+
+/* ------------------------------------------------------------------ Panel */
+#panel {
+  padding: 13px 15px; /* 14/16 less the 1px border */
+  border: 1px solid var(--line);
+  border-radius: var(--radius-product-mockup);
+  background: var(--bg-surface);
+  box-shadow: var(--frame);
+  animation: ui-rise-in var(--dur-slow) var(--ease-out);
+}
+
+/* Collapsed: the panel (with the sidebar, banner and status) goes; the toolbar, its dots and the toast stay. */
+#panel-wrap.collapsed {
+  display: none;
+}
+
+/* The scrollbar sits in the panel's right padding, so the text column keeps its width. */
+#messages {
+  margin-right: -11px;
+  padding-right: 11px;
+}
+
+/* A scrolled log fades out at the edge that cuts through content (set by chat.js on scroll).
+ * Only the mask's alpha matters; --text-strong is just an opaque colour. */
+#messages.fade-top,
+.ts-list.fade-top {
+  mask-image: linear-gradient(to bottom, transparent 0, var(--text-strong) 20px);
+}
+
+#messages.fade-bottom,
+.ts-list.fade-bottom {
+  mask-image: linear-gradient(to top, transparent 0, var(--text-strong) 20px);
+}
+
+#messages.fade-top.fade-bottom,
+.ts-list.fade-top.fade-bottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--text-strong) 20px,
+    var(--text-strong) calc(100% - 20px),
+    transparent 100%
+  );
+}
+
+/* ------------------------------------------------------------------ Empty state */
+#messages:not(:empty) + #empty-state {
+  display: none;
+}
+
+.empty-state {
+  padding: 2px 0 4px;
+}
+
+.es-variant {
+  display: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--spacing-12);
+  row-gap: var(--spacing-14);
+}
+
+/* setup › no speech-to-text › listening (or mic only) › ready.
+ * data-capture is off | on | no-stt (capture running with nothing to transcribe it). */
+#panel[data-setup='true'] .es-setup,
+#panel:not([data-setup='true'])[data-listen='none'] .es-audio,
+#panel:not([data-setup='true'])[data-capture='no-stt'] .es-audio,
+#panel:not([data-setup='true'])[data-listen='ready'][data-capture='on'] .es-listening,
+#panel:not([data-setup='true'])[data-listen='mic-only'][data-capture='on'] .es-mic-only,
+#panel:not([data-setup='true']):not([data-listen='none'])[data-capture='off'] .es-ready {
+  display: grid;
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+.es-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.es-title {
+  color: var(--text-strong);
+  font: var(--type-title-sm);
+  letter-spacing: var(--type-title-sm-track);
+}
+
+.es-body {
+  color: var(--text-2);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+}
+
+/* Listening (and microphone only): the breathing live dot leads the line. */
+.es-listening,
+.es-mic-only {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--spacing-10);
+}
+
+.es-listening .es-body,
+.es-mic-only .es-body {
+  color: var(--text-1);
+}
+
+.es-live-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px; /* centred on the first 20px line */
+  border-radius: var(--radius-pills);
+  background: var(--ok);
+  animation: ui-breathe var(--dur-breathe) var(--ease-std) infinite;
+}
+
+/* Keycap rows: one list, keys in their own column so the labels line up (Windows keycaps such as
+ * "Ctrl Shift Enter" are too wide for two pairs per line). */
+.es-keys {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--spacing-8) var(--spacing-12);
+  margin: 0;
+  padding-top: var(--spacing-12);
+  border-top: 1px solid var(--line);
+}
+
+.es-key {
+  display: contents;
+}
+
+.es-key dt {
+  display: inline-flex;
+  gap: var(--spacing-4);
+}
+
+/* macOS symbol keycaps (⌘ ⇧ ↵): the mono stack has no such glyphs, and a fallback's are tiny, so they
+ * take the meta role's sans stack, which reaches the system's own symbols (as the toolbar hints do). */
+.theme-overlay .kbd-sym {
+  padding-top: 2px; /* the sans line box sits the symbols about 1px high in the 22px cap */
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+.es-key dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------------ Answers */
+.response-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  animation: ui-rise-in var(--dur-base) var(--ease-out);
+}
+
+.response-group + .response-group {
+  margin-top: var(--spacing-14);
+  padding-top: var(--spacing-14);
+  border-top: 1px solid var(--line);
+}
+
+/* Meta row: the question as a quiet line, the category pill and the time. */
+.rg-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-8);
+  min-width: 0;
+}
+
+.user-bubble {
+  display: -webkit-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: var(--spacing-10);
+  border-left: 2px solid var(--line-strong);
+  overflow: hidden;
+  color: var(--text-2);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.user-bubble:empty {
+  display: none;
+}
+
+.category-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pills);
+  background: var(--bg-layer);
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+.category-pill:empty {
+  display: none;
+}
+
+.response-sep {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-3);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-text {
+  min-width: 0;
+  color: var(--text-answer);
+  font: var(--type-answer);
+  letter-spacing: var(--type-answer-track);
+  overflow-wrap: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+  transition: color var(--dur-slow) var(--ease-std);
+}
+
+/* An error with no partial answer shows only the error block. */
+.ai-text:empty:not(.is-thinking) {
+  display: none;
+}
+
+.ai-text.small {
+  font: var(--type-lede);
+  letter-spacing: var(--type-lede-track);
+}
+
+.ai-text > * + * {
+  margin-top: var(--spacing-10);
+}
+
+.ai-text p,
+.ai-text ul,
+.ai-text ol,
+.ai-text pre {
+  margin-bottom: 0;
+}
+
+.ai-text ul,
+.ai-text ol {
+  margin-top: 0;
+  padding-left: 22px;
+}
+
+.ai-text > * + ul,
+.ai-text > * + ol,
+.ai-text > * + pre {
+  margin-top: var(--spacing-10);
+}
+
+.ai-text li + li {
+  margin-top: var(--spacing-6);
+}
+
+.ai-text li::marker {
+  color: var(--text-3);
+}
+
+.ai-text strong {
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.ai-text h3 {
+  color: var(--text-strong);
+  font: var(--type-title-sm);
+  letter-spacing: var(--type-title-sm-track);
+}
+
+/* Inline code: --type-code-answer inside the 20px answer, --type-code in 14px and 16px text. */
+.ai-text code {
+  padding: 1px 5px;
+  border-radius: var(--radius-buttons);
+  background: var(--bg-layer);
+  color: var(--text-strong);
+  font: var(--type-code-answer);
+  letter-spacing: var(--type-code-answer-track);
+}
+
+.ai-text.small code,
+.ai-text.cards code,
+.ai-text.is-thinking code,
+.ai-error-msg code {
+  font: var(--type-code);
+  letter-spacing: var(--type-code-track);
+}
+
+/* Code blocks: --type-code on the well. */
+.ai-text pre {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cards);
+  background: var(--bg-well);
+  overflow-x: auto;
+  color: var(--text-1);
+  font: var(--type-code);
+  letter-spacing: var(--type-code-track);
+}
+
+.ai-text pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+/* Older answers step back once a newer one arrives. */
+.response-group.older .ai-text,
+.response-group.older .ai-text strong,
+.response-group.older .ai-text h3 {
+  color: var(--text-2);
+}
+
+/* Thinking: the mode's label (data-label) fades in after --delay-label with a shimmer; ".still-working" after 8s. */
+.ai-text.is-thinking {
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+}
+
+.ai-text.is-thinking::before {
+  content: attr(data-label);
+  display: inline-block;
+  background: linear-gradient(
+    90deg,
+    var(--text-3) 0 38%,
+    var(--text-strong) 50%,
+    var(--text-3) 62% 100%
+  );
+  background-size: 200% 100%;
+  background-position: 150% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation:
+    ui-fade-in var(--dur-base) var(--ease-out) var(--delay-label) both,
+    ui-shimmer var(--dur-shimmer) linear infinite;
+}
+
+.ai-text.is-thinking.still-working::before {
+  content: attr(data-label) ' · still working';
+}
+
+/* Streaming caret: 2px, Signal Blue. */
+.ai-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.14em;
+  background: var(--accent);
+  animation: ui-caret var(--dur-caret) steps(1) infinite;
+}
+
+/* Error: hairline callout, no tint: the eyebrow names it, the message explains, one fix button acts.
+ * The partial answer above it is kept. */
+.ai-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  padding: 11px 13px;
+  border: 1px solid var(--danger-line);
+  border-radius: var(--radius-cards);
+  background: var(--danger-bg);
+}
+
+.ai-error-eyebrow {
+  color: var(--danger);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+}
+
+.ai-error-msg {
+  color: var(--text-1);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.ai-fix-row {
+  display: flex;
+  gap: var(--spacing-8);
+  margin-top: var(--spacing-6);
+}
+
+.ai-fix-row:empty {
+  display: none;
+}
+
+/* Structured answers (résumé analysis): one card per section. */
+.ai-text.cards {
+  color: var(--text-1);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+}
+
+.ai-text.cards > * + * {
+  margin-top: var(--spacing-8);
+}
+
+.ai-card {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cards);
+  background: var(--bg-tint);
+  animation: ui-rise-in var(--dur-base) var(--ease-out);
+}
+
+.ai-text.cards h3 {
+  color: var(--text-2);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+}
+
+/* While streaming, before the sections become cards. */
+.ai-text.cards > h3:not(:first-child) {
+  margin-top: var(--spacing-14);
+}
+
+.ai-card h3 {
+  margin: 0 0 var(--spacing-6);
+}
+
+.ai-card > * + * {
+  margin-top: var(--spacing-6);
+}
+
+.ai-card ul {
+  padding-left: 18px;
+}
+
+.ai-card li + li {
+  margin-top: var(--spacing-4);
+}
+
+.ai-card .num,
+.ai-card strong {
+  color: var(--text-strong);
+}
+
+/* Copy / Save as Markdown… (26px) and the "From your notes" source chips. */
+.ai-actions,
+.ai-sources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-6);
+}
+
+.ai-action.btn {
+  min-height: 26px;
+  padding: 0 11px;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+}
+
+.ai-sources-label {
+  margin-right: var(--spacing-4);
+  color: var(--text-3);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+.ai-source.tag {
+  max-width: 260px;
+  color: var(--text-1);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-std);
+}
+
+.ai-source-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-source.tag:hover:not(:disabled) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+/* ------------------------------------------------------------------ Banner (#onscreenly-status) */
+#onscreenly-status {
+  display: none;
+  align-items: center;
+  gap: var(--spacing-10);
+  min-height: 42px;
+  padding: 7px 7px 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cards);
+  background: var(--bg-tint);
+  color: var(--text-1);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#onscreenly-status.show {
+  display: flex;
+  animation: ui-rise-in var(--dur-base) var(--ease-out);
+}
+
+#onscreenly-status[data-tone='warn'] {
+  border-color: var(--warn-line);
+  background: var(--warn-bg);
+}
+
+#onscreenly-status[data-tone='error'] {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+}
+
+.banner-msg {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Warn and error read through their ink and line (achromatic by default), not an icon. */
+#onscreenly-status[data-tone='warn'] .banner-msg {
+  color: var(--warn);
+}
+
+#onscreenly-status[data-tone='error'] .banner-msg {
+  color: var(--danger);
+}
+
+.banner-action.btn {
+  flex: none;
+  min-height: 26px;
+  padding: 0 11px;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+}
+
+/* "Dismiss": a quiet text button, the height of the action beside it. */
+.banner-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-buttons);
+  color: var(--text-2);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    color var(--dur-fast) var(--ease-std);
+}
+
+.banner-close:hover:not(:disabled) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+/* ------------------------------------------------------------------ Action row */
+#action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+
+.act {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-8);
+  height: var(--control-h);
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-buttons);
+  color: var(--text-1);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    color var(--dur-fast) var(--ease-std),
+    opacity var(--dur-fast) var(--ease-std);
+}
+
+.act:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+.act:active:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-pressed);
+}
+
+.act-primary {
+  border-color: var(--line);
+  background: var(--bg-tint);
+}
+
+.act:disabled,
+.act[aria-disabled='true'] {
+  opacity: 0.5;
+}
+
+/* When the row runs out of room (Windows key names, a long status), the hints go first: Assist's, then
+ * Say's (set by chat.js from scrollWidth). The buttons' titles still name the shortcuts. */
+#action-row.drop-assist-hint .act-secondary .shortcut-hint,
+#action-row.drop-hints .shortcut-hint {
+  display: none;
+}
+
+/* Speech status: right-aligned, a 6px dot and a short label. Hidden while off. */
+.stt-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-6);
+  margin-left: auto;
+  padding-right: 2px;
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  white-space: nowrap;
+}
+
+.stt-status.stt-disconnected {
+  display: none;
+}
+
+.stt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+  background: var(--icon);
+}
+
+.stt-connecting .stt-dot,
+.stt-loading .stt-dot,
+.stt-stopping .stt-dot {
+  animation: ui-breathe var(--dur-breathe) var(--ease-std) infinite;
+}
+
+.stt-streaming .stt-dot,
+.stt-local .stt-dot,
+.stt-batch .stt-dot {
+  background: var(--ok);
+}
+
+/* Not transcribing: the label turns strong and the dot becomes a hollow ring, like the live dot's. */
+.stt-error,
+.stt-unavailable {
+  color: var(--text-1);
+}
+
+.stt-error .stt-dot,
+.stt-unavailable .stt-dot {
+  background: transparent;
+  border: 1.5px solid var(--text-1);
+}
+
+/* ------------------------------------------------------------------ Composer */
+#composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-10);
+  padding: 11px; /* 12px less the 1px border */
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-inputs);
+  background: var(--bg-well);
+  box-shadow: var(--field-shadow);
+  cursor: text;
+  transition:
+    border-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std);
+}
+
+/* Speech fill: a muted green edge. Accumulating breathes; ready adds the hint and the Send ring. */
+#composer.stt-filling,
+#composer.stt-ready {
+  border-color: var(--ok-line);
+}
+
+#composer.stt-accumulating::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid var(--ok-line);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: ui-breathe var(--dur-breathe) var(--ease-std) infinite;
+}
+
+#composer.stt-dimmed #input-area {
+  opacity: 0.55;
+}
+
+#composer:focus-within {
+  border-color: var(--selected-line);
+  box-shadow: var(--focus-halo), var(--field-shadow);
+}
+
+/* Focus keeps the speech edge: the halo shows focus, the border keeps saying where the text came from.
+ * (After ↵ answers a question, focus stays in #input while the next one fills.) */
+#composer:is(.stt-filling, .stt-ready):focus-within {
+  border-color: var(--ok-line);
+}
+
+#composer.stt-accumulating:focus-within {
+  border-color: var(--line-strong);
+}
+
+#input-area {
+  position: relative;
+  min-height: 20px;
+}
+
+#placeholder,
+.input-ghost {
+  position: absolute;
+  inset: 0 0 auto;
+  overflow: hidden;
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+#placeholder {
+  color: var(--text-3);
+}
+
+/* Live speech (approval 7): the other side's words as one upright line until they settle, led by a
+ * breathing live dot. Long speech keeps its newest words in view (the ellipsis goes at the start). */
+.input-ghost {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  color: var(--text-2);
+}
+
+.input-ghost::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+  background: var(--ok);
+  animation: ui-breathe var(--dur-breathe) var(--ease-std) infinite;
+}
+
+.ghost-text {
+  min-width: 0;
+  overflow: hidden;
+  direction: rtl;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ghost-text > span {
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
+#input {
+  display: block;
+  width: 100%;
+  min-height: 20px;
+  max-height: 100px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  background: transparent;
+  color: var(--text-1);
+  caret-color: var(--accent);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+}
+
+/* The composer frame shows focus instead. */
+#input:focus-visible {
+  outline: none;
+}
+
+#composer-bottom {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  cursor: default;
+}
+
+#history-btn[aria-expanded='true'] {
+  background: var(--bg-pressed);
+  color: var(--text-strong);
+}
+
+.composer-hint {
+  display: none;
+  margin-right: var(--spacing-4);
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  white-space: nowrap;
+}
+
+#composer.stt-ready .composer-hint {
+  display: inline;
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+/* Send: a Signal Blue pill, "Send" and its key, always (approval 13). Empty, it runs Assist (the title
+ * says so). */
+#send-btn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-6);
+  height: var(--control-h);
+  padding: 0 12px;
+  border-radius: var(--radius-pills);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std);
+}
+
+.send-hint {
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+}
+
+#send-btn:hover:not(:disabled) {
+  box-shadow: var(--accent-hover-shadow);
+}
+
+#send-btn:active:not(:disabled) {
+  background: var(--accent-press);
+  box-shadow: none;
+}
+
+/* With no AI provider, "Open settings" in the empty state is the one accent: Send waits in neutral
+ * (it still runs and explains what is missing). */
+#panel[data-setup='true'] #send-btn {
+  background: var(--bg-pressed);
+  color: var(--text-1);
+}
+
+#panel[data-setup='true'] #send-btn .send-hint {
+  color: var(--text-2);
+}
+
+#panel[data-setup='true'] #send-btn:hover:not(:disabled) {
+  background: var(--bg-layer);
+  box-shadow: none;
+  color: var(--text-strong);
+}
+
+#send-btn.ready:not(:focus-visible) {
+  outline: 3px solid var(--selected-bg);
+  outline-offset: 0;
+}
+
+/* Busy: a spinner over the label; the label keeps its room so Send never changes width. It is only
+ * transparent, not hidden, so "Send" stays the button's accessible name. */
+#send-btn.busy {
+  cursor: default;
+}
+
+#send-btn.busy > * {
+  opacity: 0;
+}
+
+#send-btn.busy::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 12px;
+  height: 12px;
+  margin: auto;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  border-radius: var(--radius-pills);
+  animation: ui-spin var(--dur-spin) linear infinite;
+}
+
+/* ------------------------------------------------------------------ Transcript sidebar */
+.transcript-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-product-mockup);
+  background: var(--bg-surface);
+  box-shadow: var(--frame);
+  color: var(--text-1);
+}
+
+/* Closed, it is invisible and click-through (wins over layout.css's pointer-events: auto by layer order). */
+.transcript-sidebar:not(.open) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.transcript-sidebar.open {
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+.ts-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+  margin: -2px -4px 10px 0;
+}
+
+.ts-title {
+  color: var(--text-strong);
+  font: var(--type-strong-sm);
+  letter-spacing: var(--type-strong-sm-track);
+}
+
+/* "Close": a quiet 24px text button. */
+.ts-close-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-buttons);
+  color: var(--text-2);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    color var(--dur-fast) var(--ease-std);
+}
+
+.ts-close-btn:hover:not(:disabled) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+.ts-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacing-14);
+  min-height: 0;
+  margin-right: -11px;
+  padding-right: 11px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.ts-turn {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  row-gap: 3px;
+  -webkit-user-select: text;
+  user-select: text;
+  animation: ui-fade-in var(--dur-base) var(--ease-out);
+}
+
+.ts-channel {
+  color: var(--text-3);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+}
+
+.ts-time {
+  color: var(--text-3);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+}
+
+.ts-text {
+  grid-column: 1 / -1;
+  color: var(--text-1);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+}
+
+.ts-you .ts-text,
+.ts-interim {
+  color: var(--text-2);
+}
+
+.ts-placeholder {
+  margin: auto 0;
+  padding: 0 12px;
+  color: var(--text-3);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  text-align: center;
+}
+
+.ts-footer {
+  flex-shrink: 0;
+  margin-top: var(--spacing-10);
+  padding-top: var(--spacing-10);
+  border-top: 1px solid var(--line);
+}
+
+.ts-clear-btn.btn {
+  padding: 0 10px;
+  margin-left: -6px;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+}
+
+/* Two-step clear: the first click asks again for 3s. No red. */
+.ts-clear-btn.confirm {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+/* ------------------------------------------------------------------ System settings */
+@media (prefers-reduced-motion: reduce) {
+  #live-dot.idle,
+  .es-live-dot,
+  .input-ghost::before,
+  .stt-dot,
+  #composer.stt-accumulating::before,
+  .ai-caret {
+    animation: none;
+  }
+
+  .ai-text.is-thinking::before {
+    animation: none;
+    background: none;
+    color: var(--text-2);
+  }
+}
+
+@media (forced-colors: active) {
+  #live-dot,
+  .stt-dot,
+  .tb-unread,
+  .input-ghost::before,
+  .es-live-dot,
+  .ai-caret {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  #live-dot.error {
+    background: Canvas;
+    border-color: CanvasText;
+  }
+
+  .tb-unread {
+    outline-color: Canvas;
+  }
+
+  .transcript-sidebar,
+  #onscreenly-status,
+  .opacity-popover,
+  #toast {
+    border: 1px solid CanvasText;
+  }
+
+  .ai-text.is-thinking::before {
+    background: none;
+    color: CanvasText;
+  }
+}

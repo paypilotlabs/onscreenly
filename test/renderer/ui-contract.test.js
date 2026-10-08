@@ -199,6 +199,97 @@ test('the click-through ids cover every id that CSS gives pointer events', () =>
   assert.deepEqual(missing, [], 'add these to the closest() list in renderer/js/window-behaviour.js');
 });
 
+// #app is click-through (pointer-events: none) and exactly these six take the mouse. Any other
+// UI must sit inside one of them.
+const CLICK_TARGETS = [
+  'toolbar',
+  'panel-wrap',
+  'transcript-sidebar',
+  'settings-scrim',
+  'onboard-scrim',
+  'consent-scrim'
+];
+
+test('layout.css gives the mouse to exactly the six ids that window-behaviour.js keeps clickable', () => {
+  const layout = readCss(path.join(RENDERER, 'css', 'layout.css'));
+  const pointer = (rule) => rule.declarations.find((d) => d.prop === 'pointer-events');
+  const app = layout.rules.filter((r) => r.selector === '#app' && pointer(r));
+  assert.equal(app.length, 1, 'one #app pointer-events rule');
+  assert.equal(pointer(app[0]).value, 'none', '#app lets the mouse through');
+  const ids = [];
+  for (const rule of layout.rules.filter((r) => pointer(r) && pointer(r).value === 'auto')) {
+    for (const selector of splitSelectorList(rule.selector)) {
+      assert.match(selector, /^#[\w-]+$/, `layout.css:${rule.line} names a bare id, not "${selector}"`);
+      ids.push(selector.slice(1));
+    }
+  }
+  assert.deepEqual([...ids].sort(), [...CLICK_TARGETS].sort());
+  assert.deepEqual([...clickThroughIds()].sort(), [...CLICK_TARGETS].sort());
+});
+
+// Layers in the order styles.css declares them, and the layer each css/*.css file is imported into.
+function layerOrder() {
+  const styles = readCss(path.join(RENDERER, 'styles.css'));
+  const order = styles.statements
+    .find((st) => st.name === 'layer')
+    .prelude.split(',')
+    .map((s) => s.trim());
+  const fileLayer = new Map();
+  for (const st of styles.statements.filter((x) => x.name === 'import')) {
+    const m = /^url\(\s*'css\/([\w-]+)\.css'\s*\)\s+layer\(\s*([\w-]+)\s*\)$/.exec(st.prelude);
+    if (m) fileLayer.set(`renderer/css/${m[1]}.css`, m[2]);
+  }
+  return { order, fileLayer };
+}
+
+test('the closed transcript sidebar is click-through, winning over layout.css by layer order', () => {
+  const sidebar = querySelectorAll(index.root, '#transcript-sidebar');
+  assert.equal(sidebar.length, 1);
+  assert.ok(classesOf(sidebar[0]).includes('transcript-sidebar'));
+
+  const { order, fileLayer } = layerOrder();
+  assert.ok(order.indexOf('layout') < order.indexOf('overlay'), 'overlay must come after layout');
+  const closed = readCss(path.join(RENDERER, 'css', 'overlay.css')).rules.filter(
+    (r) => r.selector === '.transcript-sidebar:not(.open)' && r.context.length === 0
+  );
+  assert.equal(closed.length, 1, 'overlay.css has one .transcript-sidebar:not(.open) rule');
+  assert.deepEqual(
+    closed[0].declarations.filter((d) => d.prop === 'pointer-events').map((d) => d.value),
+    ['none']
+  );
+
+  // Nothing in overlay or a later layer hands the sidebar the mouse again, except while it is open.
+  const from = order.indexOf('overlay');
+  for (const file of rendererCssFiles()) {
+    const layer = fileLayer.get(relative(file));
+    if (!layer || order.indexOf(layer) < from) continue;
+    for (const rule of readCss(file).rules) {
+      if (!rule.declarations.some((d) => d.prop === 'pointer-events' && d.value !== 'none')) continue;
+      for (const selector of splitSelectorList(rule.selector)) {
+        const parts = parseComplex(selector);
+        const subject = parts[parts.length - 1].compound;
+        if (subject.id !== 'transcript-sidebar' && !subject.classes.includes('transcript-sidebar')) continue;
+        assert.ok(
+          subject.classes.includes('open'),
+          `${relative(file)}:${rule.line} "${selector}" takes the mouse while closed`
+        );
+      }
+    }
+  }
+});
+
+test('#app carries the overlay theme, and no theme class sits on html, body or a scrim', () => {
+  assert.deepEqual(
+    querySelectorAll(index.root, '.theme-overlay').map((el) => el.attrs.id),
+    ['app']
+  );
+  for (const selector of ['html', 'body', '#settings-scrim', '#onboard-scrim', '#consent-scrim']) {
+    for (const el of querySelectorAll(index.root, selector)) {
+      assert.ok(!classesOf(el).some((k) => k.startsWith('theme-')), `${selector} carries a theme class`);
+    }
+  }
+});
+
 test('--main-w and --side-w match MAIN_W and SIDE_W in app/main/window.js', () => {
   const windowJs = fs.readFileSync(path.join(ROOT, 'app', 'main', 'window.js'), 'utf8');
   const constant = (name) => {

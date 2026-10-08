@@ -1,0 +1,288 @@
+/* Shared controls: explicit classes only (.btn*, .chip, .tag, .field, .kbd and their states).
+ * Every value is a semantic token, so each control renders correctly in both themes. Text only: no icons. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-6);
+  min-height: var(--btn-h);
+  padding: 9px 19px; /* 10px 20px less the 1px border = 34px */
+  border: 1px solid transparent;
+  border-radius: var(--radius-buttons);
+  font: var(--type-button);
+  letter-spacing: var(--type-button-track);
+  white-space: nowrap;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std),
+    color var(--dur-fast) var(--ease-std);
+}
+
+.btn.compact {
+  min-height: var(--btn-h-compact);
+  padding: 7px 15px; /* 8px 16px less the border = 30px */
+}
+
+.btn-primary {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover:not(:disabled, [aria-disabled='true']) {
+  box-shadow: var(--accent-hover-shadow);
+}
+
+.btn-primary:active:not(:disabled, [aria-disabled='true']) {
+  background: var(--accent-press);
+  box-shadow: none;
+}
+
+.btn-secondary,
+.btn-danger {
+  background: var(--bg-surface);
+  border-color: var(--line-strong);
+  color: var(--text-nav);
+}
+
+.btn-secondary:hover:not(:disabled, [aria-disabled='true']),
+.btn-danger:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-layer);
+  color: var(--text-strong);
+}
+
+.btn-secondary:active:not(:disabled, [aria-disabled='true']),
+.btn-danger:active:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-pressed);
+}
+
+.btn-danger {
+  color: var(--danger);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.btn-ghost:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-layer);
+  color: var(--text-1);
+}
+
+.btn-ghost:active:not(:disabled, [aria-disabled='true']) {
+  background: var(--bg-pressed);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  background: var(--bg-layer);
+  border-color: transparent;
+  color: var(--text-disabled);
+  box-shadow: none;
+}
+
+.btn-ghost:disabled,
+.btn-ghost[aria-disabled='true'] {
+  background: transparent;
+}
+
+/* A disabled secondary keeps its surface and hairline and only loses its text colour: a filled
+ * disabled state reads heavier than the secondary at rest, most of all on a Frost card. */
+.btn-secondary:disabled,
+.btn-secondary[aria-disabled='true'],
+.btn-danger:disabled,
+.btn-danger[aria-disabled='true'] {
+  background: var(--bg-surface);
+  border-color: var(--line-strong);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  height: var(--control-h);
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pills);
+  background: var(--bg-layer);
+  color: var(--text-nav);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    border-color var(--dur-fast) var(--ease-std);
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--bg-pressed);
+  color: var(--text-strong);
+}
+
+.chip[aria-pressed='true'],
+.chip.on {
+  background: var(--selected-bg);
+  border-color: var(--selected-line);
+  color: var(--text-strong);
+}
+
+.chip:disabled {
+  color: var(--text-disabled);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pills);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag.is-ok {
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+
+.tag .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+  background: currentColor;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  min-height: var(--field-h);
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-inputs);
+  background: var(--bg-well);
+  box-shadow: var(--field-shadow);
+  color: var(--text-1);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+  transition:
+    border-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std);
+}
+
+textarea.field {
+  padding: 9px 11px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field::placeholder {
+  color: var(--text-3);
+  opacity: 1;
+}
+
+.field:hover:not(:disabled, :focus) {
+  border-color: var(--line-strong);
+}
+
+.field:focus,
+.field:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-halo), var(--field-shadow);
+}
+
+.field[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.field:disabled {
+  color: var(--text-disabled);
+}
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-buttons);
+  background: var(--bg-layer);
+  color: var(--text-1);
+  font: var(--type-kbd);
+  letter-spacing: var(--type-kbd-track);
+}
+
+
+/* Checkbox: a 16px box; checked, an accent fill with an on-accent check. Its edge uses --icon, not
+ * the Bone hairline: at 16px a Bone edge on Chalk all but disappears. */
+.check {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--icon);
+  border-radius: var(--radius-buttons);
+  background: var(--bg-well);
+  box-shadow: var(--field-shadow);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    border-color var(--dur-fast) var(--ease-std);
+}
+
+.check::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: var(--on-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 12px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 12px no-repeat;
+  opacity: 0;
+}
+
+.check:hover:not(:disabled, :checked) {
+  border-color: var(--icon-solo);
+}
+
+.check:checked {
+  border-color: var(--accent-fill);
+  background: var(--accent-fill);
+  box-shadow: none;
+}
+
+.check:checked::before {
+  opacity: 1;
+}
+
+.check:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-halo), var(--field-shadow);
+}
+
+.check:checked:focus-visible {
+  box-shadow: var(--focus-halo);
+}
+
+.check:disabled {
+  border-color: var(--line-strong);
+  background: var(--bg-layer);
+  box-shadow: none;
+  cursor: default;
+}
+
+.check:disabled::before {
+  background: var(--text-disabled);
+}

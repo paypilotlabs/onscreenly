@@ -1,10 +1,10 @@
 // Boot: load settings and state from main, then paint the UI.
 import { state } from './state.js';
-import { $, isWindows, onscreenly, setSessionButton } from './core.js';
-import { placeholder, smartBtn, syncPlaceholder, updateSendButtonState } from './composer.js';
+import { isWindows, onscreenly, setSessionButton } from './core.js';
+import { smartBtn, syncPlaceholder, updateSendButtonState } from './composer.js';
 import { applyOpacity } from './toolbar.js';
+import { setLiveDotState } from './transcript.js';
 import { updateSmartTooltip } from './settings-panel.js';
-import { showExample } from './settings-save.js';
 import { OB_STEPS, publikStep, showOnboard } from './onboarding.js';
 
 export function init() {
@@ -17,22 +17,6 @@ export function init() {
     // onboarding card. With one, the "Connect an AI provider" card becomes the
     // publik disclosure; the BYO branch stays one tap away on that card.
     if (state.publikState.available) OB_STEPS.splice(2, 1, { ...publikStep(), publik: true });
-
-    // R4: shortcut hints
-    const sayHintEl = document.getElementById('say-shortcut-hint');
-    const assistHintEl = document.getElementById('assist-shortcut-hint');
-    if (sayHintEl) sayHintEl.textContent = isWindows ? 'Ctrl+↵' : '⌘↵';
-    if (assistHintEl) assistHintEl.textContent = isWindows ? 'Ctrl+Shift+↵' : '⌘⇧↵';
-    const sayBtn = document.querySelector('.act[data-mode="say"]');
-    const assistBtn = document.querySelector('.act[data-mode="assist"]');
-    if (sayBtn)
-      sayBtn.title = isWindows
-        ? 'Suggests what to say next based on the conversation (Ctrl+Enter)'
-        : 'Suggests what to say next based on the conversation (⌘↵)';
-    if (assistBtn)
-      assistBtn.title = isWindows
-        ? 'Scans your screen and conversation to decide what you need (Ctrl+Shift+Enter)'
-        : 'Scans your screen and conversation to decide what you need (⌘⇧↵)';
 
     // R6: smart tooltip
     updateSmartTooltip();
@@ -49,20 +33,14 @@ export function init() {
     }
 
     smartBtn.classList.toggle('on', !!state.settings.smart);
-    showExample();
+    smartBtn.setAttribute('aria-pressed', String(!!state.settings.smart));
     syncPlaceholder();
     updateSendButtonState(); // Initialize send button state
-
-    // Fix placeholder shortcut hint to match platform
-    if (isWindows) {
-      placeholder.innerHTML =
-        'Ask about your screen or conversation, or <span class="keycap">Ctrl</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist';
-    }
 
     applyOpacity(state.settings.opacity, false);
 
     const st = await onscreenly.captureState();
-    $('#live-dot').classList.toggle('off', !st.active);
+    setLiveDotState(st.active ? 'idle' : 'off');
     setSessionButton(st.active);
     if (!state.settings.onboarded) showOnboard();
   })();

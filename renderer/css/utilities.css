@@ -1,0 +1,28 @@
+/* Utilities. This layer comes after every component layer, so .hidden wins without !important. */
+.hidden {
+  display: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}

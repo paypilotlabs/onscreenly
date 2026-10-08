@@ -1,4 +1,4 @@
-// The answer panel: markdown rendering, streaming answers, busy state, transcript interim, toasts and mode buttons.
+// The answer panel: answer groups, markdown rendering, streaming answers, busy state, toasts and mode buttons.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
 
@@ -130,27 +130,79 @@ function groupIntoCards(el) {
   }
 }
 
-function clearMessages() {
-  messages.innerHTML = '';
-  state.aiEl = null;
-  state.caretEl = null;
+function createEl(tag, className, text) {
+  const node = document.createElement(tag);
+  node.className = className;
+  if (text) node.textContent = text;
+  return node;
 }
 
-function addUserBubble(text) {
-  const b = document.createElement('div');
-  b.className = 'user-bubble';
-  b.textContent = text;
-  messages.appendChild(b);
+// ---- scrolling -----------------------------------------------------------
+// The log follows the newest answer until its question reaches the top, then stops, so a long
+// answer is read from its start. Scrolling by hand takes over until the next answer. A finished
+// answer that only just overflows shows its end, so its card actions or sources stay in view.
+let following = true;
+
+// Where a group's question line starts (below the hairline that separates it from the previous one).
+function groupTop(group) {
+  const pad = group.previousElementSibling ? parseFloat(getComputedStyle(group).paddingTop) || 0 : 0;
+  return group.offsetTop - messages.offsetTop + pad;
 }
 
-function startAi(small) {
-  state.aiEl = document.createElement('div');
-  state.aiEl.className = 'ai-text' + (small ? ' small' : '');
+function followNewest() {
+  const group = messages.lastElementChild;
+  if (following && group) {
+    const max = messages.scrollHeight - messages.clientHeight;
+    const top = groupTop(group);
+    const showEnd = group.dataset.state === 'done' && max - top <= 48;
+    messages.scrollTop = Math.max(0, showEnd ? max : Math.min(top, max));
+  }
+  updateFades(messages);
+}
+
+// A scrolled list fades out at the edge that cuts through content (not at the top of the log when
+// an answer starts exactly there).
+function updateFades(list) {
+  const max = list.scrollHeight - list.clientHeight;
+  const top = list.scrollTop;
+  let fadeTop = top > 1;
+  if (fadeTop && list === messages) {
+    fadeTop = ![...messages.querySelectorAll('.response-group')].some((g) => Math.abs(groupTop(g) - top) < 2);
+  }
+  list.classList.toggle('fade-top', fadeTop);
+  list.classList.toggle('fade-bottom', max - top > 2);
+}
+
+// One answer: a meta row (the question as a quiet line, its category and the time), then the
+// answer itself, streaming behind a caret. Older answers step back once a newer one arrives.
+function startResponseGroup({ question, category, small, cards } = {}) {
+  messages.querySelectorAll('.response-group').forEach((g) => g.classList.add('older'));
+  const now = new Date();
+  const time = createEl('time', 'response-sep', now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  time.dateTime = now.toISOString();
+  const meta = createEl('div', 'rg-meta');
+  meta.append(
+    createEl('div', 'user-bubble', question),
+    createEl('span', 'category-pill', category ? category.charAt(0).toUpperCase() + category.slice(1) : ''),
+    time
+  );
+  state.aiEl = createEl('div', 'ai-text' + (small ? ' small' : '') + (cards ? ' cards' : ''));
   state.aiEl.dataset.raw = '';
-  state.caretEl = document.createElement('span');
-  state.caretEl.className = 'ai-caret';
+  state.caretEl = createEl('span', 'ai-caret');
+  state.caretEl.setAttribute('aria-hidden', 'true');
   state.aiEl.appendChild(state.caretEl);
-  messages.appendChild(state.aiEl);
+  const group = createEl('div', 'response-group');
+  group.dataset.state = 'streaming';
+  group.append(meta, state.aiEl);
+  messages.appendChild(group);
+  following = true;
+  followNewest();
+  return group;
+}
+
+// An answer with no llm:start before it (an early error) still gets its own group.
+function startAi(small) {
+  startResponseGroup({ small });
 }
 
 function appendToken(t) {
@@ -165,6 +217,7 @@ function appendToken(t) {
   } else {
     state.aiEl.appendChild(span);
   }
+  followNewest();
 }
 
 function finalizeAi() {
@@ -174,71 +227,71 @@ function finalizeAi() {
   if (el.classList.contains('cards')) groupIntoCards(el);
   state.aiEl = null;
   state.caretEl = null;
+  const group = el.closest('.response-group');
+  if (group) group.dataset.state = 'done';
+  followNewest();
   return el;
 }
 
-// Under a finished answer: Copy / Save as Markdown for a structured answer,
-// and the vault notes it drew on. Clicking a note opens it in Obsidian.
-function addAnswerExtras(el, sources) {
-  const raw = el.dataset.raw || '';
-  let anchor = el;
-  if (el.classList.contains('cards') && raw.trim()) {
-    const actions = document.createElement('div');
-    actions.className = 'ai-actions';
-    const copy = document.createElement('button');
+// Under a finished answer: Copy / Save as Markdown… for a structured answer, and the vault notes
+// it drew on. Clicking a note opens it in Obsidian.
+function addAnswerExtras(answer, sources) {
+  const raw = answer.dataset.raw || '';
+  let anchor = answer;
+  if (answer.classList.contains('cards') && raw.trim()) {
+    const actions = createEl('div', 'ai-actions');
+    const copy = createEl('button', 'btn btn-secondary compact ai-action', 'Copy');
     copy.type = 'button';
-    copy.className = 'ai-action';
-    copy.textContent = 'Copy';
+    copy.dataset.act = 'copy';
     copy.addEventListener('click', () => {
       onscreenly
         .copyAnswer(raw)
-        .then(() => showToast('Copied to the clipboard', 1600))
-        .catch(() => showToast('Could not copy', 2000));
+        .then(() => showToast('Copied', 1600, 'ok'))
+        .catch(() => showToast('Couldn’t copy', 2000));
     });
-    const save = document.createElement('button');
+    const save = createEl('button', 'btn btn-secondary compact ai-action', 'Save as Markdown…');
     save.type = 'button';
-    save.className = 'ai-action';
-    save.textContent = 'Save as Markdown…';
+    save.dataset.act = 'save';
     save.addEventListener('click', () => {
       onscreenly
         .saveAnswerMarkdown(raw, 'resume-analysis')
-        .then((result) => result && result.saved && showToast('Saved ' + result.fileName, 2200))
-        .catch(() => showToast('Could not save the file', 2200));
+        .then((result) => result && result.saved && showToast('Saved ' + result.fileName, 2200, 'ok'))
+        .catch(() => showToast('Couldn’t save the file', 2200));
     });
     actions.append(copy, save);
     anchor.after(actions);
     anchor = actions;
   }
   if (Array.isArray(sources) && sources.length) {
-    const row = document.createElement('div');
-    row.className = 'ai-sources';
-    const label = document.createElement('span');
-    label.textContent = 'From your notes';
-    row.append(label);
+    const row = createEl('div', 'ai-sources');
+    row.append(createEl('span', 'ai-sources-label', 'From your notes'));
     for (const source of sources) {
-      const link = document.createElement('button');
+      const link = createEl('button', 'tag ai-source');
       link.type = 'button';
-      link.className = 'ai-source';
-      link.textContent = source.title;
       link.title = 'Open in Obsidian: ' + source.relPath;
+      link.append(createEl('span', 'ai-source-title', source.title));
       link.addEventListener('click', () => onscreenly.knowledgeOpenNote(source.relPath).catch(() => {}));
       row.append(link);
     }
     anchor.after(row);
   }
+  followNewest();
 }
 
 let busyFailsafe = null;
 function armBusyFailsafe() {
   clearTimeout(busyFailsafe);
-  busyFailsafe = setTimeout(() => {
-    busy = false;
-    $('#send-btn').classList.toggle('busy', false);
-  }, 40000);
+  busyFailsafe = setTimeout(() => setBusy(false), 40000);
 }
 function setBusy(v) {
   busy = v;
   $('#send-btn').classList.toggle('busy', v);
+  messages.setAttribute('aria-busy', String(v));
+  // The mode buttons step back while an answer is on its way (runMode ignores them meanwhile).
+  document.querySelectorAll('.act').forEach((btn) => {
+    if (v) btn.setAttribute('aria-disabled', 'true');
+    else btn.removeAttribute('aria-disabled');
+  });
   clearTimeout(busyFailsafe);
   // Failsafe: main has a 25s stream watchdog that always sends llm:done/llm:error, but if a
   // terminal event is ever lost the whole UI stays frozen — self-clear after a generous window.
@@ -265,25 +318,28 @@ function clearTranscriptInterim() {
 }
 
 // ---- toast helper ------------------------------------------------------
-// FIX #7: Toast queue system — ensures latest toast wins cleanly without stacking
+// One toast at a time, centred under the toolbar; the latest replaces the last. While it shows, the
+// panel moves down by its height (overlay.css), so it never covers an answer. `tone` 'ok' adds a dot.
 let toastTimer = null;
-let toastFadeTimer = null;
-function showToast(message, ms) {
-  let el = document.getElementById('toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'toast';
-    document.getElementById('panel-wrap').appendChild(el);
+function showToast(message, ms, tone) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-atomic', 'true');
+    document.getElementById('toolbar').appendChild(toast);
   }
-  // Clear any pending timers to prevent overlap
   clearTimeout(toastTimer);
-  clearTimeout(toastFadeTimer);
-  // Immediately update content (no stacking)
-  el.textContent = message;
-  el.classList.add('show');
-  toastTimer = setTimeout(() => {
-    el.classList.remove('show');
-  }, ms);
+  toast.textContent = message;
+  toast.title = message;
+  if (tone) toast.dataset.tone = tone;
+  else delete toast.dataset.tone;
+  // Restart the fade-in when one toast replaces another.
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  toastTimer = setTimeout(() => toast.classList.remove('show'), ms);
 }
 
 // ---- actions -----------------------------------------------------------
@@ -297,14 +353,18 @@ export function init() {
   document.querySelectorAll('.act').forEach((btn) => {
     btn.addEventListener('click', () => runMode(btn.dataset.mode, ''));
   });
+  messages.addEventListener('scroll', () => updateFades(messages), { passive: true });
+  messages.addEventListener('wheel', () => (following = false), { passive: true });
+  // A rising answer overflows the log for a moment; check the fades again once it settles.
+  messages.addEventListener('animationend', () => updateFades(messages));
+  // The log shrinks when a banner or toast appears beside it: keep the same part of the answer in view.
+  new ResizeObserver(() => followNewest()).observe(messages);
 }
 
 export {
   MAX_RESPONSES,
   addAnswerExtras,
-  addUserBubble,
   appendToken,
-  clearMessages,
   clearTranscriptInterim,
   esc,
   finalizeAi,
@@ -313,5 +373,7 @@ export {
   runMode,
   setBusy,
   showToast,
-  startAi
+  startAi,
+  startResponseGroup,
+  updateFades
 };

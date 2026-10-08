@@ -1,12 +1,14 @@
-// Design system, part 1: the tokens in renderer/css/tokens.css. Every check parses the
+// Design system. Part 1: the tokens in renderer/css/tokens.css. Every check parses the
 // file's text, and the contrast checks compute WCAG ratios from the token values, so a
 // changed value is judged by the same rules the design was approved under.
+// Part 2 (at the end): the rules every other stylesheet follows (docs/design/README.md).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { parseCss, RENDERER } = require('../helpers/css');
+const { parseCss, readCss, rendererCssFiles, stripComments, RENDERER } = require('../helpers/css');
+const { parseComplex, splitSelectorList } = require('../helpers/markup');
 
 const TOKENS_CSS = fs.readFileSync(path.join(RENDERER, 'css', 'tokens.css'), 'utf8');
 const TOKENS = parseCss(TOKENS_CSS);
@@ -384,4 +386,307 @@ test('styles.css imports the font and token layers first, in that order', () => 
     .map((s) => /^url\(\s*['"]?([^'")]+)['"]?\s*\)\s+layer\(\s*([\w-]+)\s*\)$/.exec(s.prelude))
     .map((m) => m && `${m[1]} → ${m[2]}`);
   assert.deepEqual(imports.slice(0, 2), ['css/fonts.css → fonts', 'css/tokens.css → tokens']);
+});
+
+// ---- part 2: the stylesheets -------------------------------------------------
+
+const LAYERS = ['fonts', 'tokens', 'base', 'layout', 'controls', 'overlay', 'workspace', 'utilities', 'motion'];
+const SHEETS = rendererCssFiles().map(readCss);
+const TOKENS_FILE = 'renderer/css/tokens.css';
+const OTHERS = SHEETS.filter((sheet) => sheet.name !== TOKENS_FILE);
+// TODO(stage B): workspace.css still holds the pre-redesign dark dialog rules, moved there
+// unchanged when the styles were split into layers. The checks that it breaks (colour
+// literals, radii, box-shadows) skip it until stage B replaces it with the light workspace;
+// then delete this exemption so they cover every stylesheet.
+const LEGACY = new Set(['renderer/css/workspace.css']);
+const DESIGNED = OTHERS.filter((sheet) => !LEGACY.has(sheet.name));
+
+/** Every declaration in a sheet, with where it is: style rules, then at-rule blocks (keyframe steps too). */
+function declarations(sheet) {
+  const out = [];
+  for (const rule of sheet.rules) {
+    for (const d of rule.declarations)
+      out.push({ ...d, selector: rule.selector, context: rule.context, line: rule.line });
+  }
+  for (const block of sheet.atBlocks) {
+    const inner = block.body.replace(/[^{}]*\{([^{}]*)\}/g, ';$1;');
+    for (const m of inner.matchAll(/([-\w]+)\s*:\s*([^;{}]+)/g)) {
+      out.push({
+        prop: m[1],
+        value: m[2].trim(),
+        important: /!\s*important/i.test(m[2]),
+        selector: `@${block.name}`,
+        context: block.context,
+        line: block.line
+      });
+    }
+  }
+  return out;
+}
+const where = (sheet, d) => `${sheet.name}:${d.line} ${d.selector} { ${d.prop}: ${d.value} }`;
+
+// Value text with url(…) and quoted strings removed, so a data: URL or a font name never counts.
+const bare = (value) =>
+  value.replace(/url\((?:[^()]|\([^()]*\))*\)/g, 'url()').replace(/(["'])(?:\\.|(?!\1).)*\1/g, '""');
+
+// CSS named colours (CSS Color 4). transparent and currentColor are not literals; system colours
+// (Canvas, CanvasText, Highlight, …) are allowed for forced-colors mode.
+const NAMED_COLORS = new Set(
+  (
+    'aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown ' +
+    'burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan ' +
+    'darkgoldenrod darkgray darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid ' +
+    'darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet ' +
+    'deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ' +
+    'ghostwhite gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki ' +
+    'lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow ' +
+    'lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray ' +
+    'lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine ' +
+    'mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise ' +
+    'mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab ' +
+    'orange orangered orchid palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru ' +
+    'pink plum powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown ' +
+    'seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan ' +
+    'teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen'
+  ).split(' ')
+);
+
+function colourLiterals(value) {
+  const v = bare(value);
+  return [
+    ...[...v.matchAll(/#[0-9a-f]{3,8}\b/gi)].map((m) => m[0]),
+    ...[...v.matchAll(/\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/gi)].map((m) => m[0]),
+    ...[...v.matchAll(/(?<![\w-])[a-z]+(?![\w-])/gi)].map((m) => m[0]).filter((w) => NAMED_COLORS.has(w.toLowerCase()))
+  ];
+}
+
+/** Complex selectors split into compounds (pseudo-classes and pseudo-elements kept as text). */
+const compounds = (selector) => splitSelectorList(selector).map((s) => parseComplex(s).map((p) => p.compound));
+
+test('styles.css holds only the layer order and one @import per layer, each to an existing file', () => {
+  const file = path.join(RENDERER, 'styles.css');
+  const sheet = readCss(file);
+  assert.deepEqual(sheet.rules, [], 'styles.css has style rules');
+  assert.deepEqual(sheet.atBlocks, [], 'styles.css has at-rule blocks');
+  const [order, ...imports] = sheet.statements;
+  assert.equal(order.name, 'layer', 'the @layer order comes first');
+  assert.deepEqual(
+    order.prelude.split(',').map((s) => s.trim()),
+    LAYERS
+  );
+  assert.deepEqual(
+    imports.map((st) => `@${st.name} ${st.prelude}`),
+    LAYERS.map((layer) => `@import url('css/${layer}.css') layer(${layer})`)
+  );
+  for (const layer of LAYERS) assert.ok(fs.existsSync(path.join(RENDERER, 'css', `${layer}.css`)), `css/${layer}.css`);
+});
+
+test('every var() names a property some stylesheet declares, or carries a fallback', () => {
+  const declared = new Set(
+    SHEETS.flatMap((sheet) => declarations(sheet).map((d) => d.prop)).filter((p) => p.startsWith('--'))
+  );
+  const missing = [];
+  for (const sheet of SHEETS) {
+    for (const d of declarations(sheet)) {
+      for (const m of d.value.matchAll(/var\(\s*(--[\w-]+)\s*(,)?/g)) {
+        if (!m[2] && !declared.has(m[1])) missing.push(`${where(sheet, d)}: ${m[1]}`);
+      }
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
+test('no colour literal outside tokens.css: every colour is a token', () => {
+  assert.ok(DESIGNED.length >= 6, 'expected the layer files');
+  const found = [];
+  for (const sheet of DESIGNED) {
+    for (const d of declarations(sheet)) {
+      const literals = colourLiterals(d.value);
+      if (literals.length) found.push(`${where(sheet, d)} → ${literals.join(', ')}`);
+    }
+  }
+  assert.deepEqual(found, []);
+  // The scan itself: it must catch each kind of literal and skip urls and strings.
+  assert.deepEqual(colourLiterals('1px solid #e4e4e7'), ['#e4e4e7']);
+  assert.deepEqual(colourLiterals('0 0 0 1px rgba(0, 0, 0, 0.4)'), ['rgba(']);
+  assert.deepEqual(colourLiterals('color-mix(in srgb, var(--x) 4%, transparent)'), ['color-mix(']);
+  assert.deepEqual(colourLiterals('white'), ['white']);
+  assert.deepEqual(colourLiterals('url("data:image/svg+xml,%3Csvg stroke=\'white\'%3E") center / 12px'), []);
+  assert.deepEqual(colourLiterals('var(--line-strong) CanvasText currentColor transparent'), []);
+});
+
+test('no !important and no italics in any stylesheet', () => {
+  for (const sheet of SHEETS) {
+    assert.doesNotMatch(stripComments(sheet.css), /!\s*important/i, `${sheet.name} uses !important`);
+    for (const d of declarations(sheet)) {
+      if (d.prop === 'font-style' || d.prop === 'font') {
+        assert.doesNotMatch(bare(d.value), /\b(?:italic|oblique)\b/i, where(sheet, d));
+      }
+    }
+  }
+});
+
+// Cards, the error block, the banner, code blocks and the popover are 12px; the panel, the sidebar
+// and every dialog 16px; the Welcome feature card 24px.
+const CARD_RADII = ['var(--radius-cards)', 'var(--radius-product-mockup)', 'var(--radius-feature-cards)'];
+const CARD_IDS = new Set(['panel', 'settings', 'onboard', 'consent', 'onscreenly-status']);
+const CARD_CLASSES = new Set([
+  'ai-card',
+  'ai-error',
+  'is-error',
+  'transcript-sidebar',
+  'opacity-popover',
+  'ws-dialog',
+  'perm-card',
+  'k-result',
+  'publik-card',
+  'whisper-card',
+  's-card'
+]);
+const isCard = (c) =>
+  c.pseudos.every((p) => !p.startsWith('::')) &&
+  (CARD_IDS.has(c.id) || c.tag === 'pre' || c.classes.some((k) => CARD_CLASSES.has(k)));
+
+test('radii come only from --radius-* tokens, and cards and dialogs use 12, 16 or 24', () => {
+  const covered = new Set();
+  const problems = [];
+  for (const sheet of DESIGNED) {
+    for (const rule of sheet.rules) {
+      for (const d of rule.declarations.filter((x) => /^border(?:-[a-z]+)*-radius$/.test(x.prop))) {
+        const parts = d.value.split(/\s+(?![^(]*\))/);
+        if (!parts.every((p) => /^var\(--radius-[\w-]+\)$/.test(p) || p === 'inherit')) {
+          problems.push(`${sheet.name}:${rule.line} ${rule.selector}: ${d.value}`);
+        }
+        for (const list of compounds(rule.selector)) {
+          const subject = list[list.length - 1];
+          if (!isCard(subject)) continue;
+          covered.add(
+            subject.id
+              ? `#${subject.id}`
+              : subject.tag === 'pre'
+                ? 'pre'
+                : `.${subject.classes.find((k) => CARD_CLASSES.has(k))}`
+          );
+          if (!CARD_RADII.includes(d.value))
+            problems.push(`${sheet.name}:${rule.line} ${rule.selector}: a card or dialog at ${d.value}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+  for (const sel of ['#panel', '.transcript-sidebar', '.ai-card', '.ai-error', '#onscreenly-status', 'pre']) {
+    assert.ok(covered.has(sel), `no radius found for ${sel}; is the check still looking at it?`);
+  }
+});
+
+// The only shadows: the overlay's frame ring, a field's inset, the CTA's hover, the focus halo.
+const SHADOWS = ['none', 'var(--frame)', 'var(--field-shadow)', 'var(--accent-hover-shadow)', 'var(--focus-halo)'];
+
+// Splits at top-level commas.
+const layersOf = (value) => value.split(/,(?![^(]*\))/).map((s) => s.trim());
+
+test('box-shadows come from the allowlist, and none of them casts an outer blur', () => {
+  const problems = [];
+  for (const sheet of DESIGNED) {
+    for (const d of declarations(sheet).filter((x) => x.prop === 'box-shadow')) {
+      if (!layersOf(d.value).every((layer) => SHADOWS.includes(layer))) problems.push(where(sheet, d));
+    }
+  }
+  for (const sheet of OTHERS) {
+    for (const d of declarations(sheet)) {
+      if (/\bdrop-shadow\(/.test(d.value) || d.prop === 'text-shadow') problems.push(where(sheet, d));
+    }
+  }
+  assert.deepEqual(problems, []);
+
+  // Each allowed token, in both themes: every layer that is not inset has no blur.
+  const resolve = (value, vars) => {
+    const m = /^var\(\s*(--[\w-]+)\s*\)$/.exec(value.trim());
+    return m ? resolve(vars.get(m[1]), vars) : value;
+  };
+  let layers = 0;
+  for (const [theme, vars] of Object.entries(THEMES)) {
+    for (const name of SHADOWS.filter((s) => s !== 'none')) {
+      const value = resolve(name, vars);
+      if (value === 'none') continue;
+      for (const layer of layersOf(
+        value.replace(/\b[\w-]+\((?:[^()]|\([^()]*\))*\)/g, (fn) => fn.replace(/,/g, ' '))
+      )) {
+        layers++;
+        if (/\binset\b/.test(layer)) continue;
+        const lengths = layer
+          .replace(/\b[\w-]+\((?:[^()]|\([^()]*\))*\)/g, ' ')
+          .split(/\s+/)
+          .filter((t) => /^-?\d*\.?\d+(?:px)?$/.test(t));
+        assert.ok(lengths.length >= 2, `${theme} ${name}: "${layer}"`);
+        assert.equal(parseFloat(lengths[2] || '0'), 0, `${theme} ${name} casts a blurred outer shadow: "${layer}"`);
+      }
+    }
+  }
+  assert.ok(layers >= 8, 'found the shadow tokens');
+});
+
+test('backdrop-filter appears only on the three scrims', () => {
+  const SCRIMS = new Set(['#settings-scrim', '#onboard-scrim', '#consent-scrim']);
+  let seen = 0;
+  for (const sheet of OTHERS) {
+    for (const d of declarations(sheet).filter((x) => /^(?:-webkit-)?backdrop-filter$/.test(x.prop))) {
+      seen++;
+      for (const selector of splitSelectorList(d.selector)) assert.ok(SCRIMS.has(selector), where(sheet, d));
+    }
+  }
+  assert.ok(seen > 0, 'the scrims blur what is behind them');
+});
+
+test('the serif display type and the hero gradient appear only on the onboarding welcome', () => {
+  const ONLY = {
+    '--type-display': '#onboard.is-hero #ob-title',
+    '--type-display-track': '#onboard.is-hero #ob-title',
+    '--gradient-hero': '#onboard.is-hero .ob-head'
+  };
+  const NEVER = [
+    '--gradient-hero-alt',
+    '--ts-5xl-3',
+    '--ts-5xl-3-track',
+    '--font-eb-garamond',
+    '--color-neon',
+    '--color-cyan-veil'
+  ];
+  for (const sheet of OTHERS) {
+    for (const d of declarations(sheet)) {
+      for (const m of d.value.matchAll(/var\(\s*(--[\w-]+)/g)) {
+        if (m[1] in ONLY) assert.equal(d.selector, ONLY[m[1]], `${where(sheet, d)}: ${m[1]} only in ${ONLY[m[1]]}`);
+        assert.ok(!NEVER.includes(m[1]), `${where(sheet, d)}: ${m[1]} is used outside tokens.css`);
+      }
+      if (sheet.name !== 'renderer/css/fonts.css' && /font-family|^font$/.test(d.prop)) {
+        assert.doesNotMatch(d.value, /Garamond/i, where(sheet, d));
+      }
+    }
+  }
+  // Inside tokens.css, EB Garamond is only the 80px step and the display role built from it, and
+  // the decorative neon and cyan-veil are never referenced.
+  const garamond = declarations(readCss(path.join(RENDERER, 'css', 'tokens.css')))
+    .filter((d) => d.value.includes('var(--font-eb-garamond)'))
+    .map((d) => d.prop);
+  assert.deepEqual(garamond.sort(), ['--ts-5xl-3', '--type-display']);
+  assert.doesNotMatch(TOKENS_CSS, /var\(--color-(?:neon|cyan-veil)\)/);
+});
+
+test('system-setting @media blocks never target :root, html or body', () => {
+  const SYSTEM = /prefers-reduced-motion|prefers-contrast|forced-colors|prefers-reduced-transparency/;
+  let seen = 0;
+  for (const sheet of SHEETS) {
+    for (const rule of sheet.rules.filter((r) => r.context.some((c) => SYSTEM.test(c)))) {
+      seen++;
+      for (const list of compounds(rule.selector)) {
+        for (const c of list) {
+          assert.ok(
+            c.tag !== 'html' && c.tag !== 'body' && !c.pseudos.includes(':root'),
+            `${sheet.name}:${rule.line} ${rule.selector}`
+          );
+        }
+      }
+    }
+  }
+  assert.ok(seen > 0, 'found the system-setting rules');
 });

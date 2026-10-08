@@ -31,7 +31,7 @@ function updateSmartTooltip() {
   btn.classList.toggle('hidden', same);
   if (same) return;
   btn.title =
-    'Fast: ' + (fast || 'fast model') + ' · Smart: ' + (smart || 'smart model') + ' (higher quality, ~2× slower)';
+    'Fast: ' + (fast || 'fast model') + ' · Smart: ' + (smart || 'smart model') + ' (higher quality, about 2× slower)';
 }
 
 // ---- settings ----------------------------------------------------------
@@ -74,6 +74,9 @@ export function init() {
   if (aiRulesEl) aiRulesEl.addEventListener('input', updateAiRulesCounter);
   $('#more-btn').addEventListener('click', openSettings);
   $('#tb-settings-btn').addEventListener('click', openSettings);
+  // The empty state's setup buttons (shown when no provider or no speech-to-text is set up).
+  $('#empty-setup').addEventListener('click', () => openSettings());
+  $('#empty-audio').addEventListener('click', () => openSettings());
   $('#s-close').addEventListener('click', () => {
     void closeSettings();
   });

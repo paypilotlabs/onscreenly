@@ -1,41 +1,48 @@
-// Speech status indicator and the transcript history sidebar.
-import { $, icon } from './core.js';
+// Speech status (the live dot and the action row's status) and the transcript sidebar.
+import { $ } from './core.js';
+import { updateFades } from './chat.js';
 
-// ---- STT / VAD status helpers ------------------------------------------
-// Live dot states: 'off' | 'idle' | 'speaking' | 'transcribing'
+// ---- live dot and speech status ------------------------------------------
+let sttState = 'disconnected';
+
+// The live dot inside "End session": 'off' | 'idle' (breathing) | 'speaking' (a ring) | 'error'
+// (hollow: the session runs but nothing is being transcribed). Never red.
+const DOT_TITLES = {
+  off: 'Not listening',
+  idle: 'Listening',
+  speaking: 'Speech detected',
+  error: 'Not transcribing'
+};
+
 function setLiveDotState(dotState) {
   const dot = document.getElementById('live-dot');
   if (!dot) return;
-  dot.classList.remove('off', 'idle', 'speaking', 'transcribing');
-  dot.classList.add(dotState);
-  const labels = {
-    off: 'Not listening',
-    idle: 'Listening — silence detected',
-    speaking: 'Speech detected',
-    transcribing: 'Transcribing…'
-  };
-  dot.title = labels[dotState] || '';
+  // A transcription error holds until the session ends, whatever the voice detector says.
+  const next = dotState !== 'off' && sttState === 'error' ? 'error' : dotState;
+  dot.className = next;
+  dot.title = DOT_TITLES[next] || '';
 }
 
-let sttState = 'disconnected';
-
+// Hidden while off; otherwise a 6px dot and a short label at the end of the action row.
 const STT_LABELS = {
-  disconnected: 'Transcription off',
-  connecting: 'Starting transcription…',
-  loading: 'Starting transcription…',
-  streaming: 'Transcription running',
-  batch: 'Transcription running',
-  local: 'Transcription running',
-  stopping: 'Stopping transcription…',
+  disconnected: '',
+  connecting: 'Starting…',
+  loading: 'Starting…',
+  streaming: 'Listening',
+  batch: 'Listening',
+  local: 'Listening',
+  stopping: 'Stopping…',
   error: 'Transcription error'
 };
 
 function setSttState(state) {
   sttState = state;
-  const label = document.getElementById('stt-status');
-  if (!label) return;
-  label.textContent = STT_LABELS[state];
-  label.className = 'stt-status stt-' + state;
+  const status = document.getElementById('stt-status');
+  if (!status) return;
+  status.className = 'stt-status stt-' + state;
+  status.querySelector('.stt-label').textContent = STT_LABELS[state];
+  if (state === 'error') setLiveDotState('error');
+  fitActionRow();
 }
 
 function updateSttStatus({ active, streaming } = {}) {
@@ -43,7 +50,20 @@ function updateSttStatus({ active, streaming } = {}) {
   else if (active === true) setSttState(streaming ? 'connecting' : 'batch');
 }
 
-// ---- transcript history sidebar (hidden by default, manual toggle) ----
+// When the action row runs out of room (Windows key names beside a long status), the shortcut hints
+// go first: Assist's, then Say's. The buttons' titles still name the shortcuts.
+function fitActionRow() {
+  const row = $('#action-row');
+  row.classList.remove('drop-assist-hint', 'drop-hints');
+  if (!row.clientWidth) return; // collapsed; checked again on expand
+  for (const cls of ['drop-assist-hint', 'drop-hints']) {
+    if (row.scrollWidth <= row.clientWidth) break;
+    row.classList.add(cls);
+  }
+}
+
+// ---- transcript sidebar (hidden by default, manual toggle) ----------------
+const PLACEHOLDER = 'Nothing yet. Start a session and the conversation shows up here.';
 let tsSidebarInterimEl = null;
 let sidebarOpen = false;
 // Track last committed row per channel — all chunks from same speaker go in one row
@@ -60,47 +80,29 @@ function placeSidebar(sidebar) {
   const areaRight = screen.availLeft + screen.availWidth;
   const fitsRight = window.screenX + panel.right + needed <= areaRight;
   const fitsLeft = window.screenX + panel.left - needed >= areaLeft;
-  const onLeft = !fitsRight && fitsLeft;
-  if (sidebar.classList.contains('left') === onLeft) return;
-  // Switch sides without animating, so the open transition starts from the new side's tucked position.
-  sidebar.classList.add('ts-instant');
-  sidebar.classList.toggle('left', onLeft);
-  void sidebar.offsetWidth;
-  sidebar.classList.remove('ts-instant');
+  sidebar.classList.toggle('left', !fitsRight && fitsLeft);
 }
 
 function showSidebar() {
   const sidebar = document.getElementById('transcript-sidebar');
-  const historyBtn = document.getElementById('history-btn');
-  if (sidebar) {
-    placeSidebar(sidebar);
-    sidebar.classList.add('open');
-  }
-  if (historyBtn) historyBtn.classList.add('active');
+  placeSidebar(sidebar);
+  sidebar.classList.add('open');
+  historyBtn.classList.add('active');
+  historyBtn.setAttribute('aria-expanded', 'true');
   sidebarOpen = true;
+  requestAnimationFrame(syncTranscriptList);
 }
 
 function hideSidebar() {
-  const sidebar = document.getElementById('transcript-sidebar');
-  const historyBtn = document.getElementById('history-btn');
-  if (sidebar) sidebar.classList.remove('open');
-  if (historyBtn) historyBtn.classList.remove('active');
+  document.getElementById('transcript-sidebar').classList.remove('open');
+  historyBtn.classList.remove('active');
+  historyBtn.setAttribute('aria-expanded', 'false');
   sidebarOpen = false;
 }
 
 function toggleSidebar() {
-  if (sidebarOpen) {
-    hideSidebar();
-  } else {
-    showSidebar();
-    // FIX #7: Scroll to bottom when opening sidebar
-    const list = document.getElementById('ts-list');
-    if (list) {
-      requestAnimationFrame(() => {
-        list.scrollTop = list.scrollHeight;
-      });
-    }
-  }
+  if (sidebarOpen) hideSidebar();
+  else showSidebar();
 }
 
 // History button toggle
@@ -108,6 +110,34 @@ const historyBtn = document.getElementById('history-btn');
 
 // Close sidebar button
 const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+
+// One turn: THEM or YOU, the time it started, and what was said.
+function turnRow(channel, text) {
+  const row = document.createElement('div');
+  row.className = 'ts-turn ts-' + channel;
+  const label = document.createElement('span');
+  label.className = 'ts-channel';
+  label.textContent = channel === 'them' ? 'Them' : 'You';
+  const now = new Date();
+  const time = document.createElement('time');
+  time.className = 'ts-time';
+  time.dateTime = now.toISOString();
+  time.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const words = document.createElement('span');
+  words.className = 'ts-text';
+  words.textContent = text;
+  row.append(label, time, words);
+  return row;
+}
+
+// Keep the newest line in view, fade the edge a scroll cuts through, and offer Clear only when
+// there is something to clear.
+function syncTranscriptList() {
+  const list = document.getElementById('ts-list');
+  list.scrollTop = list.scrollHeight;
+  updateFades(list);
+  $('#clear-transcript-btn').disabled = !list.querySelector('.ts-turn');
+}
 
 function appendTranscriptHistoryTurn(channel, text, isInterim) {
   const list = document.getElementById('ts-list');
@@ -120,15 +150,9 @@ function appendTranscriptHistoryTurn(channel, text, isInterim) {
   if (isInterim) {
     // Update the single floating interim row
     if (!tsSidebarInterimEl) {
-      tsSidebarInterimEl = document.createElement('div');
-      tsSidebarInterimEl.className = 'ts-turn ts-' + channel + ' ts-interim-row';
-      const chLabel = document.createElement('span');
-      chLabel.className = 'ts-channel';
-      chLabel.textContent = channel === 'them' ? 'Them' : 'You';
-      const txt = document.createElement('span');
-      txt.className = 'ts-text ts-interim';
-      tsSidebarInterimEl.appendChild(chLabel);
-      tsSidebarInterimEl.appendChild(txt);
+      tsSidebarInterimEl = turnRow(channel, '');
+      tsSidebarInterimEl.classList.add('ts-interim-row');
+      tsSidebarInterimEl.querySelector('.ts-text').classList.add('ts-interim');
       list.appendChild(tsSidebarInterimEl);
     }
     tsSidebarInterimEl.querySelector('.ts-text').textContent = text;
@@ -145,26 +169,9 @@ function appendTranscriptHistoryTurn(channel, text, isInterim) {
     if (useExisting) {
       // Append to existing row — accumulates sentence fragments
       const txt = existingRow.querySelector('.ts-text');
-      if (txt) {
-        txt.textContent = txt.textContent ? txt.textContent + ' ' + text : text;
-      }
+      txt.textContent = txt.textContent ? txt.textContent + ' ' + text : text;
     } else {
-      // Start a new row (no buttons — just clean history view)
-      const row = document.createElement('div');
-      row.className = 'ts-turn ts-' + channel;
-
-      const chLabel = document.createElement('span');
-      chLabel.className = 'ts-channel';
-      chLabel.textContent = channel === 'them' ? 'Them' : 'You';
-
-      const txt = document.createElement('span');
-      txt.className = 'ts-text';
-      txt.textContent = text;
-
-      row.appendChild(chLabel);
-      row.appendChild(txt);
-      list.appendChild(row);
-      tsLastRow[channel] = row;
+      tsLastRow[channel] = list.appendChild(turnRow(channel, text));
     }
 
     // Reset silence timer
@@ -177,34 +184,39 @@ function appendTranscriptHistoryTurn(channel, text, isInterim) {
     const other = channel === 'you' ? 'them' : 'you';
     clearTimeout(tsRowTimer[other]);
     tsLastRow[other] = null;
-
-    list.scrollTop = list.scrollHeight;
   }
+  syncTranscriptList();
 }
 
 function clearTranscriptSidebar() {
   const list = document.getElementById('ts-list');
-  if (list) list.innerHTML = '<div class="ts-placeholder">Conversation history will appear here when listening.</div>';
+  const ph = document.createElement('div');
+  ph.className = 'ts-placeholder';
+  ph.textContent = PLACEHOLDER;
+  list.replaceChildren(ph);
   tsSidebarInterimEl = null;
   tsLastRow.you = null;
   tsLastRow.them = null;
   clearTimeout(tsRowTimer.you);
   clearTimeout(tsRowTimer.them);
+  syncTranscriptList();
 }
 
 export function init() {
-  if (historyBtn) {
-    historyBtn.querySelector('.ic').innerHTML = icon('message-square-text', { size: 14 });
-    historyBtn.addEventListener('click', toggleSidebar);
-  }
-  if (closeSidebarBtn) {
-    closeSidebarBtn.addEventListener('click', hideSidebar);
-  }
+  historyBtn.addEventListener('click', toggleSidebar);
+  closeSidebarBtn.addEventListener('click', hideSidebar);
+  const list = document.getElementById('ts-list');
+  list.addEventListener('scroll', () => updateFades(list), { passive: true });
+  syncTranscriptList();
+  fitActionRow();
+  // Geist arrives after the first layout (font-display: swap) and changes the labels' widths.
+  document.fonts.ready.then(fitActionRow);
 }
 
 export {
   appendTranscriptHistoryTurn,
   clearTranscriptSidebar,
+  fitActionRow,
   hideSidebar,
   setLiveDotState,
   setSttState,
