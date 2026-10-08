@@ -9,7 +9,7 @@ Onscreenly is maintained by Lohith Kumar and licensed under GPL-3.0-or-later. It
 | Feature | Behavior |
 |---|---|
 | Floating overlay | Transparent, always-on-top toolbar and answer panel, with adjustable opacity. Empty areas pass mouse clicks to the application underneath. |
-| Screen assistance | Screenshots plus recent conversation provide context for questions, coding help, and Smart assist. |
+| Screen assistance | Screenshots plus recent conversation provide context for questions, coding help, and Assist. |
 | Microphone transcription | Captures your microphone on its own “You” channel. |
 | Meeting audio | Captures system output on a separate “Them” channel where supported. Off by default on macOS; enable it in Settings → Audio. |
 | AI providers | OpenAI, Anthropic, Gemini, Azure, Cerebras, Groq, MiniMax, DeepSeek, Ollama, Custom OpenAI-compatible endpoints, and optionally Publik. Availability depends on your endpoint, account, and selected model. |
@@ -180,6 +180,10 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
 - App-link callers need explicit consent. A separate consent controls access to captured slide captions.
 - Do not commit personal profiles or provider keys. Both new and legacy settings filenames and their backups are excluded by `.gitignore`.
 
+## Design
+
+The interface's design notes are in [docs/design/README.md](docs/design/README.md), with a clickable prototype in [docs/design/prototype.html](docs/design/prototype.html) (open it in a browser). Screenshots of the app's main states are in [docs/design/screens/](docs/design/screens/); `e2e/screens.spec.js` writes fresh ones to `test-results/ui/`.
+
 ## Project layout and provenance
 
 - `app/main/`: the Electron main process, one module per concern:
@@ -207,6 +211,6 @@ On **2026-10-05** Onscreenly moved to Electron 44, both windows became sandboxed
 - `test/`: automated tests using synthetic data and mocked integrations, mirroring the `src/` groups plus `renderer/` and `build/`.
 - `vendor/app-link/`: vendored integration library with its original provenance.
 
-Historical screenshots under `docs/` show the upstream Cue interface and are not current Onscreenly product screenshots. No new visual design or icon is included in this rename.
+The screenshots directly under `docs/` are historical: they show the upstream Cue interface. Current screenshots are in `docs/design/screens/`.
 
 Copyright (C) 2026 Lohith Kumar. Based on [Cue by Blueturboguy07](https://github.com/Blueturboguy07/cue); see [NOTICE](NOTICE). Licensed under GPL-3.0-or-later, see [LICENSE](LICENSE). See and `vendor/app-link/VENDORED.md` / `build-resources/whisper.cpp.LICENSE` for third-party provenance.

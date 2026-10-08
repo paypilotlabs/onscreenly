@@ -17,6 +17,7 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 - [ ] macOS asks for Microphone and Screen & System Audio Recording; after granting both and reopening, the overlay appears.
 - [ ] The overlay sits above other windows; empty areas pass clicks through to the app underneath.
 - [ ] The first-run walkthrough appears once and can be skipped.
+- [ ] Windows first run: no permissions window. A returning user with the microphone off gets the permissions window above the overlay, and **Continue without microphone** works.
 
 ## 2. API keys
 
@@ -29,7 +30,7 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 ## 3. Answers
 
 - [ ] Type a question and press Enter: an answer streams in.
-- [ ] **Smart assist** (Command/Ctrl+Shift+Enter) answers about what is on screen.
+- [ ] **Assist** (Command/Ctrl+Shift+Enter) answers about what is on screen.
 - [ ] **Solve the coding problem on screen** (Command/Ctrl+H) on a LeetCode page returns a solution.
 - [ ] Turn **Smart** on: the answer uses the smart model (slower, longer).
 
@@ -40,6 +41,7 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 - [ ] **Recap** summarises what was said.
 - [ ] Meeting audio (Settings → Audio, on): in a Zoom, Meet or Teams test call, the other side appears as "Them". On macOS, the menu bar shows the screen-recording indicator while it is on.
 - [ ] **End session** stops listening and the indicator goes away.
+- [ ] ⌘⇧L / Ctrl+Shift+L from another app starts and ends a session.
 
 ## 5. Screen sharing
 
@@ -78,6 +80,16 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 - [ ] **Delete all my data** asks first; Cancel changes nothing.
 - [ ] Confirming removes settings, keys, résumé and meeting history and restarts Onscreenly as new.
 
+## 11. Design and accessibility
+
+- [ ] Opacity at 100%, 60% and 20% over a video call, a white document and a dark code editor: answers stay readable and the toolbar stays findable.
+- [ ] The light dialogs (Settings, onboarding, consent, permissions) over a dark desktop and over a bright one.
+- [ ] Text and borders look sharp on a Retina display, on a 1x display, and on Windows at 150% scaling.
+- [ ] Keyboard only: Tab reaches every control with a visible focus ring, dialogs keep focus inside, and Escape closes one layer per press (the composer text, then Opacity, then the transcript).
+- [ ] VoiceOver (macOS) and NVDA (Windows) read the toolbar buttons, answers as they finish, and the status lines.
+- [ ] Reduce Motion: no pulsing dot, caret or shimmer. Increase Contrast: the overlay goes solid and lines are stronger.
+- [ ] Screen sharing still hides the overlay, as in section 5.
+
 ## Result
 
 | Area | Pass / fail | Notes |
@@ -92,5 +104,6 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 | Résumé analysis | | |
 | Obsidian notes | | |
 | Data | | |
+| Design and accessibility | | |
 
 File an issue for each failure, with the build, OS and steps.
