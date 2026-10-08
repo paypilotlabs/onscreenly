@@ -1,6 +1,6 @@
 // Filling the settings form, app-link callers, the status line and provider selectors.
 import { state } from './state.js';
-import { $, isMac, onscreenly } from './core.js';
+import { $, isMac, onscreenly, setButtonKind } from './core.js';
 import { applyOpacity } from './toolbar.js';
 import { updateAiRulesCounter, updateCustomProviderFields, updateSmartTooltip } from './settings-panel.js';
 import { fillProfile } from './profile-settings.js';
@@ -38,7 +38,7 @@ function fillSettings() {
   $('#model-smart').value = m.smart;
   fillAppLinkCallers();
   fillKeyStorageNote();
-  $('#s-status').textContent = statusText();
+  setStatus(statusText());
   fillProfile();
   fillKnowledge();
   // Transcription tab
@@ -122,6 +122,15 @@ async function fillAppLinkCallers() {
     row.append(label, scope, button);
     host.append(row);
   }
+}
+
+// The footer status, seen from every tab: what is set up, "Saved · …" after a save, or why a save
+// failed. The tone draws its dot (workspace.css).
+function setStatus(text, tone = null) {
+  const status = $('#s-status');
+  status.textContent = text;
+  status.classList.toggle('is-ok', tone === 'ok');
+  status.classList.toggle('is-error', tone === 'error');
 }
 
 function statusText() {
@@ -210,6 +219,8 @@ function paintReadiness() {
   const panel = $('#panel');
   panel.dataset.setup = String(!providerLooksReady());
   panel.dataset.listen = listenReadiness(state.settings, state.whisperOverview);
+  // With nothing to transcribe, downloading a local model is the Audio tab's main action.
+  setButtonKind($('#whisper-download'), panel.dataset.listen === 'none' ? 'primary' : 'secondary');
 }
 
 export function init() {
@@ -224,7 +235,7 @@ export function init() {
       const m = state.settings.models[state.settings.provider] || { fast: '', smart: '' };
       $('#model-fast').value = m.fast;
       $('#model-smart').value = m.smart;
-      $('#s-status').textContent = statusText();
+      setStatus(statusText());
       updateSmartTooltip();
     })
   );
@@ -245,9 +256,9 @@ export function init() {
     button.addEventListener('click', () => {
       state.settings.sttProvider = button.dataset.sttProvider;
       pressChip('#stt-provider-seg', (candidate) => candidate === button);
-      $('#s-status').textContent = statusText();
+      setStatus(statusText());
     })
   );
 }
 
-export { fillSettings, listenReadiness, paintReadiness, providerLooksReady, statusText };
+export { fillSettings, listenReadiness, paintReadiness, providerLooksReady, setStatus, statusText };
