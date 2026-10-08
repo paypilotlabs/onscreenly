@@ -41,6 +41,8 @@ const dialog = $('#settings');
 // `tab` picks the tab to show (keys, profile, knowledge, transcription, style or appearance);
 // without one, Settings opens where it was left. Click listeners pass an event, never a tab.
 function openSettings(tab) {
+  // Until boot has read the settings there is nothing to fill the form with.
+  if (!state.settings) return;
   const wasOpen = !scrim.classList.contains('hidden');
   fillSettings();
   if (!wasOpen) rememberOpener(dialog);

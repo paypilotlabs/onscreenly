@@ -32,7 +32,8 @@ async function launchApp({ settings, profile, env } = {}) {
     timeout: 90000
   });
   const page = await app.firstWindow();
-  await page.waitForSelector('#toolbar');
+  // The page's scripts run after #toolbar exists; a click before boot has read the settings is lost.
+  await page.waitForSelector('html[data-booted]');
   return { app, page, profile: dir };
 }
 

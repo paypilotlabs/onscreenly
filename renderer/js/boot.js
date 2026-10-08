@@ -48,5 +48,7 @@ export function init() {
       await Promise.race([garamond, new Promise((resolve) => setTimeout(resolve, 300))]);
       showOnboard();
     }
+    // Startup is done: the app tests wait for this before they click anything.
+    document.documentElement.dataset.booted = 'true';
   })();
 }
