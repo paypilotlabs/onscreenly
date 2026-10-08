@@ -171,8 +171,17 @@ test('watching refreshes after a note changes', async (t) => {
       resolve(null);
     }
   });
-  fs.writeFileSync(path.join(root, 'b.md'), 'Bravo kubernetes');
-  const result = await Promise.race([changed, new Promise((r) => setTimeout(() => r('timeout'), 5000))]);
+  // macOS starts its file-event stream a moment after fs.watch returns and misses a write made
+  // before then, so the note is written again until the watcher reports it.
+  const write = () => fs.writeFileSync(path.join(root, 'b.md'), 'Bravo kubernetes');
+  write();
+  const rewrite = setInterval(write, 250);
+  let result;
+  try {
+    result = await Promise.race([changed, new Promise((r) => setTimeout(() => r('timeout'), 5000))]);
+  } finally {
+    clearInterval(rewrite);
+  }
   if (result === null) return;
   assert.notEqual(result, 'timeout');
   assert.equal(index.search('kubernetes')[0].relPath, 'b.md');
