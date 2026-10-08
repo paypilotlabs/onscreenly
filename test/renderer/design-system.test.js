@@ -309,23 +309,37 @@ test('each theme puts Steel, Fog and Mist only in their approved roles', () => {
   assert.deepEqual([...new Set(using('workspace', 'mist'))], ['--icon']);
   for (const name of ['--text-2', '--text-3', '--icon-solo']) is('workspace', name, steel, 'Steel');
 
-  // Overlay (dark): the same three greys, with the roles flipped for a dark surface.
+  // Overlay (dark): the same three greys, with the roles flipped for a dark surface. Steel
+  // (2.88:1 on Carbon) is disabled text only, and Fog (4.15:1) only draws icons.
+  assert.deepEqual([...new Set(using('overlay', 'steel'))], ['--text-disabled']);
+  assert.deepEqual([...new Set(using('overlay', 'fog'))], ['--icon', '--icon-solo']);
   is('overlay', '--text-2', mist, 'Mist');
   is('overlay', '--icon', fog, 'Fog');
   is('overlay', '--icon-solo', fog, 'Fog');
   is('overlay', '--text-disabled', steel, 'Steel');
 });
 
+// Every --text-* role a theme declares, except disabled text (WCAG exempts it).
+function textRoles(theme) {
+  const names = unlayered(`.theme-${theme}`)
+    .flatMap((r) => r.declarations.map((d) => d.prop))
+    .filter((name) => name.startsWith('--text-') && name !== '--text-disabled');
+  for (const core of ['--text-1', '--text-2']) assert.ok(names.includes(core), `${theme} declares ${core}`);
+  return names;
+}
+
 test('workspace text roles reach 4.5:1 on Chalk, Frost and Vapor', () => {
   for (const surface of ['chalk', 'frost', 'vapor']) {
-    for (const name of ['--text-1', '--text-nav', '--text-2']) {
+    for (const name of textRoles('workspace')) {
       atLeast(4.5, token('workspace', name), named(surface), `workspace ${name} on ${surface}`);
     }
   }
 });
 
-test('overlay secondary text reaches 4.5:1 on the overlay surface over white and black', () => {
-  for (const surface of overlaySurfaces()) atLeast(4.5, token('overlay', '--text-2'), surface, 'overlay --text-2');
+test('overlay text roles reach 4.5:1 on the overlay surface over white and black', () => {
+  for (const surface of overlaySurfaces()) {
+    for (const name of textRoles('overlay')) atLeast(4.5, token('overlay', name), surface, `overlay ${name}`);
+  }
 });
 
 test('icon-only strokes reach 3:1 in both themes', () => {
