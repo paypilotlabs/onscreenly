@@ -1,0 +1,116 @@
+/* Motion and system settings. Enter animations only: hiding is instant via .hidden.
+ * Rules inside the @media blocks never target :root, html or body (the prototype replays them on a class). */
+@keyframes ui-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes ui-caret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ui-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    animation-delay: 0ms;
+    transition-duration: 0.01ms;
+    transition-delay: 0ms;
+    scroll-behavior: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .glass,
+  .ws-dialog,
+  .btn,
+  .chip,
+  .tag,
+  .field,
+  .kbd,
+  .check,
+  #toolbar,
+  #composer,
+  .ai-card,
+  .ai-error {
+    border: 1px solid CanvasText;
+  }
+  .btn-primary,
+  #send-btn {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+  .check:checked {
+    forced-color-adjust: none;
+    border-color: Highlight;
+    background: Highlight;
+  }
+  .check::before {
+    forced-color-adjust: none;
+    background: HighlightText;
+  }
+  :focus-visible {
+    outline-color: Highlight;
+  }
+}

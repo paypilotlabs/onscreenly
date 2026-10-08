@@ -1,7 +1,7 @@
 // Settings › Knowledge: choose the Obsidian vault, switch notes on or off,
 // skip folders, and try a search to see which notes a question would use.
 import { state } from './state.js';
-import { $, onscreenly } from './core.js';
+import { $, onscreenly, setButtonKind } from './core.js';
 
 let searchTimer = null;
 
@@ -12,10 +12,18 @@ function formatTime(ms) {
 function renderStatus(status) {
   if (!status) return;
   const hasVault = !!status.vaultPath;
+  // A chosen vault reads in body text, with its note count as a tag once it has been indexed.
+  $('.s-vault-card').classList.toggle('is-set', hasVault);
+  const count = $('#vault-count');
+  const indexed = hasVault && status.indexedAt > 0;
+  count.textContent = indexed ? `${status.notes.toLocaleString()} ${status.notes === 1 ? 'note' : 'notes'}` : '';
+  count.classList.toggle('hidden', !indexed);
   $('#vault-path').textContent = hasVault
     ? `${status.vaultName} — ${status.vaultPath}`
     : 'No vault chosen. Pick the folder that holds your notes (the one with a .obsidian folder inside).';
   $('#vault-pick').textContent = hasVault ? 'Change folder…' : 'Choose vault folder…';
+  // Choosing the vault is the pane's primary action until one is chosen.
+  setButtonKind($('#vault-pick'), hasVault ? 'secondary' : 'primary');
   $('#vault-reindex').disabled = !hasVault || !status.enabled || status.indexing;
   $('#vault-forget').disabled = !hasVault;
   $('#knowledge-enabled').disabled = !hasVault;

@@ -1,7 +1,7 @@
 // Audio capture in the renderer: microphone via AudioWorklet and meeting audio via getDisplayMedia loopback.
 import { state } from './state.js';
 import { isMac, isWindows, onscreenly } from './core.js';
-import { showStatus } from './events.js';
+import { showAudioStatus, showStatus } from './events.js';
 
 // ---- capture: mic (renderer side) — uses AudioWorklet (modern, off-main-thread) ----
 let audioCtx = null,
@@ -148,7 +148,7 @@ async function startSystemAudio() {
   // call. Default to staying invisible; the user opts in in Settings > Audio.
   if (isMac && !(state.settings && state.settings.meetingAudio)) {
     onscreenly.log('system audio: meeting audio is off on macOS -- no display-capture session opened');
-    showStatus(
+    showAudioStatus(
       'Meeting audio is off. macOS shows a screen-recording indicator whenever an app captures system audio; turn Meeting audio on in Settings \u203a Audio if you want the other side transcribed.'
     );
     return;

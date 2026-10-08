@@ -102,6 +102,16 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+      # Screenshots of the main states from e2e/screens.spec.js, for review.
+      - name: Keep the UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: test-results/ui/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
   package-windows:
     name: Package Windows
     runs-on: windows-latest

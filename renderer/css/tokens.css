@@ -1,0 +1,422 @@
+/* Onscreenly design tokens.
+ *
+ * Section 1 is the Cluely token set, copied verbatim.
+ * Source: https://styles.refero.design/style/72da35d5-1cfd-41a3-94f6-cb6b8c07a670 (Cluely)
+ * Four source quirks (the token wins in each; see docs/design/README.md):
+ *   1. --tracking-* are px and near zero; roles use the guideline em values.
+ *   2. The elevation prose names #0544a9 but --shadow-subtle uses rgb(12,68,161).
+ *   3. --radius-full (110.25px) coexists with --radius-pills (9999px); pills use --radius-pills.
+ *   4. --shadow-subtle-2's second layer has no inset; it is used only for the prototype's mockup frame.
+ * --color-neon and --color-cyan-veil are declared and never referenced.
+ */
+
+/* 1. Cluely tokens (verbatim) */
+:root {
+  /* Colors */
+  --color-signal-blue: #3c83f6;
+  --color-deep-dusk: #022c70;
+  --color-azure-crest: #0544a5;
+  --color-hover-glow: #81b6ff;
+  --color-ink-black: #000000;
+  --color-carbon: #18181b;
+  --color-slate: #2e3038;
+  --color-steel: #5e616e;
+  --color-fog: #777a88;
+  --color-mist: #afb3c4;
+  --color-vapor: #edeef2;
+  --color-frost: #f3f8ff;
+  --color-chalk: #ffffff;
+  --color-bone: #e4e4e7;
+  --color-ash: #d7d7d7;
+  --color-neon: #00ff26;
+  --color-cyan-veil: #7df0f8;
+
+  /* Typography — Font Families */
+  --font-eb-garamond: 'EB Garamond', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-geist: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-ui-monospace: 'ui-monospace', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Typography — Scale */
+  --text-caption: 10px;
+  --leading-caption: 1.5;
+  --tracking-caption: 0px;
+  --text-body: 16px;
+  --leading-body: 1.5;
+  --tracking-body: -0.01px;
+  --text-subheading: 20px;
+  --leading-subheading: 1.38;
+  --tracking-subheading: -0.018px;
+  --text-heading-sm: 28px;
+  --leading-heading-sm: 1.25;
+  --tracking-heading-sm: -0.025px;
+  --text-heading: 36px;
+  --leading-heading: 1.2;
+  --tracking-heading: -0.031px;
+  --text-heading-lg: 48px;
+  --leading-heading-lg: 1.13;
+  --tracking-heading-lg: -0.036px;
+  --text-display: 80px;
+  --leading-display: 1.02;
+  --tracking-display: -0.96px;
+
+  /* Typography — Weights */
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
+  /* Spacing */
+  --spacing-4: 4px;
+  --spacing-5: 5px;
+  --spacing-6: 6px;
+  --spacing-7: 7px;
+  --spacing-8: 8px;
+  --spacing-9: 9px;
+  --spacing-10: 10px;
+  --spacing-12: 12px;
+  --spacing-14: 14px;
+  --spacing-16: 16px;
+  --spacing-18: 18px;
+  --spacing-20: 20px;
+  --spacing-28: 28px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-73: 73px;
+
+  /* Layout */
+  --page-max-width: 1200px;
+  --section-gap: 64px;
+  --card-padding: 24px;
+  --element-gap: 8px;
+
+  /* Border Radius */
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-3xl-2: 32px;
+  --radius-full: 110.25px;
+
+  /* Named Radii */
+  --radius-cards: 12px;
+  --radius-pills: 9999px;
+  --radius-inputs: 8px;
+  --radius-buttons: 4px;
+  --radius-feature-cards: 24px;
+  --radius-product-mockup: 16px;
+
+  /* Shadows */
+  --shadow-subtle: rgb(12, 68, 161) 0px 0px 0px 0.5px, rgb(2, 44, 112) 0px -1px 0px 0px inset, rgb(129, 182, 255) 0px 0.5px 0px 0px inset;
+  --shadow-subtle-2: rgba(207, 226, 255, 0.24) 0px 0px 0px 1px, rgba(255, 255, 255, 0.8) 0px -0.5px 0px 0px;
+  --shadow-subtle-3: rgba(255, 255, 255, 0.25) 0px -1px 0px 0px;
+  --shadow-lg: rgba(0, 0, 0, 0.05) 0px 2px 20px -1px inset;
+  --shadow-lg-2: rgba(148, 172, 243, 0.4) 20px 20px 24px 0px, rgba(191, 229, 251, 0.4) -3px -3px 4px 0px inset, rgba(19, 26, 228, 0.1) 4px 4px 4px 0px inset;
+
+  /* Surfaces */
+  --surface-canvas: #ffffff;
+  --surface-frost-tint: #f3f8ff;
+  --surface-vapor-layer: #edeef2;
+  --surface-bone-border: #e4e4e7;
+}
+
+/* 2. Cluely DTCG typography steps: --ts-<step> is a font shorthand, --ts-<step>-track its tracking. */
+:root {
+  --ts-xs: 600 9px/1.25 var(--font-geist);
+  --ts-xs-track: -0.025em;
+  --ts-xs-2: 400 10px/1.5 var(--font-ui-monospace);
+  --ts-xs-2-track: 0em;
+  --ts-xs-3: 400 10px/1.5 var(--font-geist);
+  --ts-xs-3-track: 0em;
+  --ts-xs-4: 400 10px/1 var(--font-geist);
+  --ts-xs-4-track: 0em;
+  --ts-xs-5: 500 10px/1.5 var(--font-geist);
+  --ts-xs-5-track: 0em;
+  --ts-xs-6: 600 10px/1 var(--font-geist);
+  --ts-xs-6-track: -0.02em;
+  --ts-xs-7: 500 11px/1.38 var(--font-geist);
+  --ts-xs-7-track: -0.03em;
+  --ts-xs-8: 400 11px/1.38 var(--font-geist);
+  --ts-xs-8-track: -0.025em;
+  --ts-xs-9: 600 11px/1.25 var(--font-geist);
+  --ts-xs-9-track: -0.025em;
+  --ts-xs-10: 400 11px/1.5 var(--font-geist);
+  --ts-xs-10-track: -0.025em;
+  --ts-xs-11: 600 11px/1.38 var(--font-geist);
+  --ts-xs-11-track: -0.036em;
+  --ts-xs-12: 500 12px/1 var(--font-geist);
+  --ts-xs-12-track: -0.025em;
+  --ts-xs-13: 500 12px/1.33 var(--font-geist);
+  --ts-xs-13-track: 0em;
+  --ts-xs-14: 400 12px/1.33 var(--font-geist);
+  --ts-xs-14-track: 0em;
+  --ts-xs-15: 400 12px/1.6 var(--font-geist);
+  --ts-xs-15-track: 0em;
+  --ts-xs-16: 400 12px/1 var(--font-geist);
+  --ts-xs-16-track: 0em;
+  --ts-xs-17: 500 12px/1.38 var(--font-geist);
+  --ts-xs-17-track: -0.025em;
+  --ts-xs-18: 600 12px/1.5 var(--font-geist);
+  --ts-xs-18-track: -0.025em;
+  --ts-xs-19: 600 12px/1.25 var(--font-geist);
+  --ts-xs-19-track: -0.025em;
+  --ts-xs-20: 600 12px/1.33 var(--font-geist);
+  --ts-xs-20-track: 0.15em;
+  --ts-xs-21: 500 12px/1.33 var(--font-geist);
+  --ts-xs-21-track: -0.025em;
+  --ts-sm: 400 13px/1.5 var(--font-geist);
+  --ts-sm-track: 0em;
+  --ts-sm-2: 500 13px/1.38 var(--font-geist);
+  --ts-sm-2-track: -0.031em;
+  --ts-sm-3: 500 13px/1.38 var(--font-geist);
+  --ts-sm-3-track: -0.025em;
+  --ts-sm-4: 500 14px/1.25 var(--font-geist);
+  --ts-sm-4-track: -0.025em;
+  --ts-sm-5: 500 14px/1.43 var(--font-geist);
+  --ts-sm-5-track: 0em;
+  --ts-sm-6: 500 14px/1.43 var(--font-geist);
+  --ts-sm-6-track: -0.025em;
+  --ts-sm-7: 500 14px/1 var(--font-geist);
+  --ts-sm-7-track: -0.025em;
+  --ts-sm-8: 400 14px/1.43 var(--font-geist);
+  --ts-sm-8-track: -0.025em;
+  --ts-base: 400 16px/1.5 var(--font-geist);
+  --ts-base-track: 0em;
+  --ts-base-2: 500 16px/1.5 var(--font-geist);
+  --ts-base-2-track: -0.008em;
+  --ts-base-3: 400 16px/1.5 var(--font-geist);
+  --ts-base-3-track: 0.025em;
+  --ts-base-4: 500 16px/1.38 var(--font-geist);
+  --ts-base-4-track: -0.025em;
+  --ts-base-5: 500 16px/1.5 var(--font-geist);
+  --ts-base-5-track: 0em;
+  --ts-base-6: 600 16px/1 var(--font-geist);
+  --ts-base-6-track: 0em;
+  --ts-base-7: 600 16px/1 var(--font-geist);
+  --ts-base-7-track: -0.02em;
+  --ts-base-8: 500 16px/1.5 var(--font-geist);
+  --ts-base-8-track: -0.025em;
+  --ts-base-9: 400 16px/1.38 var(--font-geist);
+  --ts-base-9-track: -0.025em;
+  --ts-lg: 400 18px/1.5 var(--font-geist);
+  --ts-lg-track: 0em;
+  --ts-lg-2: 400 18px/1.56 var(--font-geist);
+  --ts-lg-2-track: 0em;
+  --ts-lg-3: 500 19px/1.4 var(--font-geist);
+  --ts-lg-3-track: -0.02em;
+  --ts-xl: 400 20px/1.38 var(--font-geist);
+  --ts-xl-track: -0.025em;
+  --ts-xl-2: 500 20px/1.38 var(--font-geist);
+  --ts-xl-2-track: -0.025em;
+  --ts-2xl: 500 24px/1.13 var(--font-geist);
+  --ts-2xl-track: -0.04em;
+  --ts-2xl-2: 500 28px/1.25 var(--font-geist);
+  --ts-2xl-2-track: -0.018em;
+  --ts-2xl-3: 500 28px/1.25 var(--font-geist);
+  --ts-2xl-3-track: -0.04em;
+  --ts-3xl: 400 30px/1.2 var(--font-geist);
+  --ts-3xl-track: 0em;
+  --ts-4xl: 300 36px/1.11 var(--font-geist);
+  --ts-4xl-track: 0em;
+  --ts-4xl-2: 600 42px/1 var(--font-geist);
+  --ts-4xl-2-track: -0.005em;
+  --ts-5xl: 400 48px/1 var(--font-geist);
+  --ts-5xl-track: 0em;
+  --ts-5xl-2: 500 56px/1.25 var(--font-geist);
+  --ts-5xl-2-track: -0.023em;
+  --ts-5xl-3: 500 80px/1.02 var(--font-eb-garamond);
+  --ts-5xl-3-track: -0.012em;
+}
+
+:root {
+  /* 3. Structure. --win-w/--win-h stand for the window size (the prototype sets them on its stage). */
+  --win-w: 100vw;
+  --win-h: 100vh;
+  --main-w: 700px;
+  --side-w: 300px;
+  --panel-w: 624px;
+  --toolbar-h: 36px;
+  --control-h: 28px;
+  --field-h: 34px;
+  --btn-h: 34px;
+  --btn-h-compact: 30px;
+
+  --z-sidebar: 0;
+  --z-panel: 1;
+  --z-app: 2;
+  --z-panel-chrome: 4;
+  --z-float: 5;
+  --z-settings: 20;
+  --z-onboard: 30;
+  --z-consent: 40;
+  --z-toolbar: 50;
+  --z-popover: 60;
+
+  --dur-press: 80ms;
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --dur-breathe: 2400ms;
+  --dur-shimmer: 1400ms;
+  --dur-caret: 1000ms;
+  --dur-spin: 800ms;
+  --delay-label: 150ms; /* the thinking label waits this long before it fades in */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-std: cubic-bezier(0.2, 0, 0, 1);
+
+  /* 4. Literals from the guideline text (hero band only) */
+  --gradient-hero: linear-gradient(180deg, #0544a9 0%, #022c70 100%);
+  --gradient-hero-alt: radial-gradient(120% 90% at 50% 0%, #1e82e0 0%, #1c38ea 100%);
+
+  /* 5. New literals pending approval (mirrored in docs/design/README.md) */
+  --lit-ok-overlay: #8fc4a3;
+  --lit-ok-workspace: #3f6b4f;
+  --lit-accent-alt: #2c70de;
+  --lit-warn-overlay: #d4b679;
+  --lit-danger-overlay: #e09a9a;
+  --lit-warn-workspace: #7a5c1e;
+  --lit-danger-workspace: #a33a3a;
+
+  /* 6. Theme-independent semantics */
+  --accent: var(--color-signal-blue);
+  --accent-fill: var(--color-signal-blue);
+  --accent-press: var(--color-azure-crest);
+  --accent-hover-shadow: var(--shadow-subtle);
+  --on-accent: var(--color-chalk);
+  --focus-ring: 2px solid var(--color-signal-blue);
+  --focus-halo: 0 0 0 3px color-mix(in srgb, var(--color-signal-blue) 18%, transparent);
+  --scrim: color-mix(in srgb, var(--color-ink-black) 45%, transparent);
+  --scrim-blur: blur(8px);
+  --scrim-dim: brightness(0.55); /* the scrim's 45% ink as a filter, for UI that sits beside a scrim */
+  --selection: color-mix(in srgb, var(--color-signal-blue) 22%, transparent);
+
+  /* 7. Type roles (font shorthand + tracking) */
+  --type-display: 500 48px/1.02 var(--font-eb-garamond); /* 5xl-3 scaled to 48px */
+  --type-display-track: -0.012em;
+  --type-heading: 500 28px/1.25 var(--font-geist);
+  --type-heading-track: -0.025em;
+  --type-answer: var(--ts-xl);
+  --type-answer-track: var(--ts-xl-track);
+  --type-title: var(--ts-xl-2);
+  --type-title-track: var(--ts-xl-2-track);
+  --type-lede: var(--ts-base-9);
+  --type-lede-track: var(--ts-base-9-track);
+  --type-title-sm: var(--ts-base-4);
+  --type-title-sm-track: var(--ts-base-4-track);
+  --type-body: var(--ts-sm-8);
+  --type-body-track: var(--ts-sm-8-track);
+  --type-strong-sm: var(--ts-sm-6);
+  --type-strong-sm-track: var(--ts-sm-6-track);
+  --type-button: var(--ts-sm-7);
+  --type-button-track: var(--ts-sm-7-track);
+  --type-control: var(--ts-sm-3);
+  --type-control-track: var(--ts-sm-3-track);
+  --type-label: var(--ts-xs-17);
+  --type-label-track: var(--ts-xs-17-track);
+  --type-meta: var(--ts-xs-21);
+  --type-meta-track: var(--ts-xs-21-track);
+  --type-help: 400 12px/1.6 var(--font-geist);
+  --type-help-track: -0.01em;
+  --type-eyebrow: var(--ts-xs-20);
+  --type-eyebrow-track: var(--ts-xs-20-track);
+  --type-kbd: 500 12px/1 var(--font-ui-monospace);
+  --type-kbd-track: 0;
+  /* Code: blocks and inline code in 14px text; inline code inside the 20px answer. Never below 12px. */
+  --type-code: 500 13px/1.5 var(--font-ui-monospace);
+  --type-code-track: 0;
+  --type-code-answer: 500 17px/1.38 var(--font-ui-monospace);
+  --type-code-answer-track: 0;
+}
+
+/* 8. Themes. Both declare the same property set (a parity test checks this).
+ *    .theme-overlay sits on #app; .theme-workspace on #settings, #onboard, #consent and .perm-card.
+ *    --text-3 is the caption role (captions, placeholders, eyebrows, timestamps). */
+.theme-overlay {
+  color-scheme: dark;
+  /* 98%: at 92% a white document behind the panel stayed legible through the answer text (no
+   * backdrop blur outside the scrims, so the surface itself has to hide the desktop). */
+  --bg-surface: color-mix(in srgb, var(--color-carbon) 98%, transparent);
+  --bg-tint: color-mix(in srgb, var(--color-chalk) 4%, transparent);
+  --bg-layer: color-mix(in srgb, var(--color-chalk) 7%, transparent);
+  --bg-pressed: color-mix(in srgb, var(--color-chalk) 10%, transparent);
+  --bg-well: color-mix(in srgb, var(--color-ink-black) 28%, transparent);
+  --bg-popover: color-mix(in srgb, var(--color-slate) 98%, transparent);
+  --line: color-mix(in srgb, var(--color-bone) 10%, transparent);
+  --line-strong: color-mix(in srgb, var(--color-bone) 18%, transparent);
+  --line-on-tint: color-mix(in srgb, var(--color-bone) 6%, transparent);
+  --text-strong: var(--color-chalk);
+  --text-1: var(--color-vapor);
+  --text-nav: var(--color-vapor);
+  --text-2: var(--color-mist);
+  --text-3: var(--color-mist);
+  --text-disabled: var(--color-steel);
+  --text-answer: var(--color-frost);
+  --icon: var(--color-fog);
+  --icon-solo: var(--color-fog);
+  --scroll-thumb: var(--icon);
+  --field-shadow: inset 0 2px 20px -1px color-mix(in srgb, var(--color-ink-black) 30%, transparent);
+  --frame: 0 0 0 1px color-mix(in srgb, var(--color-ink-black) 40%, transparent), inset 0 1px 0 color-mix(in srgb, var(--color-chalk) 6%, transparent);
+  --selected-bg: color-mix(in srgb, var(--color-signal-blue) 14%, transparent);
+  --selected-line: color-mix(in srgb, var(--color-signal-blue) 50%, transparent);
+  --ok: var(--lit-ok-overlay);
+  --ok-line: color-mix(in srgb, var(--lit-ok-overlay) 45%, transparent);
+  --warn: var(--text-strong);
+  --danger: var(--text-strong);
+  --warn-bg: transparent;
+  --danger-bg: transparent;
+  --warn-line: var(--line-strong);
+  --danger-line: var(--line-strong);
+}
+
+.theme-workspace {
+  color-scheme: light;
+  --bg-surface: var(--color-chalk);
+  --bg-tint: var(--color-frost);
+  --bg-layer: var(--color-vapor);
+  --bg-pressed: color-mix(in srgb, var(--color-vapor), var(--color-steel) 8%);
+  --bg-well: var(--color-chalk);
+  --bg-popover: var(--color-chalk);
+  --line: var(--color-bone);
+  --line-strong: var(--color-bone);
+  --line-on-tint: var(--color-ash);
+  --text-strong: var(--color-carbon);
+  --text-1: var(--color-carbon);
+  --text-nav: var(--color-slate);
+  --text-2: var(--color-steel);
+  --text-3: var(--color-steel);
+  --text-disabled: var(--color-fog);
+  --text-answer: var(--color-carbon);
+  --icon: var(--color-mist);
+  --icon-solo: var(--color-steel);
+  --scroll-thumb: var(--icon);
+  --field-shadow: var(--shadow-lg);
+  --frame: none;
+  --selected-bg: var(--color-frost);
+  --selected-line: var(--color-signal-blue);
+  --ok: var(--lit-ok-workspace);
+  --ok-line: color-mix(in srgb, var(--lit-ok-workspace) 40%, transparent);
+  --warn: var(--text-strong);
+  --danger: var(--text-strong);
+  --warn-bg: transparent;
+  --danger-bg: transparent;
+  --warn-line: var(--line-strong);
+  --danger-line: var(--line-strong);
+}
+
+/* System settings that change token values. */
+@media (prefers-contrast: more) {
+  .theme-overlay {
+    --bg-surface: var(--color-carbon);
+    --line-strong: color-mix(in srgb, var(--color-bone) 24%, transparent);
+  }
+  .theme-workspace {
+    --line-strong: var(--color-steel);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .theme-overlay {
+    --bg-surface: var(--color-carbon);
+  }
+}

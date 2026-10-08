@@ -1,83 +1,120 @@
 // Events pushed from the main process: capture, transcription, answers and status messages.
 import { state } from './state.js';
-import { onscreenly, setSessionButton } from './core.js';
+import { $, onscreenly, setSessionButton } from './core.js';
 import {
   MAX_RESPONSES,
   addAnswerExtras,
   appendToken,
   clearTranscriptInterim,
+  failAi,
   finalizeAi,
   messages,
   noteStreamActivity,
+  runMode,
   setBusy,
   showToast,
-  startAi
+  startResponseGroup
 } from './chat.js';
-import { autoFillInputFromSTT, cancelSoftClear, composer, input, softClearSTTFill } from './composer.js';
+import {
+  autoFillInputFromSTT,
+  cancelSoftClear,
+  clearGhost,
+  composer,
+  input,
+  showGhost,
+  softClearSTTFill
+} from './composer.js';
 import { startMic, stopMic, stopSystemAudio } from './audio.js';
 import { appendTranscriptHistoryTurn, setLiveDotState, setSttState, sttState, updateSttStatus } from './transcript.js';
 import { publikActionButton } from './publik-settings.js';
 import { showPublikCard } from './onboarding.js';
+import { openSettings } from './settings-panel.js';
+import { markUnread } from './toolbar.js';
 
-// ---- real-time transcript display (interim + final) ----
-let interimEl = null;
-function getOrCreateInterimEl() {
-  if (!interimEl) {
-    interimEl = document.createElement('div');
-    interimEl.className = 'interim-transcript';
-    // Insert into panel-main (the left column), before the action row
-    const panelMain = document.getElementById('panel-main');
-    const actionRow = document.getElementById('action-row');
-    if (panelMain && actionRow && actionRow.parentNode === panelMain) {
-      panelMain.insertBefore(interimEl, actionRow);
-    } else if (panelMain) {
-      panelMain.appendChild(interimEl);
-    } else {
-      document.getElementById('panel').appendChild(interimEl);
-    }
-  }
-  return interimEl;
-}
-// FIX #12: Show interim text in input box (grayed/italic) before final arrives
-let inputInterimEl = null;
-function showInterimInInput(text) {
-  if (!inputInterimEl) {
-    inputInterimEl = document.createElement('span');
-    inputInterimEl.className = 'input-interim';
-    // FIX #2: Insert into composer (not input-area) for correct positioning
-    composer.appendChild(inputInterimEl);
-  }
-  inputInterimEl.textContent = text;
-  inputInterimEl.style.display = text ? 'block' : 'none';
-}
-function clearInputInterim() {
-  if (inputInterimEl) {
-    inputInterimEl.textContent = '';
-    inputInterimEl.style.display = 'none';
-  }
-}
+// The banner above the action row: a message, at most one action, and Dismiss. `tone` is 'info',
+// 'warn' or 'error' (read out at once).
 let statusTimer = null;
-function showStatus(message, button) {
+function showStatus(message, button, tone = 'info') {
   let el = document.getElementById('onscreenly-status');
   if (!el) {
     el = document.createElement('div');
     el.id = 'onscreenly-status';
-    // Insert into panel-main before the action row
-    const panelMain = document.getElementById('panel-main');
-    const actionRow = document.getElementById('action-row');
-    if (panelMain && actionRow && actionRow.parentNode === panelMain) {
-      panelMain.insertBefore(el, actionRow);
-    } else if (panelMain) {
-      panelMain.appendChild(el);
-    } else {
-      document.getElementById('panel').appendChild(el);
-    }
+    const text = document.createElement('span');
+    text.className = 'banner-msg';
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'banner-close';
+    dismiss.title = 'Dismiss this message';
+    dismiss.textContent = 'Dismiss';
+    dismiss.addEventListener('click', hideStatus);
+    el.append(text, dismiss);
+    document.getElementById('panel-main').insertBefore(el, document.getElementById('action-row'));
   }
-  el.textContent = message;
-  if (button) el.appendChild(button);
+  el.dataset.tone = tone;
+  el.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+  el.querySelector('.banner-msg').textContent = message;
+  const previous = el.querySelector('.banner-action');
+  if (previous) previous.remove();
+  if (button) {
+    button.type = 'button';
+    button.classList.add('btn', 'btn-secondary', 'compact', 'banner-action');
+    el.querySelector('.banner-close').before(button);
+  }
+  // Restart the rise-in when one message replaces another.
+  el.classList.remove('show');
+  void el.offsetWidth;
   el.classList.add('show');
   clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => el.classList.remove('show'), button ? 30000 : 11000);
+  statusTimer = setTimeout(hideStatus, button ? 30000 : 11000);
+}
+
+function hideStatus() {
+  clearTimeout(statusTimer);
+  const el = document.getElementById('onscreenly-status');
+  if (el) el.classList.remove('show');
+}
+
+// A warning about listening, with the way to fix it: Settings › Audio.
+function showAudioStatus(message) {
+  const button = document.createElement('button');
+  button.textContent = 'Open Audio settings';
+  button.addEventListener('click', () => {
+    hideStatus();
+    openSettings('transcription');
+  });
+  showStatus(message, button, 'warn');
+}
+
+// ---- answer errors ---------------------------------------------------------
+// The button under a failed answer, from the code main gave the error. No code, no button: an error
+// with an action (publik) leaves the next step to its banner or card.
+function fixFor(code, run) {
+  switch (code) {
+    case 'no-provider':
+      return { label: 'Open settings', run: () => openSettings('keys') };
+    case 'needs-resume':
+      return { label: 'Open Profile', run: () => openSettings('profile') };
+    case 'needs-session':
+      return {
+        label: 'Start session',
+        run: () => {
+          const stop = $('#stop-btn');
+          if (!stop.classList.contains('active')) stop.click();
+        }
+      };
+    case 'needs-speech':
+      return noSpeechToText() ? { label: 'Open Audio settings', run: () => openSettings('transcription') } : null;
+    case 'provider-failed':
+    case 'interrupted':
+      return run ? { label: 'Try again', run: () => runMode(run.mode, run.text) } : null;
+    default:
+      return null;
+  }
+}
+
+// Nothing can transcribe: no speech-to-text key and no local model (#panel[data-listen], boot.js).
+function noSpeechToText() {
+  return $('#panel').dataset.listen === 'none';
 }
 
 export function init() {
@@ -96,11 +133,7 @@ export function init() {
     } else {
       stopMic();
       stopSystemAudio();
-      // FIX #2: Clear interim element when capture stops
-      if (interimEl) {
-        interimEl.textContent = '';
-        interimEl.classList.remove('show');
-      }
+      clearGhost();
       // Don't auto-close sidebar — let user keep it open if they want
     }
     if (active && mode === 'local') setSttState('local');
@@ -108,27 +141,16 @@ export function init() {
   });
 
   onscreenly.on('stt:interim', ({ channel, text }) => {
-    setLiveDotState('transcribing');
-    const el = getOrCreateInterimEl();
-    const label = channel === 'them' ? 'Them' : 'You';
-    el.textContent = `${label}: ${text}`;
-    el.classList.add('show');
+    setLiveDotState('speaking');
     appendTranscriptHistoryTurn(channel, text, true); // update sidebar interim
 
-    // FIX #12: Show interviewer's interim speech in input area
-    if (channel === 'them' && !input.value.trim()) {
-      showInterimInInput(text);
-    }
+    // Live speech shows once: the other side's words as ghost text in the empty composer.
+    if (channel === 'them' && !input.value.trim()) showGhost(text);
   });
-  onscreenly.on('stt:final', ({ channel, text }) => {
+  onscreenly.on('stt:final', () => {
     setLiveDotState('idle');
-    // Clear interim when we get a final
-    if (interimEl) {
-      interimEl.textContent = '';
-      interimEl.classList.remove('show');
-    }
     clearTranscriptInterim();
-    clearInputInterim(); // FIX #12: Clear interim text from input area
+    clearGhost();
     // sidebar: the final turn is added via the 'transcript' event below
   });
   onscreenly.on('stt:status', ({ channel, status, provider }) => {
@@ -145,8 +167,8 @@ export function init() {
       if (localStates[status]) setSttState(localStates[status]);
       if (status === 'loading') setSessionButton(true);
       if (status === 'off' || status === 'error') setSessionButton(false);
-      if (status === 'loading' || status === 'transcribing' || status === 'stopping') setLiveDotState('transcribing');
-      if (status === 'ready') setLiveDotState('idle');
+      if (status === 'transcribing') setLiveDotState('speaking');
+      if (status === 'loading' || status === 'ready' || status === 'stopping') setLiveDotState('idle');
       if (status === 'off') setLiveDotState('off');
       return;
     }
@@ -155,56 +177,31 @@ export function init() {
   onscreenly.on('vad:state', ({ channel, speaking }) => {
     setLiveDotState(speaking ? 'speaking' : 'idle');
   });
+  // "Slide 3 · <caption>": on screen the caption stops at 60 characters; screen readers get all of it.
   onscreenly.on('slides:update', ({ count, last }) => {
     if (!count) return;
-    const title = last && last.caption ? last.caption.split('\n')[0].slice(0, 80) : 'Slide ' + count;
-    showToast(`Slide ${count} captured · ${title}`, 3000);
+    const caption = last && last.caption ? last.caption.split('\n')[0].trim() : '';
+    if (!caption) {
+      showToast(`Slide ${count}`, 3000);
+      return;
+    }
+    const shown = caption.length > 60 ? caption.slice(0, 60).trimEnd() + '…' : caption;
+    showToast(`Slide ${count} · ${caption}`, 3000, null, `Slide ${count} · ${shown}`);
   });
-  onscreenly.on('llm:start', ({ userBubble, small, category, layout }) => {
+  onscreenly.on('llm:start', ({ userBubble, small, category, layout, mode }) => {
     state.responseCount++;
     if (state.responseCount > MAX_RESPONSES) {
       const oldest = messages.querySelector('.response-group');
       if (oldest) oldest.remove();
       state.responseCount = MAX_RESPONSES;
     }
-    const group = document.createElement('div');
-    group.className = 'response-group';
-    const sep = document.createElement('div');
-    sep.className = 'response-sep';
-    sep.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    group.appendChild(sep);
-    if (userBubble) {
-      const b = document.createElement('div');
-      b.className = 'user-bubble';
-      b.textContent = userBubble;
-      group.appendChild(b);
-    }
-    if (category) {
-      const pill = document.createElement('div');
-      pill.className = 'category-pill';
-      pill.textContent = category.charAt(0).toUpperCase() + category.slice(1);
-      group.appendChild(pill);
-    }
-    state.aiEl = document.createElement('div');
-    state.aiEl.className = 'ai-text' + (small ? ' small' : '') + (layout === 'cards' ? ' cards' : '');
-    state.aiEl.dataset.raw = '';
-    state.caretEl = document.createElement('span');
-    state.caretEl.className = 'ai-caret';
-    state.aiEl.appendChild(state.caretEl);
-    group.appendChild(state.aiEl);
-    messages.appendChild(group);
-    // Use requestAnimationFrame so the DOM is fully updated before scrolling.
-    // Scroll #messages directly rather than calling sep.scrollIntoView(): that
-    // scrolls *every* scrollable ancestor, and once the panel is tall enough it
-    // scrolls the document too, aligning the separator to the top of the window
-    // and pushing #toolbar out of view. html/body are overflow:hidden, so there
-    // is no scrollbar or wheel gesture to undo it — the Stop/Hide/Quit controls
-    // just never come back.
-    requestAnimationFrame(() => {
-      if (sep && sep.isConnected) {
-        messages.scrollTo({ top: sep.offsetTop - messages.offsetTop, behavior: 'smooth' });
-      }
-    });
+    // The log scrolls itself (chat.js), never with scrollIntoView(): that scrolls every scrollable
+    // ancestor too, and once the panel is tall enough it scrolls the document, pushing #toolbar
+    // out of view. html/body are overflow:hidden, so nothing would bring the controls back.
+    startResponseGroup({ question: userBubble, category, small, cards: layout === 'cards', mode });
+    markUnread();
+    // A global shortcut asks from main, not through runMode: "Try again" repeats it too.
+    if (mode && (!state.lastRun || state.lastRun.mode !== mode)) state.lastRun = { mode, text: '' };
     setBusy(true);
   });
   onscreenly.on('llm:token', ({ text }) => {
@@ -216,10 +213,13 @@ export function init() {
     if (el) addAnswerExtras(el, sources);
     setBusy(false);
   });
-  onscreenly.on('llm:error', ({ message, action }) => {
-    if (!state.aiEl) startAi(true);
-    state.aiEl.dataset.raw = message;
-    finalizeAi();
+  onscreenly.on('llm:error', ({ message, action, code }) => {
+    // Without speech-to-text, "say something" would not help: say why nothing was heard.
+    const text =
+      code === 'needs-speech' && noSpeechToText()
+        ? 'Nothing has been transcribed. No speech-to-text is set up, so Onscreenly can’t hear the conversation.'
+        : message;
+    failAi(text, { code, fix: action ? null : fixFor(code, state.lastRun) });
     setBusy(false);
     // publik errors carry one action: the renderer's markdown emits no anchors,
     // so a link needs a real button (same pattern as the mic banner).
@@ -249,8 +249,14 @@ export function init() {
       appendTranscriptHistoryTurn(t.channel, t.text, false);
     }
   });
-  onscreenly.on('status', ({ message }) => {
+  onscreenly.on('status', ({ message, code }) => {
     onscreenly.log('[status] ' + message);
+    // A session that nothing can transcribe: "No speech-to-text", and the way to set it up.
+    if (code === 'stt-unavailable') {
+      setSttState('unavailable');
+      showAudioStatus(message);
+      return;
+    }
     showStatus(message);
     if (sttState !== 'disconnected') {
       const lower = message.toLowerCase();
@@ -259,4 +265,4 @@ export function init() {
   });
 }
 
-export { clearInputInterim, interimEl, showStatus };
+export { showAudioStatus, showStatus };

@@ -555,7 +555,7 @@ function createLLM(settings) {
     }
   } else if (provider !== 'ollama' && !apiKey) {
     // Ollama is a local server: the field holds a URL, and no key is required.
-    configurationError = `Add your ${provider} API key in Settings.`;
+    configurationError = `Add your ${normalizeProviderName(provider)} API key in Settings › API keys.`;
   }
 
   // Azure needs a second credential: the resource endpoint.

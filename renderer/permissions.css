@@ -1,0 +1,12 @@
+/* The permissions window's stylesheet: the main window's layers it needs, in the same order. It has
+ * no overlay, so no layout or overlay layer; the card itself is styled in workspace.css (.perm-card),
+ * and the page geometry sits in permissions.html's own <style>. */
+@layer fonts, tokens, base, controls, workspace, utilities, motion;
+
+@import url('css/fonts.css') layer(fonts);
+@import url('css/tokens.css') layer(tokens);
+@import url('css/base.css') layer(base);
+@import url('css/controls.css') layer(controls);
+@import url('css/workspace.css') layer(workspace);
+@import url('css/utilities.css') layer(utilities);
+@import url('css/motion.css') layer(motion);

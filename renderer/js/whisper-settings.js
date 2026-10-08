@@ -1,6 +1,7 @@
 // Local Whisper model list, download, import and delete.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
+import { paintReadiness } from './settings-form.js';
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
@@ -44,6 +45,7 @@ async function refreshWhisperModels() {
     state.whisperOverview = await onscreenly.whisperModels();
     const runtimeBadge = $('#whisper-runtime-status');
     runtimeBadge.classList.toggle('ready', state.whisperOverview.runtime.available);
+    runtimeBadge.classList.toggle('is-ok', state.whisperOverview.runtime.available);
     runtimeBadge.classList.toggle('error', !state.whisperOverview.runtime.available);
     runtimeBadge.textContent = state.whisperOverview.runtime.available
       ? `Ready · v${state.whisperOverview.runtime.version} · ${state.whisperOverview.runtime.target}`
@@ -55,7 +57,7 @@ async function refreshWhisperModels() {
     for (const model of state.whisperOverview.models) {
       const option = document.createElement('option');
       option.value = model.id;
-      option.textContent = `${model.label} — ${formatBytes(model.bytes)}${model.recommended ? ' (recommended)' : ''}${model.installed ? ' ✓' : ''}`;
+      option.textContent = `${model.label} — ${formatBytes(model.bytes)}${model.recommended ? ' (recommended)' : ''}${model.installed ? ' · downloaded' : ''}`;
       select.appendChild(option);
     }
     const selectionExists = state.whisperOverview.models.some((model) => model.id === previousSelection);
@@ -66,6 +68,8 @@ async function refreshWhisperModels() {
       ? 'Model files are verified before they can be loaded.'
       : state.whisperOverview.runtime.message;
     renderWhisperModelState();
+    // A model that finished downloading changes what the empty state offers.
+    paintReadiness();
   } catch (error) {
     status.textContent = `Could not load local model information: ${error.message}`;
   }

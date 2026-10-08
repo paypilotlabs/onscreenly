@@ -73,7 +73,7 @@ function consentCopy(request) {
     message: slides
       ? `${who} wants to read Onscreenly’s captured slide captions.`
       : action
-        ? `${who} wants to control onscreenly.`
+        ? `${who} wants to control Onscreenly.`
         : `${who} wants to see what Onscreenly is doing.`,
     detail:
       (slides

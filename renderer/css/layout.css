@@ -1,0 +1,127 @@
+/* Layout: the overlay window's geometry and click-through.
+ * The window is --side-w + --main-w + --side-w wide (MAIN_W/SIDE_W in app/main/window.js). #app fills the
+ * main column; the strips either side are room for the transcript sidebar. The window is transparent:
+ * only the UI blocks the mouse, every gap passes through to the screen below. */
+
+#app {
+  position: relative;
+  z-index: var(--z-app);
+  width: var(--main-w);
+  height: 100%;
+  margin-left: var(--side-w);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-14) 0;
+  pointer-events: none;
+  opacity: var(--onscreenly-opacity, 1);
+}
+
+/* The opacity popover opens upward as one 36px row: 14px margin + 36px row + 8px gap = 58px above the
+ * toolbar. Applied instantly (no transition), so the popover never starts outside the window. */
+#app.opacity-open {
+  padding-top: 58px;
+}
+
+#settings-scrim,
+#onboard-scrim,
+#consent-scrim {
+  opacity: var(--onscreenly-opacity, 1);
+}
+
+/* Exactly these six block the mouse (window-behaviour.js uses the same list for click-through). */
+#toolbar,
+#panel-wrap,
+#transcript-sidebar,
+#settings-scrim,
+#onboard-scrim,
+#consent-scrim {
+  pointer-events: auto;
+}
+
+/* The toolbar never shrinks: a tall panel must not squeeze away the session and quit controls. */
+#toolbar {
+  flex-shrink: 0;
+}
+
+/* Flex chain #app → #panel-wrap → #panel → #panel-columns → #panel-main. Every link may shrink
+ * (min-height: 0), and #messages is the only block that does, so with long answers, a banner and the
+ * popover open the composer still ends inside the 600px window. */
+#panel-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  width: var(--panel-w);
+  margin-top: var(--spacing-10);
+}
+
+#panel {
+  position: relative;
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+#panel-columns {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#panel-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: var(--spacing-10);
+  min-width: 0;
+  min-height: 0;
+}
+
+#panel-main > * {
+  flex-shrink: 0;
+}
+
+#messages {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(var(--win-h) * 0.5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Any spare height (the panel's floor with the sidebar open) goes above the action row, so the
+ * composer stays at the bottom. */
+#messages,
+#empty-state {
+  margin-bottom: auto;
+}
+
+/* With the sidebar open the panel is at least as tall as the sidebar needs; the two always match. */
+#panel-wrap:has(> .transcript-sidebar.open) > #panel {
+  min-height: 240px;
+}
+
+/* An empty log takes no room (and no flex gap); #empty-state shows instead. */
+#messages:empty {
+  display: none;
+}
+
+/* Transcript sidebar: same top and height as the panel, 12px beside it, in the right strip
+ * (.left: the left strip, when the screen has no room on the right). */
+.transcript-sidebar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(100% + var(--spacing-12));
+  z-index: var(--z-sidebar);
+  width: var(--side-w);
+}
+
+.transcript-sidebar.left {
+  left: auto;
+  right: calc(100% + var(--spacing-12));
+}

@@ -1,99 +1,238 @@
 // First-run onboarding and the publik disclosure/card dialogs.
 import { state } from './state.js';
-import { $, isWindows, onscreenly } from './core.js';
+import { $, isMac, isWindows, kbd, onscreenly, setButtonKind } from './core.js';
 import { esc } from './chat.js';
-import { openSettings } from './settings-panel.js';
+import { rememberOpener, restoreFocus, safeFocus, topDialog } from './a11y.js';
+import { onSettingsClosed, openSettings } from './settings-panel.js';
+import { listenReadiness, providerLooksReady, providerName, sttName } from './settings-form.js';
 import { renderPublikBlock, selectByoProvider } from './publik-settings.js';
 import { setIgnore } from './window-behaviour.js';
 
 // ---- onboarding / first-run tutorial -----------------------------------
+// Each step fills the dialog's head (eyebrow, title, lede), its body, the body's buttons, and the
+// footer: Skip, "Step n of 4" with decorative dots, Back and Next. One blue button per view: when
+// the body has the primary action (bodyPrimary), Next is secondary.
 const obScrim = $('#onboard-scrim');
-const permissionHelp = isWindows
-  ? 'Onscreenly needs permission to see and hear. Open Windows Privacy & security settings, allow <strong>Microphone</strong> and <strong>Screen recording</strong> for Onscreenly, then come back here.'
-  : 'Onscreenly needs two macOS permissions. Click each button, turn <strong>Onscreenly</strong> ON in the window that opens, then come back here.';
-const permissionButtons = isWindows
-  ? [
-      { label: 'Open Microphone settings', action: () => onscreenly.openPane('ms-settings:privacy-microphone') },
-      {
-        label: 'Open Screen recording settings',
-        action: () => onscreenly.openPane('ms-settings:privacy-screenrecorder')
+const onboard = $('#onboard');
+const isLinux = !isMac && !isWindows;
+
+// Windows 10 has no screen-capture permission (its settings page exists only on Windows 11);
+// boot.js sets this once it knows the build.
+let windows10 = false;
+function setWindows10(value) {
+  windows10 = value;
+}
+
+// The system settings page behind each "Open settings" button. Linux asks for neither permission.
+const PERMISSION_PANES = isWindows
+  ? { mic: 'ms-settings:privacy-microphone', screen: 'ms-settings:privacy-screenrecorder' }
+  : isMac
+    ? {
+        mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+        screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
       }
-    ]
-  : [
-      {
-        label: 'Open Microphone settings',
-        action: () => onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone')
-      },
-      {
-        label: 'Open Screen Recording settings',
-        action: () =>
-          onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
-      }
-    ];
-const assistShortcut = isWindows
-  ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">↵</span>'
-  : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">↵</span>';
-const sayShortcut = isWindows
-  ? '<span class="kbd">Ctrl</span> <span class="kbd">↵</span>'
-  : '<span class="kbd">⌘</span> <span class="kbd">↵</span>';
-const quitShortcut = isWindows
-  ? '<span class="kbd">Ctrl</span><span class="kbd">⇧</span><span class="kbd">X</span>'
-  : '<span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">X</span>';
+    : null;
+
+// What the permissions step knows: { mic, screen } from permissions:check, or null until it answers
+// (Linux never asks; it has no such permissions).
+let permissions = null;
+
+async function checkPermissions() {
+  if (isLinux) return;
+  try {
+    permissions = await onscreenly.permissionsCheck();
+  } catch (_) {
+    permissions = null;
+  }
+  if (onPermissionsStep()) renderOnboard();
+}
+
+const MAC_NOTE =
+  'Meeting audio (the other side of a call) is off by default on macOS, because the system shows a recording indicator while it runs. Turn it on in Settings › Audio.';
+const WINDOWS_10_NOTE = 'Screen capture needs no permission on Windows 10.';
+const LINUX_NOTE =
+  'Linux doesn’t ask for these permissions. If your desktop blocks screen capture, allow it in its privacy settings.';
+
+// Each row is 'ok' (an "Allowed" tag), 'not' ("Not yet" and its "Open settings" button) or 'plain'
+// (no state: Linux, or before the check answers). Once everything is allowed the step only confirms.
+function permissionsView() {
+  if (isLinux) return { allOk: false, rows: { mic: 'plain', screen: 'plain' }, note: LINUX_NOTE };
+  const micOk = !!permissions && permissions.mic === 'granted';
+  const screenOk = windows10 || (!!permissions && permissions.screen === 'granted');
+  const view = (ok) => (!permissions ? 'plain' : ok ? 'ok' : 'not');
+  return {
+    allOk: micOk && screenOk,
+    rows: { mic: view(micOk), screen: view(screenOk) },
+    note: isMac ? MAC_NOTE : windows10 ? WINDOWS_10_NOTE : ''
+  };
+}
+
+// A row in a Frost row group: a name, a line under it, and the row's state on the right. The
+// button opens the system settings page it names (the label says which, for assistive tech).
+function permissionRow(perm, name, sub, page, view) {
+  const hide = (shown) => (shown ? '' : ' hidden');
+  const pane = PERMISSION_PANES ? ` data-open-pane="${PERMISSION_PANES[perm]}"` : '';
+  return (
+    `<div class="ws-row ob-perm-row" data-perm="${perm}"><div class="ws-row-info">` +
+    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div>` +
+    `<span class="tag is-ok ob-perm-ok${hide(view === 'ok')}"><span class="dot" aria-hidden="true"></span>Allowed</span>` +
+    `<span class="tag ob-perm-not${hide(view === 'not')}">Not yet</span>` +
+    `<button type="button" class="btn btn-secondary compact ob-perm-open${hide(view === 'not')}"${pane} aria-label="Open ${page} settings">Open settings</button>` +
+    '</div>'
+  );
+}
+
+function permissionsBody() {
+  const { rows, note } = permissionsView();
+  return (
+    '<div class="ob-rows ws-rows">' +
+    permissionRow('mic', 'Microphone', 'To hear you', 'Microphone', rows.mic) +
+    (windows10
+      ? ''
+      : permissionRow('screen', 'Screen recording', 'To see your screen', 'Screen Recording', rows.screen)) +
+    '</div>' +
+    (note ? `<p class="ob-note">${note}</p>` : '')
+  );
+}
+
+// A row for what answers or listening need, with a tag saying what is connected.
+function needRow(need, name, sub, connected) {
+  const tag = connected
+    ? `<span class="tag is-ok" data-slot="${need}"><span class="dot" aria-hidden="true"></span>${esc(connected)}</span>`
+    : `<span class="tag" data-slot="${need}">Not set</span>`;
+  return (
+    `<div class="ws-row ob-need-row" data-need="${need}"><div class="ws-row-info">` +
+    `<div class="ws-row-name">${name}</div><div class="ws-row-sub">${sub}</div></div>${tag}</div>`
+  );
+}
+
+function providerBody() {
+  const listening = listenReadiness(state.settings, state.whisperOverview) !== 'none';
+  return (
+    '<div class="ob-rows ws-rows ob-needs">' +
+    needRow(
+      'answers',
+      'Answers',
+      'An API key for the provider you choose',
+      providerLooksReady() && `Connected · ${providerName(state.settings.provider)}`
+    ) +
+    needRow(
+      'listening',
+      'Listening',
+      'Speech-to-text: a Deepgram, OpenAI, Groq or Gemini key, or a free local model you download in Settings › Audio',
+      listening && sttName(state.settings)
+    ) +
+    '</div>'
+  );
+}
+
+const SHORTCUTS = [
+  ['Start or end a session', ['mod', 'shift', 'L']],
+  ['What should I say?', ['mod', '↵']],
+  ['Assist', ['mod', 'shift', '↵']],
+  ['Solve the coding problem on screen', ['mod', 'H']],
+  ['Hide or show', ['mod', 'shift', '/']]
+];
+
 const OB_STEPS = [
   {
-    icon: '👋',
+    hero: true,
     title: 'Welcome to Onscreenly',
-    body: 'Onscreenly is a private AI copilot that floats over your screen. It can see your screen, hear your meetings, and help you answer questions – with best-effort protection from screen capture.'
+    lede: 'A quiet AI copilot that floats over your screen.',
+    body: () =>
+      '<dl class="ob-features">' +
+      '<div class="ob-feature"><dt class="ob-feature-key">Screen</dt><dd>Sees your screen when you ask</dd></div>' +
+      `<div class="ob-feature"><dt class="ob-feature-key">Audio</dt><dd>${
+        isMac
+          ? 'Hears you once you start a session, and the other side when Meeting audio is on'
+          : 'Hears the conversation once you start a session'
+      }</dd></div>` +
+      '<div class="ob-feature"><dt class="ob-feature-key">Answers</dt><dd>Suggests what to say next</dd></div>' +
+      '</dl>' +
+      '<p class="ob-caveat">It tries to stay out of screen shares, but that is best effort, so check before you rely on it.</p>'
   },
   {
-    icon: '🔐',
-    title: 'Allow Onscreenly to see & hear',
-    body:
-      permissionHelp +
-      '<ul><li><strong>Microphone</strong> – to hear you</li><li><strong>Screen recording</strong> – to see your screen and hear your meeting</li></ul>',
-    buttons: permissionButtons
+    eyebrow: 'Permissions',
+    permissions: true,
+    get title() {
+      return permissionsView().allOk ? 'Microphone and screen recording are on' : 'Let Onscreenly see and hear';
+    },
+    get lede() {
+      return permissionsView().allOk ? '' : 'Onscreenly needs to hear the conversation and see your screen to answer.';
+    },
+    body: permissionsBody
   },
   {
-    icon: '⚙️',
+    eyebrow: 'AI provider',
     title: 'Connect an AI provider',
-    body: 'Onscreenly uses API keys for <span class="hl">Cerebras API</span> and options to enable real-time transcription via a local or hosted transcription model.',
+    lede: 'Answers come from the provider you choose, with your own API key.',
+    body: providerBody,
+    // Until a provider is connected, opening Settings is the step's primary action. Either way
+    // onboarding waits behind Settings and comes back at "You're all set".
+    get bodyPrimary() {
+      return !providerLooksReady();
+    },
+    get buttons() {
+      return providerLooksReady()
+        ? [{ label: 'Change provider', kind: 'secondary', action: () => suspendOnboard('keys') }]
+        : [{ label: 'Open Settings', kind: 'primary', action: () => suspendOnboard('keys') }];
+    }
+  },
+  {
+    eyebrow: 'Shortcuts',
+    title: 'You’re all set',
+    lede: 'Reopen this guide from Help in the toolbar.',
+    body: () =>
+      '<div class="ob-rows ws-rows ob-keys">' +
+      SHORTCUTS.map(
+        ([label, keys]) =>
+          `<div class="ws-row ob-key-row"><span class="ob-key-label">${label}</span><span class="ob-keycaps">${kbd(...keys)}</span></div>`
+      ).join('') +
+      '</div>',
     buttons: [
       {
-        label: 'Configure Onscreenly settings',
+        label: 'Add your résumé',
+        kind: 'secondary',
         action: () => {
           finishOnboard();
-          openSettings();
+          openSettings('profile');
+        }
+      },
+      {
+        label: 'Connect Obsidian notes',
+        kind: 'secondary',
+        action: () => {
+          finishOnboard();
+          openSettings('knowledge');
         }
       }
     ]
-  },
-  {
-    icon: '✨',
-    title: 'You’re all set',
-    body:
-      'How to use Onscreenly:<ul><li>' +
-      sayShortcut +
-      ' — <strong>What should I say?</strong> from the conversation</li><li>' +
-      assistShortcut +
-      ' — <strong>Smart assist</strong> with whatever\'s on screen or being said</li><li>Click <strong>Start session</strong> in the top bar to start listening to a meeting</li><li>Type a question and press <span class="kbd">↵</span></li></ul>Reopen this guide anytime by clicking the <strong>help</strong> icon in the top bar. Quit with ' +
-      quitShortcut +
-      '.'
   }
 ];
 // First-run disclosure (R21 §4.3): two disclosures — cost and data path —
 // and a visible "use my own key" branch. Copy comes from main (one source).
-// Only "Continue" mints a key; Next/Skip never provision.
+// Only "Continue" mints a key; Next/Skip never provision. The two choices are
+// equal and each moves on, so the view has no Next.
 function publikStep() {
   const c = state.publikState.copy.disclosure;
+  // The terms sentence ends with its own link ("…agree to the publik API terms.").
+  const link = '<a id="ob-publik-terms" href="#">publik API terms</a>';
+  const terms = esc(c.terms).includes('publik API terms')
+    ? esc(c.terms).replace('publik API terms', link)
+    : `${esc(c.terms)} ${link}`;
   return {
-    icon: '🪙',
+    eyebrow: 'AI provider',
     title: c.title,
+    lede: c.intro,
     body: () =>
-      `${esc(c.intro)}<br><br><strong>Cost.</strong> ${esc(c.cost)}<br><br><strong>Where your prompts go.</strong> ${esc(c.dataPath)}` +
-      `<span class="ob-fine">${esc(c.terms)} <a id="ob-publik-terms">publik API terms</a></span>`,
+      `<p class="ob-text"><strong>Cost.</strong> ${esc(c.cost)}</p>` +
+      `<p class="ob-text"><strong>Where your prompts go.</strong> ${esc(c.dataPath)}</p>` +
+      `<span class="ob-fine">${terms}</span>`,
+    hideNext: true,
     buttons: [
       {
         label: c.accept,
+        kind: 'secondary',
         action: async () => {
           const btns = $('#ob-buttons').querySelectorAll('button');
           btns.forEach((b) => {
@@ -118,10 +257,14 @@ function publikStep() {
       },
       {
         label: c.decline,
+        kind: 'secondary',
         action: () => {
-          if (obDialog) hideOnboardDialog();
-          else finishOnboard();
-          openSettings();
+          if (obDialog) {
+            hideOnboardDialog();
+            openSettings('keys');
+          } else {
+            suspendOnboard('keys');
+          }
           selectByoProvider();
         }
       }
@@ -151,16 +294,16 @@ function publikCardStep() {
   if (card.primary) {
     buttons.push({
       label: card.primary.label,
-      primary: true,
+      kind: 'primary',
+      cta: true,
       action: async () => {
         onscreenly.publikOpen(card.primary.url);
         await done();
       }
     });
   }
-  buttons.push({ label: card.secondary.label, action: done });
+  buttons.push({ label: card.secondary.label, kind: 'secondary', action: done });
   return {
-    icon: '✅',
     title: card.title,
     body: () =>
       `<div class="publik-card-balance">${esc(card.balance)}</div><div class="publik-card-why">${esc(card.why)}</div>`,
@@ -177,8 +320,8 @@ function showPublikDisclosure() {
   $('#onboard').classList.add('dialog');
   obIndex = idx;
   renderOnboard();
-  obScrim.classList.remove('hidden');
-  setIgnore(false);
+  showOnboardScrim();
+  safeFocus($('#ob-buttons .btn'));
 }
 // Show the card: inside onboarding it becomes the next step; afterwards it
 // is a dialog of its own (also reached from the "never a silent starter"
@@ -193,6 +336,7 @@ function showPublikCard() {
     OB_STEPS.splice(idx + 1, 0, publikCardStep());
     obIndex = idx + 1;
     renderOnboard();
+    safeFocus($('#ob-buttons .btn'));
     return;
   }
   OB_STEPS.push(publikCardStep());
@@ -200,35 +344,56 @@ function showPublikCard() {
   $('#onboard').classList.add('dialog');
   obIndex = OB_STEPS.length - 1;
   renderOnboard();
-  obScrim.classList.remove('hidden');
-  setIgnore(false);
+  showOnboardScrim();
+  safeFocus($('#ob-buttons .btn'));
 }
 function hideOnboardDialog() {
   obDialog = false;
   $('#onboard').classList.remove('dialog');
-  obScrim.classList.add('hidden');
+  hideOnboardScrim();
 }
 
 let obIndex = 0;
 function renderOnboard() {
   const step = OB_STEPS[obIndex];
-  $('#ob-icon').textContent = step.icon;
+  const last = obIndex === OB_STEPS.length - 1;
+  const ob = $('#onboard');
+  ob.classList.toggle('is-hero', !!step.hero);
+  // The publik card has its own two buttons and no Next/Skip: leaving it any
+  // other way would spend the starter without the card being acknowledged.
+  ob.classList.toggle('card', !!step.publikCard);
+  // The publik disclosure on its own (obDialog) is not a step, so it has no eyebrow.
+  $('#ob-eyebrow').textContent = obDialog ? '' : step.eyebrow || '';
   $('#ob-title').textContent = step.title;
-  $('#ob-body').innerHTML = typeof step.body === 'function' ? step.body() : step.body;
+  $('#ob-lede').textContent = step.lede || '';
+  const body = $('#ob-body');
+  body.innerHTML = typeof step.body === 'function' ? step.body() : step.body || '';
+  body.scrollTop = 0;
   const termsLink = $('#ob-publik-terms');
-  if (termsLink) termsLink.addEventListener('click', () => onscreenly.publikOpen(state.publikState.links.terms));
+  // href="#" puts the link in the Tab order; the click opens the terms in the browser instead.
+  if (termsLink)
+    termsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      onscreenly.publikOpen(state.publikState.links.terms);
+    });
   const btns = $('#ob-buttons');
   btns.innerHTML = '';
   (step.buttons || []).forEach((b) => {
     const el = document.createElement('button');
+    el.type = 'button';
+    setButtonKind(el, b.kind || 'secondary');
+    if (b.cta) el.classList.add('ob-cta');
     el.textContent = b.label;
-    if (b.primary) el.classList.add('ob-cta');
     el.addEventListener('click', b.action);
     btns.appendChild(el);
   });
-  // The publik card has its own two buttons and no Next/Skip: leaving it any
-  // other way would spend the starter without the card being acknowledged.
-  $('#onboard').classList.toggle('card', !!step.publikCard);
+  const next = $('#ob-next');
+  next.textContent = last ? 'Get started' : 'Next';
+  setButtonKind(next, step.bodyPrimary ? 'secondary' : 'primary');
+  next.classList.toggle('hidden', !!step.hideNext);
+  $('#ob-back').style.visibility = obIndex === 0 ? 'hidden' : 'visible';
+  $('#ob-skip').style.visibility = last ? 'hidden' : 'visible';
+  $('#ob-count').textContent = `Step ${obIndex + 1} of ${OB_STEPS.length}`;
   const dots = $('#ob-dots');
   dots.innerHTML = '';
   OB_STEPS.forEach((_, i) => {
@@ -236,24 +401,56 @@ function renderOnboard() {
     if (i === obIndex) d.className = 'on';
     dots.appendChild(d);
   });
-  $('#ob-back').style.visibility = obIndex === 0 ? 'hidden' : 'visible';
-  $('#ob-next').textContent = obIndex === OB_STEPS.length - 1 ? 'Done' : 'Next';
-  $('#ob-skip').style.visibility = obIndex === OB_STEPS.length - 1 ? 'hidden' : 'visible';
 }
-function showOnboard() {
-  obDialog = false;
-  $('#onboard').classList.remove('dialog');
-  obIndex = 0;
-  renderOnboard();
+// The scrim remembers what had focus before it showed and gives focus back once it hides.
+function showOnboardScrim() {
+  if (obScrim.classList.contains('hidden')) rememberOpener(onboard);
   obScrim.classList.remove('hidden');
   setIgnore(false);
 }
+function hideOnboardScrim() {
+  obScrim.classList.add('hidden');
+  restoreFocus(onboard);
+}
+function onPermissionsStep() {
+  return !obScrim.classList.contains('hidden') && !obDialog && !!OB_STEPS[obIndex].permissions;
+}
+
+// Opening Settings from inside onboarding (step 3, or declining publik) suspends it: onboarding hides
+// and comes back at "You're all set" once Settings closes after a successful save.
+let obSuspended = false;
+function suspendOnboard(tab) {
+  obSuspended = true;
+  obScrim.classList.add('hidden');
+  openSettings(tab);
+}
+function resumeOnboard() {
+  if (!obSuspended) return;
+  obSuspended = false;
+  obIndex = OB_STEPS.length - 1;
+  renderOnboard();
+  obScrim.classList.remove('hidden');
+  setIgnore(false);
+  safeFocus($('#ob-next'));
+}
+
+function showOnboard() {
+  obDialog = false;
+  obSuspended = false;
+  $('#onboard').classList.remove('dialog');
+  obIndex = 0;
+  renderOnboard();
+  showOnboardScrim();
+  safeFocus($('#ob-next'));
+  checkPermissions();
+}
+
 async function finishOnboard() {
   if (obDialog) {
     hideOnboardDialog();
     return;
   }
-  obScrim.classList.add('hidden');
+  hideOnboardScrim();
   if (state.settings && !state.settings.onboarded) {
     state.settings.onboarded = true;
     await onscreenly.settingsSet({ onboarded: true });
@@ -266,16 +463,41 @@ export function init() {
     else {
       obIndex++;
       renderOnboard();
+      if (onPermissionsStep()) checkPermissions();
     }
   });
   $('#ob-back').addEventListener('click', () => {
     if (obIndex > 0) {
       obIndex--;
       renderOnboard();
+      if (onPermissionsStep()) checkPermissions();
     }
   });
   $('#ob-skip').addEventListener('click', finishOnboard);
   $('#logo-btn').addEventListener('click', showOnboard);
+  // The permissions step's "Open settings" buttons open the system settings page they name. Coming
+  // back to the window checks again, so a permission switched on there shows as allowed here.
+  $('#ob-body').addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open-pane]');
+    if (open) onscreenly.openPane(open.dataset.openPane);
+  });
+  window.addEventListener('focus', () => {
+    if (onPermissionsStep()) checkPermissions();
+  });
+  onSettingsClosed(resumeOnboard);
+  // Escape skips onboarding, one layer per press: it runs in the capture phase and stops there, so
+  // Settings underneath stays open, and it waits while consent is on top. The publik card has no
+  // way out but its two buttons, so it ignores Escape.
+  document.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || topDialog() !== onboard) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!OB_STEPS[obIndex].publikCard) finishOnboard();
+    },
+    true
+  );
 }
 
-export { OB_STEPS, publikStep, showOnboard, showPublikCard, showPublikDisclosure };
+export { OB_STEPS, publikStep, setWindows10, showOnboard, showPublikCard, showPublikDisclosure };

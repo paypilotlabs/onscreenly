@@ -119,7 +119,7 @@ test('hedges the consent sheet when the caller cannot be verified', () => {
 
 test('asks separately, and differently, for control', () => {
   const copy = consentCopy({ callerName: 'Iris', scope: 'action', verification: 'token' });
-  assert.match(copy.message, /wants to control onscreenly/);
+  assert.match(copy.message, /wants to control Onscreenly\./);
   assert.equal(copy.allowLabel, 'Allow control');
 });
 
@@ -134,7 +134,7 @@ test('asks separately, and differently, for control', () => {
 test('asks separately, and differently, for slide captions — never folded into the control prompt', () => {
   const copy = consentCopy({ callerName: 'Iris', scope: 'slides', verification: 'none' });
   assert.match(copy.message, /slide captions/);
-  assert.doesNotMatch(copy.message, /control onscreenly/);
+  assert.doesNotMatch(copy.message, /control Onscreenly/i);
   assert.match(copy.detail, /caption/i);
   assert.match(copy.detail, /screen/i);
   // Reassures rather than overstates: captions only, never a screenshot.

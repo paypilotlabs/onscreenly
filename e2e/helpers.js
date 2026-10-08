@@ -14,9 +14,10 @@ function tempDir(prefix) {
 
 /**
  * Starts the app. `settings` seeds the settings file of a new profile; pass
- * `profile` to start again on an existing one.
+ * `profile` to start again on an existing one. `env` adds variables such as
+ * the hooks in launch.cjs.
  */
-async function launchApp({ settings, profile } = {}) {
+async function launchApp({ settings, profile, env } = {}) {
   const dir = profile || tempDir('profile');
   const file = path.join(dir, 'onscreenly-data.json');
   if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify({ onboarded: true, ...(settings || {}) }));
@@ -27,7 +28,7 @@ async function launchApp({ settings, profile } = {}) {
   const app = await electron.launch({
     args,
     cwd: ROOT,
-    env: { ...process.env, ONSCREENLY_E2E_PROFILE: dir },
+    env: { ...process.env, ...env, ONSCREENLY_E2E_PROFILE: dir },
     timeout: 90000
   });
   const page = await app.firstWindow();
@@ -35,11 +36,32 @@ async function launchApp({ settings, profile } = {}) {
   return { app, page, profile: dir };
 }
 
+/** The app's window showing renderer/<file>, once it has opened and loaded that page. */
+async function appWindow(app, file, timeout = 30000) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const win = app.windows().find((w) => w.url().endsWith(`/renderer/${file}`));
+    if (win) return win;
+    if (Date.now() > deadline) throw new Error(`No window opened renderer/${file}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/**
+ * The errors launch.cjs recorded for this profile's windows: console errors
+ * and failed loads. A clean run leaves none.
+ */
+function consoleErrors(profile) {
+  const file = path.join(profile, 'console.log');
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : [];
+}
+
 /**
  * A local OpenAI-compatible chat endpoint that streams `reply(request)` back
- * and records every request it receives.
+ * and records every request it receives. `status` (a number, or a function of
+ * the request's 1-based number) makes it fail with that HTTP status instead.
  */
-async function startMockProvider(reply) {
+async function startMockProvider(reply, { status = 200 } = {}) {
   const requests = [];
   const server = http.createServer((req, res) => {
     let body = '';
@@ -47,6 +69,12 @@ async function startMockProvider(reply) {
     req.on('end', () => {
       const json = JSON.parse(body || '{}');
       requests.push(json);
+      const code = typeof status === 'function' ? status(requests.length) : status;
+      if (code !== 200) {
+        res.writeHead(code, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'Mock provider error', type: 'server_error' } }));
+        return;
+      }
       const text = reply(json);
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       const chunk = (delta, finish) =>
@@ -126,7 +154,9 @@ async function closeSettings(page) {
 
 module.exports = {
   ROOT,
+  appWindow,
   closeSettings,
+  consoleErrors,
   launchApp,
   makeFolder,
   openSettingsTab,

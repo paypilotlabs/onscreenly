@@ -2,6 +2,8 @@
 
 Download the file for your computer from the [Releases page](https://github.com/squid-beast/onscreenly/releases/latest). Every release lists `SHA256SUMS` next to the downloads.
 
+The repository is private: the Releases page and its downloads are visible to collaborators only. Ask the owner for access, or build from source.
+
 | Computer | File |
 |---|---|
 | Mac with Apple silicon (M1 and later) | `Onscreenly-<version>-mac-arm64.zip` |
@@ -71,7 +73,7 @@ sha256sum -c SHA256SUMS --ignore-missing          # Linux
 
 On Windows, run `Get-FileHash .\Onscreenly-<version>-win-x64-setup.exe` in PowerShell and compare the hash with the line in `SHA256SUMS`.
 
-**Build provenance:** when the repository is public, each release file also carries a GitHub attestation that proves which workflow run built it from which commit. With the [GitHub CLI](https://cli.github.com/):
+**Build provenance:** Build-provenance attestations are skipped while the repository is private. Once it is public, each release file also carries a GitHub attestation that proves which workflow run built it from which commit. With the [GitHub CLI](https://cli.github.com/):
 
 ```sh
 gh attestation verify Onscreenly-<version>-mac-arm64.zip --repo squid-beast/onscreenly

@@ -1,0 +1,1302 @@
+/* Workspace: the light Cluely dialogs (Settings, onboarding, consent) and the permissions card.
+ * Text only: no icons. Headings, eyebrows and tags carry the structure; status is an ok dot or a ring.
+ *
+ * Every surface is Chalk with a 1px Bone edge and no shadow (--frame is none in this theme).
+ * Frost marks at most one card per Settings pane. Spacing rhythm: dialog padding 24 (28 in
+ * onboarding and the permissions card), inner cards 16, field gap 8, 20 between groups. */
+
+/* ---- Control caret -------------------------------------------------------------------------
+ * The one drawn mark left: the caret of a select, part of that control (as a native select draws its
+ * own). Disclosures say "Show" / "Hide" in words instead. The SVG stroke is opaque, so the mask takes
+ * background-color. */
+.ws-dialog {
+  --mask-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ---- Scrims ---------------------------------------------------------------------------------
+ * They cover the main column only (left: --side-w, width: --main-w), so a light dialog sits
+ * over the dimmed dark overlay. Hiding is instant via .hidden; showing fades in.
+ * (Their opacity and pointer-events live in layout.css with #app's.) */
+#settings-scrim,
+#onboard-scrim,
+#consent-scrim {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: var(--side-w);
+  width: var(--main-w);
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  backdrop-filter: var(--scrim-blur);
+  animation: ui-fade-in var(--dur-fast) var(--ease-out);
+}
+
+/* The open transcript sidebar sits 12px beside the 624px panel, so it reaches 26px into the main
+ * column (--sidebar-overlap). While a dialog is open the scrim stops at the sidebar's edge, and the
+ * sidebar dims itself with the scrim's own darkening and blur, so the overlay dims as one piece and
+ * the side strip gains no click-blocking area. The padding keeps the dialog centred on the main
+ * column. Without the open sidebar the scrim keeps the main column exactly. */
+#settings-scrim,
+#onboard-scrim,
+#consent-scrim {
+  --sidebar-overlap: calc((var(--main-w) - var(--panel-w)) / 2 - var(--spacing-12));
+}
+
+#app:has(.transcript-sidebar.open:not(.left)) ~ :is(#settings-scrim, #onboard-scrim, #consent-scrim) {
+  width: calc(var(--main-w) - var(--sidebar-overlap));
+  padding-left: var(--sidebar-overlap);
+}
+
+#app:has(.transcript-sidebar.open.left) ~ :is(#settings-scrim, #onboard-scrim, #consent-scrim) {
+  left: calc(var(--side-w) + var(--sidebar-overlap));
+  width: calc(var(--main-w) - var(--sidebar-overlap));
+  padding-right: var(--sidebar-overlap);
+}
+
+#app:has(~ :is(#settings-scrim, #onboard-scrim, #consent-scrim):not(.hidden)) .transcript-sidebar.open {
+  filter: var(--scrim-dim) var(--scrim-blur);
+  pointer-events: none;
+}
+
+#settings-scrim {
+  z-index: var(--z-settings);
+}
+
+#onboard-scrim {
+  z-index: var(--z-onboard);
+}
+
+#consent-scrim {
+  z-index: var(--z-consent);
+}
+
+/* ---- Dialog frame ------------------------------------------------------------------------ */
+.ws-dialog {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-product-mockup);
+  box-shadow: var(--frame);
+  color: var(--text-1);
+  font: var(--type-body);
+  letter-spacing: var(--type-body-track);
+  animation: ui-dialog-in var(--dur-base) var(--ease-out);
+}
+
+/* Frost row group with Ash dividers: permission rows, shortcut rows. */
+.ws-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-cards);
+  background: var(--bg-tint);
+}
+
+.ws-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  min-height: 60px;
+  padding: var(--spacing-12) var(--spacing-16);
+}
+
+.ws-row + .ws-row {
+  border-top: 1px solid var(--line-on-tint);
+}
+
+.ws-row-info,
+.perm-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ws-row-name,
+.perm-name {
+  font: var(--type-strong-sm);
+  letter-spacing: var(--type-strong-sm-track);
+  color: var(--text-1);
+}
+
+.ws-row-sub,
+.perm-status {
+  margin-top: 2px;
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  color: var(--text-2);
+}
+
+/* ==== Settings ============================================================================
+ * Height budget at the 600px window: header 62 + tabs 41 + pane 406 + footer 41 + border 2 = 552.
+ * The height is fixed so switching tabs never resizes the dialog. */
+#settings {
+  width: 520px;
+  height: calc(var(--win-h) - 48px);
+  max-height: calc(var(--win-h) - 48px);
+}
+
+.s-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+  padding: var(--spacing-20) var(--card-padding) var(--spacing-12);
+}
+
+.s-title {
+  font: var(--type-title);
+  letter-spacing: var(--type-title-track);
+  color: var(--text-strong);
+}
+
+/* Tabs: one row. Rest Steel, hover Slate, selected Carbon with a 2px Signal Blue underline. */
+.s-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--spacing-4);
+  height: 41px;
+  padding: 0 var(--spacing-16);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.s-tab {
+  position: relative;
+  height: 40px;
+  padding: 0 var(--spacing-8);
+  border-radius: var(--radius-buttons); /* rounds the inset focus ring */
+  color: var(--text-2);
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-std);
+}
+
+.s-tab:hover {
+  color: var(--text-nav);
+}
+
+.s-tab.on {
+  color: var(--text-strong);
+}
+
+.s-tab.on::after {
+  content: '';
+  position: absolute;
+  left: var(--spacing-8);
+  right: var(--spacing-8);
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.s-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Pane: scrolls inside its 406px budget. The stable gutter keeps the right edge at 24px. */
+.s-tab-pane {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--spacing-20);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-20) var(--spacing-14) var(--card-padding) var(--card-padding);
+  scrollbar-gutter: stable;
+}
+
+.s-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  margin: 0;
+}
+
+.s-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+}
+
+.s-eyebrow {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.s-hint {
+  min-width: 0;
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+  text-align: right;
+}
+
+.s-help,
+.s-note {
+  margin: 0;
+  text-wrap: pretty;
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+}
+
+.s-note.warn {
+  color: var(--warn);
+  font-weight: var(--font-weight-medium);
+}
+
+/* The pane's one Frost card. */
+.s-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+  padding: var(--spacing-16);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-cards);
+  background: var(--bg-tint);
+}
+
+/* Chips on a Frost card: Chalk with a Bone edge at rest, a Signal Blue edge when selected. */
+.s-card .chip {
+  background: var(--bg-surface);
+  border-color: var(--line);
+}
+
+.s-card .chip:hover:not(:disabled) {
+  background: var(--bg-layer);
+}
+
+.s-card .chip[aria-pressed='true'],
+.s-card .chip.on {
+  background: var(--bg-surface);
+  border-color: var(--selected-line);
+}
+
+/* Field row: Slate label in a 96px column, control on the right. */
+.s-field {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: start;
+  column-gap: var(--spacing-12);
+}
+
+.s-field > label:not(.s-check),
+.s-field > .s-field-label {
+  display: flex;
+  align-items: center;
+  min-height: var(--field-h);
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--text-nav);
+}
+
+.s-field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+.s-indent,
+.s-key-note {
+  margin-left: 108px; /* the 96px label column plus its 12px gap */
+}
+
+/* Inside a card the label column gives up the card's 16px padding and 1px edge, so every control
+ * in a pane starts on the same vertical line. */
+.s-card .s-field {
+  grid-template-columns: 79px minmax(0, 1fr);
+}
+
+.s-card .s-indent,
+.s-card .s-key-note {
+  margin-left: 91px;
+}
+
+/* publik selected: no key field, so the key-storage sentence does not apply. */
+.s-key-card:has(#publik-settings:not(.hidden)) .s-key-note {
+  display: none;
+}
+
+.s-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+
+.s-num {
+  width: 96px;
+  font-variant-numeric: tabular-nums;
+}
+
+.s-unit {
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--text-2);
+}
+
+/* Label above its field (interview prep). */
+.s-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+.s-stack > label {
+  font: var(--type-label);
+  letter-spacing: var(--type-label-track);
+  color: var(--text-nav);
+}
+
+.s-tab-pane textarea.field {
+  min-height: var(--field-h);
+}
+
+.s-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-6);
+}
+
+.s-default-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--spacing-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pills);
+  background: var(--bg-surface);
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+.s-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+
+/* Native select with a drawn chevron. */
+.s-select {
+  position: relative;
+  min-width: 0;
+}
+
+.s-select select.field {
+  appearance: none;
+  padding-right: 34px;
+  cursor: pointer;
+}
+
+.s-select::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-12);
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  background: var(--icon-solo);
+  -webkit-mask: var(--mask-chevron) center / 14px no-repeat;
+  mask: var(--mask-chevron) center / 14px no-repeat;
+  pointer-events: none;
+}
+
+/* Checkbox row. */
+.s-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  min-height: var(--field-h);
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.s-check:has(input:disabled) {
+  color: var(--text-disabled);
+  cursor: default;
+}
+
+/* Inline status lines inside a pane (profile, whisper). Empty ones take no space. */
+.s-status {
+  margin: 0;
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+}
+
+.s-tab-pane .s-status:empty {
+  display: none;
+}
+
+/* Footer: the save status, visible from every tab. */
+.s-foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 41px;
+  padding: var(--spacing-10) var(--card-padding);
+  border-top: 1px solid var(--line-strong);
+}
+
+.s-foot .s-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+/* Saved: an ok dot. Couldn't save: a hollow ring in the danger ink (strong text by default), with the
+ * text in medium weight. The same dot language as the overlay's live dot. */
+.s-foot .s-status::before {
+  content: '';
+  display: none;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+}
+
+.s-foot .s-status.is-error {
+  color: var(--danger);
+  font-weight: var(--font-weight-medium);
+}
+
+.s-foot .s-status.is-error::before {
+  display: block;
+  border: 1.5px solid var(--danger);
+}
+
+.s-foot .s-status.is-ok::before {
+  display: block;
+  background: var(--ok);
+}
+
+/* ---- Keys: provider chips, key card, publik block, callers ---- */
+.publik-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+}
+
+.publik-line {
+  font: var(--type-strong-sm);
+  letter-spacing: var(--type-strong-sm-track);
+  color: var(--text-1);
+}
+
+.publik-line.warn {
+  color: var(--warn);
+}
+
+.publik-card .s-note {
+  color: var(--text-nav);
+}
+
+.publik-card .s-actions {
+  margin-top: var(--spacing-4);
+}
+
+.publik-why summary,
+.s-details summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  list-style: none;
+  cursor: pointer;
+}
+
+.publik-why summary::-webkit-details-marker,
+.s-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.publik-why summary {
+  width: max-content;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  color: var(--text-nav);
+}
+
+/* Disclosures are text only: the label, then a quiet "Show" or "Hide" 8px after it, as a toolbar label
+ * and its hint. The cue is decorative to assistive tech (alt text ''): <details> already exposes
+ * whether it is open. */
+.publik-why summary::after,
+.s-details summary::after {
+  content: 'Show' / '';
+  flex: none;
+  margin-top: 1px; /* the meta line box is shorter: share the label's baseline */
+  color: var(--text-2);
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+.publik-why[open] summary::after,
+.s-details[open] summary::after {
+  content: 'Hide' / '';
+}
+
+.publik-why summary:hover::after,
+.s-details summary:hover::after {
+  color: var(--text-nav);
+}
+
+.publik-why summary:hover {
+  color: var(--text-strong);
+}
+
+.publik-why .s-note {
+  margin-top: var(--spacing-6);
+}
+
+.s-callers {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-cards);
+}
+
+.s-callers:has(.s-caller-empty) {
+  border: 0;
+}
+
+.s-caller {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+  min-height: 48px;
+  padding: var(--spacing-8) var(--spacing-8) var(--spacing-8) var(--spacing-14);
+}
+
+.s-caller + .s-caller {
+  border-top: 1px solid var(--line);
+}
+
+.s-caller-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-strong-sm);
+  letter-spacing: var(--type-strong-sm-track);
+  color: var(--text-1);
+}
+
+.s-caller-empty {
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+}
+
+/* ---- Profile ---- */
+.s-details {
+  gap: 0;
+}
+
+/* The eyebrow with "Show" / "Hide" beside it, and the hint as a caption on the line below (beside
+ * them it would wrap in the 470px pane). */
+.s-details summary {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  row-gap: var(--spacing-4);
+}
+
+.s-details summary .s-eyebrow {
+  flex: none;
+}
+
+.s-details summary .s-hint {
+  order: 1;
+  flex-basis: 100%;
+  text-align: left;
+}
+
+.s-details summary:hover .s-eyebrow {
+  color: var(--text-nav);
+}
+
+.s-details-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+  margin-top: var(--spacing-12);
+}
+
+/* ---- Knowledge ---- */
+.s-vault-head {
+  align-items: center;
+  min-height: 24px;
+}
+
+.s-vault-row {
+  margin-bottom: var(--spacing-4);
+}
+
+.s-vault-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.s-vault-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+
+.s-vault-card.is-set .s-vault-path {
+  color: var(--text-1);
+}
+
+.k-results {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-cards);
+}
+
+.k-results:empty {
+  display: none;
+}
+
+.k-result {
+  padding: var(--spacing-10) var(--spacing-14);
+}
+
+.k-result + .k-result {
+  border-top: 1px solid var(--line);
+}
+
+.k-result-title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  color: var(--text-nav);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) var(--ease-std);
+}
+
+.k-result-title:hover {
+  color: var(--text-strong);
+  text-decoration-color: var(--accent);
+}
+
+.k-result-snippet {
+  display: -webkit-box;
+  margin-top: 2px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.k-results > .s-note {
+  padding: var(--spacing-10) var(--spacing-14);
+}
+
+/* ---- Audio ---- */
+.whisper-runtime-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+  min-height: 24px;
+  margin-bottom: var(--spacing-4);
+}
+
+.whisper-badge.ready {
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+
+.whisper-badge.error {
+  border-color: var(--danger-line);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.whisper-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+}
+
+.whisper-progress-wrap progress {
+  flex: 1 1 auto;
+  height: 6px;
+  border: 0;
+  border-radius: var(--radius-pills);
+  overflow: hidden;
+  appearance: none;
+  background: var(--bg-pressed);
+}
+
+.whisper-progress-wrap progress::-webkit-progress-bar {
+  background: var(--bg-pressed);
+}
+
+.whisper-progress-wrap progress::-webkit-progress-value {
+  border-radius: var(--radius-pills);
+  background: var(--accent);
+}
+
+.whisper-progress-wrap span {
+  width: 36px;
+  text-align: right;
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  color: var(--text-2);
+}
+
+/* ---- Style ---- */
+.s-counter {
+  align-self: flex-end;
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.s-counter.s-counter-warn {
+  color: var(--warn);
+}
+
+.s-counter #ai-rules-count.over {
+  color: var(--danger);
+  font-weight: var(--font-weight-semibold);
+}
+
+.s-hint-block {
+  display: block; /* running text, not the card's flex column */
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-nav);
+}
+
+.s-hint-block strong,
+.s-hint-block em {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-strong);
+}
+
+/* ---- Appearance ---- */
+.s-opacity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-16);
+  min-height: var(--field-h);
+}
+
+.s-opacity-row input[type='range'] {
+  flex: 1 1 auto;
+  height: 4px;
+  margin: 0;
+  border-radius: var(--radius-pills);
+  appearance: none;
+  /* --fill is the slider's position, set by the opacity code (100% when unset). */
+  background: linear-gradient(to right, var(--accent) 0 var(--fill, 100%), var(--bg-pressed) var(--fill, 100%) 100%);
+  cursor: pointer;
+}
+
+.s-opacity-row input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--bg-surface);
+  border-radius: var(--radius-pills);
+  appearance: none;
+  background: var(--accent-fill);
+}
+
+.s-opacity-row input[type='range']:focus-visible {
+  outline: none;
+}
+
+.s-opacity-row input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus-halo);
+}
+
+.s-opacity-row span {
+  width: 40px;
+  text-align: right;
+  font: var(--type-control);
+  letter-spacing: var(--type-control-track);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+}
+
+/* ==== Onboarding ===========================================================================
+ * Head (eyebrow, title, lede), body, body buttons, then a footer with Skip, the step count with
+ * decorative dots, Back and Next. One blue button per view. #ob-icon stays in the DOM, hidden. */
+#onboard {
+  width: 520px;
+  max-height: calc(var(--win-h) - 32px);
+}
+
+/* The four steps share one height, so the footer (and Next under the pointer) stays put from step to
+ * step. The height is the tallest step (the publik disclosure, when it replaces step 3) plus the 28px
+ * minimum spacer. Spare room collects above the footer: the ::after spacer sits between the body
+ * buttons and the footer, and #ob-body scrolls if a step ever needs more. The publik dialog and card
+ * keep their own height. */
+#onboard:not(.dialog, .card) {
+  height: min(504px, calc(var(--win-h) - 32px));
+}
+
+#onboard::after {
+  content: '';
+  order: 1;
+  flex: 1 0 var(--spacing-28);
+}
+
+#onboard:is(.dialog, .card)::after {
+  display: none;
+}
+
+.ob-head {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: flex-start;
+  padding: var(--spacing-28) var(--spacing-28) 0;
+}
+
+.ob-eyebrow {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.ob-eyebrow:empty {
+  display: none;
+}
+
+.ob-title {
+  margin-top: var(--spacing-6);
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+
+.ob-eyebrow:empty + .ob-title {
+  margin-top: 0;
+}
+
+.ob-lede {
+  margin-top: var(--spacing-8);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.ob-lede:empty {
+  display: none;
+}
+
+.ob-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-20) var(--spacing-28) 0;
+  color: var(--text-2);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.ob-body:empty {
+  display: none;
+}
+
+.ob-body strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-strong);
+}
+
+.ob-text + .ob-text {
+  margin-top: var(--spacing-12);
+}
+
+.ob-buttons {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-16) var(--spacing-28) 0;
+}
+
+.ob-buttons:empty {
+  display: none;
+}
+
+/* Footer: Skip, the progress, then Back and Next on the right. Skip and Back keep their footprint when
+ * hidden (visibility), so the progress never moves; a wider "Get started" grows leftward from Next's
+ * right edge. A centred progress cannot hold still here: Back + "Get started" is wider than half the
+ * row that is left beside it. */
+.ob-actions {
+  display: flex;
+  flex-shrink: 0;
+  order: 2;
+  align-items: center;
+  gap: var(--spacing-12);
+  padding: var(--spacing-16) var(--spacing-28);
+  border-top: 1px solid var(--line-strong);
+}
+
+.ob-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-10);
+}
+
+.ob-dots {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+}
+
+.ob-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pills);
+  background: var(--icon);
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.ob-dots span.on {
+  width: 18px;
+  background: var(--accent);
+}
+
+.ob-count {
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+
+.ob-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  margin-left: auto;
+}
+
+/* Row groups and notes in the body. */
+.ob-rows .tag {
+  flex-shrink: 0;
+}
+
+/* Notes under a card: help text set off by a 2px rule (the overlay's quiet-line device), not an icon. */
+.ob-note,
+.ob-caveat {
+  margin: var(--spacing-16) 0 0;
+  padding-left: var(--spacing-12);
+  border-left: 2px solid var(--line-strong);
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+/* Step 3: what Onscreenly needs, one row each, with its state as a tag. */
+.ob-need-row .ws-row-sub {
+  text-wrap: pretty;
+}
+
+.ob-key-row {
+  justify-content: space-between;
+  min-height: 44px;
+  padding-block: var(--spacing-10);
+}
+
+.ob-key-label {
+  color: var(--text-1);
+}
+
+.ob-keycaps {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--spacing-4);
+}
+
+.ob-keycaps .kbd {
+  background: var(--bg-surface);
+}
+
+/* macOS symbol keycaps (⌘ ⇧ ↵) take the sans stack, as in the overlay (see overlay.css). */
+.theme-workspace .kbd-sym {
+  padding-top: 2px; /* the sans line box sits the symbols about 1px high in the 22px cap */
+  font: var(--type-meta);
+  letter-spacing: var(--type-meta-track);
+}
+
+/* Welcome: the hero band. The serif and the gradient appear here and nowhere else.
+ * The Bone hairline would ring the dark band with a light halo, so the hero drops it: the Chalk part
+ * below stands out against the dark scrim on its own (the border stays as space, so the size holds). */
+#onboard.is-hero {
+  border-color: transparent;
+  background-clip: padding-box;
+}
+
+#onboard.is-hero .ob-head {
+  align-items: center;
+  padding: var(--spacing-32) var(--spacing-28) var(--spacing-28);
+  background: var(--gradient-hero);
+  text-align: center;
+}
+
+#onboard.is-hero .ob-eyebrow {
+  display: none;
+}
+
+#onboard.is-hero #ob-title {
+  margin-top: 0;
+  font: var(--type-display);
+  letter-spacing: var(--type-display-track);
+  color: var(--on-accent);
+}
+
+#onboard.is-hero .ob-lede {
+  margin-top: var(--spacing-10);
+  font: var(--type-lede);
+  letter-spacing: var(--type-lede-track);
+  color: var(--bg-tint); /* Frost on the band: 8.18:1 on the light stop */
+}
+
+/* The Welcome Frost feature card: the only 24px card. A short definition list: an eyebrow names each
+ * part (Screen, Audio, Answers) in its own column, so the sentences line up; Ash rules divide them. */
+.ob-features {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--spacing-4) var(--spacing-20);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-feature-cards);
+  background: var(--bg-tint);
+}
+
+.ob-feature {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--spacing-12);
+  padding-block: var(--spacing-12);
+}
+
+.ob-feature + .ob-feature {
+  border-top: 1px solid var(--line-on-tint);
+}
+
+.ob-feature-key {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.ob-feature dd {
+  margin: 0;
+  color: var(--text-1);
+  text-wrap: pretty;
+}
+
+/* Under the card, its rule lined up with the card's text edge (padding plus border). */
+.ob-caveat {
+  margin-inline: 21px;
+}
+
+/* publik disclosure (#onboard.dialog) and card (#onboard.card): no step footer. */
+#onboard.dialog .ob-actions,
+#onboard.card .ob-actions {
+  display: none;
+}
+
+#onboard.dialog .ob-buttons,
+#onboard.card .ob-buttons {
+  padding-top: var(--card-padding);
+  padding-bottom: var(--spacing-28);
+}
+
+#onboard.dialog:not(.card) .ob-buttons .btn {
+  flex: 1 1 0;
+}
+
+.ob-body .ob-fine {
+  display: block;
+  margin-top: var(--spacing-12);
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+}
+
+.ob-body .ob-fine a {
+  color: var(--text-nav);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.ob-body .ob-fine a:hover {
+  color: var(--text-strong);
+}
+
+.ob-body .publik-card-balance {
+  padding: var(--spacing-16) var(--spacing-20);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-cards);
+  background: var(--bg-tint);
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+
+.ob-body .publik-card-why {
+  margin-top: var(--spacing-12);
+  color: var(--text-nav);
+}
+
+/* ==== Consent ============================================================================== */
+#consent {
+  width: 420px;
+  align-items: flex-start;
+  padding: var(--card-padding);
+}
+
+.cs-eyebrow {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.cs-title {
+  margin-top: var(--spacing-6);
+  font: var(--type-title);
+  letter-spacing: var(--type-title-track);
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+
+.cs-body {
+  margin-top: var(--spacing-8);
+  color: var(--text-nav);
+  white-space: pre-line;
+}
+
+.cs-actions {
+  display: flex;
+  align-self: stretch;
+  justify-content: flex-end;
+  gap: var(--spacing-8);
+  margin-top: var(--card-padding);
+}
+
+/* ==== Permissions window ===================================================================
+ * The 484px card in the 500x540 window. The card is the drag region; rows and actions are not. */
+.perm-card {
+  width: 484px;
+  max-height: calc(var(--win-h) - 16px);
+  align-items: flex-start;
+  padding: var(--spacing-28) var(--spacing-28) var(--card-padding);
+  -webkit-app-region: drag;
+}
+
+.perm-eyebrow {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--type-eyebrow-track);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.perm-title {
+  margin-top: var(--spacing-6);
+  font: var(--type-heading);
+  letter-spacing: var(--type-heading-track);
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+
+.perm-desc {
+  margin-top: var(--spacing-8);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.perm-rows {
+  align-self: stretch;
+  margin-top: var(--spacing-20);
+}
+
+.perm-badge,
+.perm-open-btn {
+  flex-shrink: 0;
+}
+
+.perm-note {
+  margin-top: var(--spacing-16);
+  padding-left: var(--spacing-12);
+  border-left: 2px solid var(--line-strong);
+  font: var(--type-help);
+  letter-spacing: var(--type-help-track);
+  color: var(--text-2);
+  text-wrap: pretty;
+}
+
+.perm-actions {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: var(--spacing-8);
+  margin-top: var(--card-padding);
+}
+
+/* The spacer takes no gap of its own, so "Continue without microphone" (Windows) still fits the row. */
+.perm-actions > .spacer {
+  margin-inline-end: calc(-1 * var(--spacing-8));
+}
+
+.perm-check-btn[aria-busy='true'] {
+  color: var(--text-2);
+}
+
+/* ---- System settings ---- */
+@media (forced-colors: active) {
+  .s-tab.on::after,
+  .ob-dots span.on {
+    background: Highlight;
+  }
+  .ws-rows,
+  .s-card,
+  .ob-features {
+    border: 1px solid CanvasText;
+  }
+}

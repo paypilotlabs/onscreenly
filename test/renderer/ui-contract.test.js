@@ -1,0 +1,416 @@
+// Structural guards for the renderer's markup, scripts and styles. They hold
+// before the redesign and must keep holding through it, so every check parses
+// the current files instead of comparing them with a snapshot.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+
+const { parseCss, readCss, rendererCssFiles, relative, RENDERER, ROOT } = require('../helpers/css');
+const {
+  classesOf,
+  elements,
+  parseComplex,
+  querySelectorAll,
+  readRendererHtml,
+  splitSelectorList
+} = require('../helpers/markup');
+const { moduleLoadLookups, moduleLoadSource } = require('../helpers/module-scan');
+const { rendererModule, rendererModuleFiles } = require('../helpers/renderer-source');
+
+const index = readRendererHtml('index.html');
+const permissions = readRendererHtml('permissions.html');
+
+// Ids the renderer creates or copies at runtime (get-or-create, or a <template> copy), so
+// they may appear more than once in markup, or both in markup and in a script. None do
+// today; '#onscreenly-status', '#toast' and '#ob-publik-terms' are the candidates.
+const DYNAMIC_IDS = new Set([]);
+
+// Looked up in init() rather than at load, and kept in the DOM even while hidden
+// (the Settings shortcut listener in settings-panel.js still binds to it).
+const KEPT_HANDLES = ['#more-btn'];
+
+function idCounts(root) {
+  const counts = new Map();
+  for (const el of elements(root)) {
+    if (el.attrs.id === undefined) continue;
+    counts.set(el.attrs.id, (counts.get(el.attrs.id) || 0) + 1);
+  }
+  return counts;
+}
+
+// Ids that renderer scripts assign at runtime: `el.id = 'x'` and `id="x"` inside markup strings.
+function scriptCreatedIds() {
+  const ids = new Map();
+  for (const file of rendererModuleFiles()) {
+    const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    for (const m of src.matchAll(/\.id\s*=\s*(['"`])([\w-]+)\1|\bid=\\?(['"])([\w-]+)\\?\3/g)) {
+      const id = m[2] || m[4];
+      if (!ids.has(id)) ids.set(id, file);
+    }
+  }
+  return ids;
+}
+
+test('static ids are unique in index.html and permissions.html', () => {
+  for (const page of [index, permissions]) {
+    const counts = idCounts(page.root);
+    assert.ok(counts.size > 0, `${relative(page.file)}: no ids found; is the parser broken?`);
+    const dupes = [...counts].filter(([id, n]) => n > 1 && !DYNAMIC_IDS.has(id)).map(([id, n]) => `#${id} ×${n}`);
+    assert.deepEqual(dupes, [], `${relative(page.file)} repeats ids`);
+  }
+});
+
+test('ids created by renderer scripts do not collide with static ids in index.html', () => {
+  const created = scriptCreatedIds();
+  assert.ok(created.size > 0, 'found no script-created ids; is the scan broken?');
+  const counts = idCounts(index.root);
+  const clashes = [...created]
+    .filter(([id]) => counts.has(id) && !DYNAMIC_IDS.has(id))
+    .map(([id, file]) => `#${id} (${file})`);
+  assert.deepEqual(clashes, [], 'add get-or-create ids to DYNAMIC_IDS, or rename them');
+  for (const id of DYNAMIC_IDS) assert.ok(created.has(id) || counts.has(id), `DYNAMIC_IDS lists unused #${id}`);
+});
+
+test('the module-load scanner keeps load-time code and masks function bodies', () => {
+  const src = [
+    "const a = $('#load');",
+    "const re = /`{1,3}/; const s = `${$('#tpl')}`;",
+    "function f() { return $('#later'); }",
+    "const g = () => $('#arrow'), h = document.getElementById('also-load');",
+    "const obj = { k: document.querySelector('.in-object') };",
+    "export function init() { if (x) { $('#nested'); } }"
+  ].join('\n');
+  assert.equal(moduleLoadSource(src).length, src.length);
+  const selectors = moduleLoadLookups(src).map((l) => l.selector);
+  assert.deepEqual(selectors, ['#load', '#tpl', '#also-load', '.in-object']);
+});
+
+test('every DOM handle a renderer module looks up at load exists in index.html', () => {
+  let total = 0;
+  for (const file of rendererModuleFiles()) {
+    for (const lookup of moduleLoadLookups(rendererModule(path.basename(file)))) {
+      total++;
+      const where = `${file}: ${lookup.call}('${lookup.selector}')`;
+      const matches = querySelectorAll(index.root, lookup.selector);
+      if (matches.length) continue;
+      // A handle the module only uses behind a null check may lack its inner part (an
+      // icon slot, say), but the element it hangs off must still be there.
+      const anchor = parseComplex(splitSelectorList(lookup.selector)[0])[0].compound.id;
+      assert.ok(lookup.guarded && anchor, `${where} matches nothing in renderer/index.html`);
+      assert.equal(querySelectorAll(index.root, `#${anchor}`).length, 1, `${where}: #${anchor} is missing`);
+    }
+  }
+  assert.ok(total > 0, 'found no module-load lookups; is the scan broken?');
+  for (const sel of KEPT_HANDLES) assert.equal(querySelectorAll(index.root, sel).length, 1, `${sel} must stay`);
+});
+
+test('Settings tabs keep their order, and each tab has its pane', () => {
+  const tabs = querySelectorAll(index.root, '[data-tab]').map((el) => el.attrs['data-tab']);
+  assert.deepEqual(tabs, ['keys', 'profile', 'knowledge', 'transcription', 'style', 'appearance']);
+  for (const tab of tabs) {
+    assert.equal(querySelectorAll(index.root, `[data-pane="${tab}"]`).length, 1, `pane for "${tab}"`);
+  }
+});
+
+test('the action row has exactly the say, assist and recap buttons, one of them primary', () => {
+  const acts = querySelectorAll(index.root, '#action-row .act');
+  assert.deepEqual(
+    acts.map((el) => el.attrs['data-mode']),
+    ['say', 'assist', 'recap']
+  );
+  for (const el of acts) assert.equal(el.tag, 'button');
+  const primary = querySelectorAll(index.root, '#action-row .act-primary');
+  assert.equal(primary.length, 1);
+  assert.ok(classesOf(primary[0]).includes('act'), 'the primary action is one of the three .act buttons');
+});
+
+// Stylesheets the main window loads: its <link>s and everything they @import.
+function indexStylesheets() {
+  const seen = new Set();
+  const visit = (file) => {
+    if (seen.has(file) || !fs.existsSync(file)) return;
+    seen.add(file);
+    for (const st of readCss(file).statements) {
+      if (st.name !== 'import') continue;
+      const m = /^(?:url\(\s*)?(['"])([^'"]+)\1/.exec(st.prelude);
+      if (m) visit(path.resolve(path.dirname(file), m[2]));
+    }
+  };
+  for (const link of querySelectorAll(index.root, 'link[rel="stylesheet"]')) {
+    visit(path.join(RENDERER, link.attrs.href));
+  }
+  return [...seen];
+}
+
+function clickThroughIds() {
+  const src = rendererModule('window-behaviour.js');
+  const lists = [...src.matchAll(/\.closest\(\s*(['"])([^'"]+)\1\s*\)/g)]
+    .map((m) => splitSelectorList(m[2]))
+    .filter((list) => list.every((s) => /^#[\w-]+$/.test(s)) && list.includes('#toolbar'));
+  assert.equal(lists.length, 1, 'expected one closest() id list (with #toolbar) in window-behaviour.js');
+  return new Set(lists[0].map((s) => s.slice(1)));
+}
+
+// The renderer makes the window click-through wherever the pointer is not over one of the
+// ids in window-behaviour.js's closest() list. CSS that gives an element pointer events
+// must therefore name only listed ids: by id (#toolbar), or through a class on an element
+// that carries a listed id (.transcript-sidebar.open is #transcript-sidebar). An element
+// without an id must sit inside a listed one.
+test('the click-through ids cover every id that CSS gives pointer events', () => {
+  const ids = clickThroughIds();
+  const sheets = indexStylesheets();
+  assert.ok(sheets.length > 0, 'index.html links no stylesheet');
+  // Classes no static element carries (open, show, …) are runtime state: ignore them.
+  const staticClasses = new Set(elements(index.root).flatMap(classesOf));
+  const ignoreClass = (k) => !staticClasses.has(k);
+  const insideListed = (el) => {
+    for (let n = el.parent; n && n.tag !== '#root'; n = n.parent) if (ids.has(n.attrs.id)) return true;
+    return false;
+  };
+
+  const cssIds = new Set();
+  const problems = [];
+  for (const file of sheets) {
+    for (const rule of readCss(file).rules) {
+      if (!rule.declarations.some((d) => d.prop === 'pointer-events' && d.value !== 'none')) continue;
+      for (const selector of splitSelectorList(rule.selector)) {
+        const where = `${relative(file)}:${rule.line} "${selector}"`;
+        const parts = parseComplex(selector);
+        const subjectId = parts[parts.length - 1].compound.id;
+        if (subjectId) {
+          cssIds.add(subjectId);
+          continue;
+        }
+        const matches = querySelectorAll(index.root, selector, { ignoreClass });
+        for (const el of matches) {
+          if (el.attrs.id) cssIds.add(el.attrs.id);
+          else if (!insideListed(el)) problems.push(`${where} takes the mouse outside the listed ids`);
+        }
+        if (!matches.length && !parts.slice(0, -1).some((p) => ids.has(p.compound.id))) {
+          problems.push(`${where} matches nothing in index.html, so its click-through cannot be checked`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(problems, []);
+  assert.ok(cssIds.size > 0, 'found no pointer-events ids; is the CSS parse broken?');
+  const missing = [...cssIds].filter((id) => !ids.has(id)).map((id) => `#${id}`);
+  assert.deepEqual(missing, [], 'add these to the closest() list in renderer/js/window-behaviour.js');
+});
+
+// #app is click-through (pointer-events: none) and exactly these six take the mouse. Any other
+// UI must sit inside one of them.
+const CLICK_TARGETS = [
+  'toolbar',
+  'panel-wrap',
+  'transcript-sidebar',
+  'settings-scrim',
+  'onboard-scrim',
+  'consent-scrim'
+];
+
+test('layout.css gives the mouse to exactly the six ids that window-behaviour.js keeps clickable', () => {
+  const layout = readCss(path.join(RENDERER, 'css', 'layout.css'));
+  const pointer = (rule) => rule.declarations.find((d) => d.prop === 'pointer-events');
+  const app = layout.rules.filter((r) => r.selector === '#app' && pointer(r));
+  assert.equal(app.length, 1, 'one #app pointer-events rule');
+  assert.equal(pointer(app[0]).value, 'none', '#app lets the mouse through');
+  const ids = [];
+  for (const rule of layout.rules.filter((r) => pointer(r) && pointer(r).value === 'auto')) {
+    for (const selector of splitSelectorList(rule.selector)) {
+      assert.match(selector, /^#[\w-]+$/, `layout.css:${rule.line} names a bare id, not "${selector}"`);
+      ids.push(selector.slice(1));
+    }
+  }
+  assert.deepEqual([...ids].sort(), [...CLICK_TARGETS].sort());
+  assert.deepEqual([...clickThroughIds()].sort(), [...CLICK_TARGETS].sort());
+});
+
+// Layers in the order styles.css declares them, and the layer each css/*.css file is imported into.
+function layerOrder() {
+  const styles = readCss(path.join(RENDERER, 'styles.css'));
+  const order = styles.statements
+    .find((st) => st.name === 'layer')
+    .prelude.split(',')
+    .map((s) => s.trim());
+  const fileLayer = new Map();
+  for (const st of styles.statements.filter((x) => x.name === 'import')) {
+    const m = /^url\(\s*'css\/([\w-]+)\.css'\s*\)\s+layer\(\s*([\w-]+)\s*\)$/.exec(st.prelude);
+    if (m) fileLayer.set(`renderer/css/${m[1]}.css`, m[2]);
+  }
+  return { order, fileLayer };
+}
+
+test('the closed transcript sidebar is click-through, winning over layout.css by layer order', () => {
+  const sidebar = querySelectorAll(index.root, '#transcript-sidebar');
+  assert.equal(sidebar.length, 1);
+  assert.ok(classesOf(sidebar[0]).includes('transcript-sidebar'));
+
+  const { order, fileLayer } = layerOrder();
+  assert.ok(order.indexOf('layout') < order.indexOf('overlay'), 'overlay must come after layout');
+  const closed = readCss(path.join(RENDERER, 'css', 'overlay.css')).rules.filter(
+    (r) => r.selector === '.transcript-sidebar:not(.open)' && r.context.length === 0
+  );
+  assert.equal(closed.length, 1, 'overlay.css has one .transcript-sidebar:not(.open) rule');
+  assert.deepEqual(
+    closed[0].declarations.filter((d) => d.prop === 'pointer-events').map((d) => d.value),
+    ['none']
+  );
+
+  // Nothing in overlay or a later layer hands the sidebar the mouse again, except while it is open.
+  const from = order.indexOf('overlay');
+  for (const file of rendererCssFiles()) {
+    const layer = fileLayer.get(relative(file));
+    if (!layer || order.indexOf(layer) < from) continue;
+    for (const rule of readCss(file).rules) {
+      if (!rule.declarations.some((d) => d.prop === 'pointer-events' && d.value !== 'none')) continue;
+      for (const selector of splitSelectorList(rule.selector)) {
+        const parts = parseComplex(selector);
+        const subject = parts[parts.length - 1].compound;
+        if (subject.id !== 'transcript-sidebar' && !subject.classes.includes('transcript-sidebar')) continue;
+        assert.ok(
+          subject.classes.includes('open'),
+          `${relative(file)}:${rule.line} "${selector}" takes the mouse while closed`
+        );
+      }
+    }
+  }
+});
+
+test('#app carries the overlay theme, and no theme class sits on html, body or a scrim', () => {
+  assert.deepEqual(
+    querySelectorAll(index.root, '.theme-overlay').map((el) => el.attrs.id),
+    ['app']
+  );
+  for (const selector of ['html', 'body', '#settings-scrim', '#onboard-scrim', '#consent-scrim']) {
+    for (const el of querySelectorAll(index.root, selector)) {
+      assert.ok(!classesOf(el).some((k) => k.startsWith('theme-')), `${selector} carries a theme class`);
+    }
+  }
+});
+
+const themesOf = (el) => classesOf(el).filter((k) => k.startsWith('theme-'));
+
+test('Settings, onboarding and consent are light workspace dialogs, and themes never nest', () => {
+  for (const id of ['settings', 'onboard', 'consent']) {
+    const found = querySelectorAll(index.root, `#${id}`);
+    assert.equal(found.length, 1, `#${id}`);
+    assert.ok(classesOf(found[0]).includes('ws-dialog'), `#${id} is a .ws-dialog`);
+    assert.deepEqual(themesOf(found[0]), ['theme-workspace'], `#${id} carries the workspace theme`);
+    assert.equal(found[0].parent.attrs.id, `${id}-scrim`, `#${id} sits directly in its scrim`);
+  }
+  assert.deepEqual(
+    querySelectorAll(index.root, '.theme-workspace')
+      .map((el) => el.attrs.id)
+      .sort(),
+    ['consent', 'onboard', 'settings']
+  );
+  for (const page of [index, permissions]) {
+    for (const el of elements(page.root)) {
+      const themes = themesOf(el);
+      if (!themes.length) continue;
+      const where = `${relative(page.file)}: <${el.tag}${el.attrs.id ? ` id="${el.attrs.id}"` : ''}>`;
+      assert.equal(themes.length, 1, `${where} carries ${themes.join(' and ')}`);
+      for (let n = el.parent; n && n.tag !== '#root'; n = n.parent) {
+        assert.deepEqual(themesOf(n), [], `${where} sits inside another theme`);
+      }
+    }
+  }
+});
+
+// The permissions window has no overlay. It loads permissions.css (the shared layers it needs, in
+// the main window's order) and permissions.js, nothing else, and its own <style> holds only the
+// page geometry, which must not sit in a layer (it frames the card for whichever layer styles it).
+test('the permissions window links only permissions.css, keeps its geometry inline, and loads no icon set', () => {
+  assert.deepEqual(
+    querySelectorAll(permissions.root, 'link').map((el) => [el.attrs.rel, el.attrs.href]),
+    [['stylesheet', 'permissions.css']]
+  );
+  assert.deepEqual(
+    querySelectorAll(permissions.root, 'script').map((el) => el.attrs.src),
+    ['permissions.js']
+  );
+  assert.doesNotMatch(permissions.html, /icons\.js/);
+
+  const inline = [...permissions.html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+  assert.equal(inline.length, 1, 'one inline <style>');
+  const geometry = parseCss(inline[0]);
+  assert.deepEqual([...geometry.statements, ...geometry.atBlocks], [], 'the inline <style> has no @-rules');
+  const selectors = new Set(geometry.rules.flatMap((rule) => splitSelectorList(rule.selector)));
+  assert.deepEqual([...selectors].sort(), ['#perm-root', 'body', 'html']);
+
+  const sheet = readCss(path.join(RENDERER, 'permissions.css'));
+  assert.deepEqual(sheet.rules, [], 'permissions.css has style rules');
+  const order = sheet.statements
+    .find((st) => st.name === 'layer')
+    .prelude.split(',')
+    .map((name) => name.trim());
+  assert.deepEqual(order, ['fonts', 'tokens', 'base', 'controls', 'workspace', 'utilities', 'motion']);
+  assert.deepEqual(
+    sheet.statements.filter((st) => st.name === 'import').map((st) => st.prelude),
+    order.map((layer) => `url('css/${layer}.css') layer(${layer})`)
+  );
+});
+
+test('the permissions card is a light workspace dialog holding every id permissions.js uses', () => {
+  const cards = querySelectorAll(permissions.root, '.perm-card');
+  assert.equal(cards.length, 1);
+  assert.ok(classesOf(cards[0]).includes('ws-dialog'));
+  assert.deepEqual(themesOf(cards[0]), ['theme-workspace']);
+
+  const src = fs.readFileSync(path.join(RENDERER, 'permissions.js'), 'utf8');
+  const ids = new Set([...src.matchAll(/\$\(\s*'([\w-]+)'\s*\)/g)].map((m) => m[1]));
+  for (const m of src.matchAll(/\$\(\s*`([\w-]+)-\$\{key\}`\s*\)/g)) {
+    for (const key of ['mic', 'screen']) ids.add(`${m[1]}-${key}`);
+  }
+  assert.ok(ids.size > 10, 'found too few ids in permissions.js; is the scan broken?');
+  const inCard = (el) => {
+    for (let n = el.parent; n; n = n.parent) if (n === cards[0]) return true;
+    return false;
+  };
+  for (const id of ids) {
+    const found = querySelectorAll(permissions.root, `#${id}`);
+    assert.equal(found.length, 1, `#${id}`);
+    assert.ok(inCard(found[0]), `#${id} sits outside the card`);
+  }
+});
+
+test('--main-w and --side-w match MAIN_W and SIDE_W in app/main/window.js', () => {
+  const windowJs = fs.readFileSync(path.join(ROOT, 'app', 'main', 'window.js'), 'utf8');
+  const constant = (name) => {
+    const found = [...windowJs.matchAll(new RegExp(String.raw`\b${name}\s*=\s*(\d+)\b`, 'g'))];
+    assert.equal(found.length, 1, `expected one ${name} in app/main/window.js`);
+    return `${found[0][1]}px`;
+  };
+  const expected = { '--main-w': constant('MAIN_W'), '--side-w': constant('SIDE_W') };
+  const seen = { '--main-w': 0, '--side-w': 0 };
+  for (const file of rendererCssFiles()) {
+    for (const rule of readCss(file).rules) {
+      for (const d of rule.declarations) {
+        if (!(d.prop in expected)) continue;
+        seen[d.prop]++;
+        assert.equal(d.value, expected[d.prop], `${relative(file)}:${rule.line} ${d.prop}`);
+      }
+    }
+  }
+  assert.ok(seen['--main-w'] > 0 && seen['--side-w'] > 0, 'no --main-w/--side-w declaration found');
+});
+
+// Both windows load their fonts from renderer/fonts only; font-src says so explicitly
+// rather than leaning on default-src.
+test('both windows allow fonts from the app itself and nowhere else', () => {
+  for (const page of [index, permissions]) {
+    const metas = querySelectorAll(page.root, 'meta[http-equiv="Content-Security-Policy"]');
+    assert.equal(metas.length, 1, `${relative(page.file)}: one CSP meta`);
+    const directives = Object.fromEntries(
+      metas[0].attrs.content
+        .split(';')
+        .map((d) => d.trim().split(/\s+/))
+        .filter((d) => d[0])
+        .map(([name, ...sources]) => [name, sources.join(' ')])
+    );
+    assert.equal(directives['default-src'], "'self'", relative(page.file));
+    assert.equal(directives['font-src'], "'self'", relative(page.file));
+  }
+});

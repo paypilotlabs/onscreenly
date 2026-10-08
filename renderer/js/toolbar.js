@@ -1,28 +1,71 @@
 // Toolbar controls: collapse/expand, opacity, start/end session and clearing the transcript.
 import { state } from './state.js';
-import { $, onscreenly } from './core.js';
+import { $, combo, onscreenly, setSessionButton } from './core.js';
 import { showToast } from './chat.js';
 import { hardClearSTTFill, inputFromSTT } from './composer.js';
 import { startSystemAudio, stopSystemAudio } from './audio.js';
-import { clearTranscriptSidebar, hideSidebar, showSidebar, sidebarOpen } from './transcript.js';
-import { interimEl } from './events.js';
+import {
+  clearTranscriptSidebar,
+  fitActionRow,
+  hideSidebar,
+  setClearConfirm,
+  setSttState,
+  showSidebar,
+  sidebarOpen
+} from './transcript.js';
 
-// Hide / collapse
+// Hide / Show: the panel collapses; the toolbar (with the live dot) and any toast stay.
 let reopenSidebarOnExpand = false;
 function toggleHide() {
   const collapsed = $('#panel-wrap').classList.toggle('collapsed');
   const btn = $('#hide-btn');
-  btn.classList.toggle('collapsed', collapsed);
-  const label = btn.querySelector('.tb-hide-label');
   const text = collapsed ? 'Show' : 'Hide';
-  if (label) label.textContent = text;
-  btn.title = text;
+  btn.classList.toggle('collapsed', collapsed);
+  btn.querySelector('.tb-hide-label').textContent = text;
+  btn.title = `${text} (${combo('mod', 'shift', '/')})`;
   btn.setAttribute('aria-label', text);
+  btn.setAttribute('aria-expanded', String(!collapsed));
   if (collapsed) {
     reopenSidebarOnExpand = sidebarOpen;
     if (sidebarOpen) hideSidebar();
-  } else if (reopenSidebarOnExpand) {
-    showSidebar();
+  } else {
+    btn.classList.remove('has-unread');
+    fitActionRow();
+    if (reopenSidebarOnExpand) showSidebar();
+  }
+}
+
+// While the panel is hidden, a new answer puts a dot on Show; showing the panel clears it.
+function markUnread() {
+  if ($('#panel-wrap').classList.contains('collapsed')) $('#hide-btn').classList.add('has-unread');
+}
+
+// ---- session -------------------------------------------------------------
+// Start or end a session: the button and ⌘⇧L (session:toggle from main) both come here. Meeting
+// audio is opened first, while a click's user gesture is fresh (getDisplayMedia needs one), and the
+// button shows "Starting…" until main's capture:state says the session is up.
+async function toggleSession() {
+  const btn = $('#stop-btn');
+  if (btn.classList.contains('is-pending')) return;
+  const turningOn = !btn.classList.contains('active');
+  if (turningOn) {
+    setSessionButton(false, true);
+    setSttState('connecting');
+    // startSystemAudio may fail (user cancels, no permission) — that's OK,
+    // mic will still work and capture will toggle regardless
+    try {
+      await startSystemAudio();
+    } catch (_) {
+      /* handled inside startSystemAudio */
+    }
+  }
+  const active = await onscreenly.captureToggle();
+  if (!turningOn) return;
+  if (!active) stopSystemAudio();
+  // Normally capture:state has already ended "Starting…"; when the start failed, nothing did.
+  if (btn.classList.contains('is-pending')) {
+    setSessionButton(active);
+    if (!active) setSttState('disconnected');
   }
 }
 
@@ -56,9 +99,20 @@ function applyOpacity(value, persist) {
   const tbVal = $('#tb-opacity-value');
   const s = $('#s-opacity-slider');
   const sVal = $('#s-opacity-value');
-  if (tb) tb.value = String(percent);
+  // The filled part of each slider's track, from the 20% floor to 100%.
+  const floor = OPACITY_MIN * 100;
+  const fill = ((percent - floor) / (100 - floor)) * 100 + '%';
+  if (tb) {
+    tb.value = String(percent);
+    tb.setAttribute('aria-valuetext', percent + '%');
+    tb.style.setProperty('--pct', fill);
+  }
   if (tbVal) tbVal.textContent = percent + '%';
-  if (s) s.value = String(percent);
+  if (s) {
+    s.value = String(percent);
+    s.setAttribute('aria-valuetext', percent + '%');
+    s.style.setProperty('--fill', fill);
+  }
   if (sVal) sVal.textContent = percent + '%';
   if (persist) persistOpacitySoon();
 }
@@ -96,37 +150,23 @@ export function init() {
     el.addEventListener('change', () => applyOpacity(Number(el.value) / 100, true));
   });
 
-  // Stop = start/stop listening. Kick off system-audio capture straight from the click so
-  // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
-  $('#stop-btn').addEventListener('click', async () => {
-    const turningOn = !$('#stop-btn').classList.contains('active');
-    if (turningOn) {
-      // startSystemAudio may fail (user cancels, no permission) — that's OK,
-      // mic will still work and capture will toggle regardless
-      try {
-        await startSystemAudio();
-      } catch (_) {
-        /* handled inside startSystemAudio */
-      }
-    }
-    const active = await onscreenly.captureToggle();
-    if (turningOn && !active) stopSystemAudio();
-  });
+  $('#stop-btn').addEventListener('click', toggleSession);
+  onscreenly.on('session:toggle', toggleSession);
   if (clearTranscriptBtn) {
     clearTranscriptBtn.addEventListener('click', async () => {
-      await onscreenly.clearTranscript();
-      // Also clear the floating interim bar
-      if (interimEl) {
-        interimEl.textContent = '';
-        interimEl.classList.remove('show');
+      if (!clearTranscriptBtn.classList.contains('confirm')) {
+        setClearConfirm(true);
+        return;
       }
+      setClearConfirm(false);
+      await onscreenly.clearTranscript();
       state.transcriptInterimEl = null;
       clearTranscriptSidebar();
       // Only a question auto-filled from the transcript goes; anything the user typed stays.
       if (inputFromSTT) hardClearSTTFill();
-      showToast('Transcript cleared.', 2500);
+      showToast('Transcript cleared', 2500, 'ok');
     });
   }
 }
 
-export { applyOpacity, clampOpacity };
+export { applyOpacity, clampOpacity, markUnread, toggleOpacityPopover };

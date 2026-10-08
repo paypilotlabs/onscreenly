@@ -71,6 +71,7 @@ const api = {
       'vad:state',
       'applink:consent-request',
       'hide:toggle',
+      'session:toggle',
       'whisper:download-progress',
       'whisper:models-changed',
       'publik:state',

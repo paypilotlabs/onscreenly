@@ -2,369 +2,465 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none';" />
   <title>Onscreenly</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="app">
-    <!-- Dedicated drag handle / top bar -->
-    <div id="toolbar">
-      <div class="drag-pill" title="Drag to move window">
-        <span class="drag-dots" aria-hidden="true"></span>
-        <span class="drag-label">Drag</span>
-      </div>
-      <button class="tb-logo" id="logo-btn" title="How to use Onscreenly" aria-label="How to use Onscreenly"></button>
-      <button class="tb-settings" id="tb-settings-btn" title="Settings" aria-label="Settings"></button>
-      <div class="tb-divider"></div>
-      <button class="tb-hide" id="hide-btn" title="Hide" aria-label="Hide"><span class="chev"></span><span class="tb-hide-label">Hide</span></button>
-      <div class="tb-divider"></div>
-      <button class="tb-stop" id="stop-btn" title="Start session" aria-label="Start session">
-        <span class="ic"></span><span class="tb-stop-label">Start session</span>
+  <div id="app" class="theme-overlay">
+    <!-- Toolbar: a 36px pill of text buttons. Press anywhere that isn't a control to drag the window. -->
+    <div id="toolbar" role="group" aria-label="Onscreenly" title="Drag to move">
+      <button type="button" class="tb-btn tb-stop" id="stop-btn" title="Start session (⌘⇧L)" aria-label="Start session" aria-keyshortcuts="Meta+Shift+L">
+        <span class="tb-stop-row"><span class="tb-lead"><span id="live-dot" class="off"></span></span><span class="tb-stop-label">Start session</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift L">⌘⇧L</span></span>
+        <!-- Sizer: the widest state, "● End session" and its hint, kept invisible so every state has one width. -->
+        <span class="tb-stop-row tb-stop-sizer" aria-hidden="true"><span class="tb-sizer-dot"></span><span>End session</span><span class="tb-hint" data-combo="mod shift L">⌘⇧L</span></span>
       </button>
-      <div class="tb-divider"></div>
+      <button type="button" class="tb-btn tb-hide" id="hide-btn" title="Hide (⌘⇧/)" aria-label="Hide" aria-keyshortcuts="Meta+Shift+/" aria-expanded="true" aria-controls="panel-wrap">
+        <span class="tb-hide-label">Hide</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift /">⌘⇧/</span><span class="tb-unread" aria-hidden="true"></span>
+      </button>
+      <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-opacity-wrap">
-        <button class="tb-opacity" id="opacity-btn" title="Opacity" aria-label="Opacity" aria-expanded="false">
-          <span class="ic"></span>
-        </button>
-        <div id="opacity-popover" class="opacity-popover hidden">
-          <div class="opacity-label">Opacity</div>
-          <div class="opacity-row">
-            <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" />
-            <span id="tb-opacity-value">100%</span>
-          </div>
+        <button type="button" class="tb-btn tb-opacity" id="opacity-btn" title="Opacity" aria-expanded="false" aria-controls="opacity-popover">Opacity</button>
+        <div id="opacity-popover" class="opacity-popover hidden" role="group" aria-label="Opacity">
+          <span class="opacity-label" aria-hidden="true">Opacity</span>
+          <input type="range" id="tb-opacity-slider" min="20" max="100" step="1" value="100" aria-label="Opacity" aria-valuetext="100%" />
+          <span id="tb-opacity-value">100%</span>
         </div>
       </div>
-      <div class="tb-divider"></div>
-      <button class="tb-quit" id="quit-btn" title="Quit Onscreenly" aria-label="Quit Onscreenly"></button>
+      <button type="button" class="tb-btn tb-logo" id="logo-btn" title="How to use Onscreenly">Help</button>
+      <button type="button" class="tb-btn tb-settings" id="tb-settings-btn" title="Settings">Settings</button>
+      <div class="tb-divider" aria-hidden="true"></div>
+      <button type="button" class="tb-btn tb-quit" id="quit-btn" title="Quit Onscreenly (⌘⇧X)" aria-label="Quit Onscreenly">Quit</button>
     </div>
 
-    <!-- Main assistant panel -->
+    <!-- Answer panel, with the transcript sidebar beside it. -->
     <div id="panel-wrap">
-      <span id="live-dot" class="off"></span>
-      <div id="stt-status" class="stt-status stt-disconnected">Transcription off</div>
-      <div id="panel" class="glass no-drag">
-
-        <!-- Two-column layout: responses (left) + live transcript sidebar (right) -->
+      <div id="panel" class="glass no-drag" data-setup="false" data-listen="ready" data-capture="off">
         <div id="panel-columns">
-
-          <!-- Left column: AI responses -->
           <div id="panel-main">
-            <div id="messages"></div>
+            <div id="messages" role="log" aria-live="polite" aria-label="Answers"></div>
+            <!-- Shown while #messages is empty. #panel[data-setup|data-listen|data-capture] picks the variant. -->
+            <div id="empty-state" class="empty-state">
+              <div class="es-variant es-setup">
+                <div class="es-copy">
+                  <p class="es-title">Connect an AI provider to get answers</p>
+                </div>
+                <button type="button" class="btn btn-primary compact es-action" id="empty-setup">Open settings</button>
+              </div>
+              <div class="es-variant es-audio">
+                <div class="es-copy">
+                  <p class="es-title">Answers work, but Onscreenly can’t transcribe yet</p>
+                  <p class="es-body">Add a speech-to-text key or download a local model to hear the conversation.</p>
+                </div>
+                <button type="button" class="btn btn-secondary compact es-action" id="empty-audio">Open Audio settings</button>
+              </div>
+              <div class="es-variant es-ready">
+                <div class="es-copy">
+                  <p class="es-title">Ready when you are</p>
+                  <p class="es-body">Start a session to listen, or ask anything below.</p>
+                </div>
+                <dl class="es-keys">
+                  <div class="es-key"><dt data-keys="mod shift L"></dt><dd>Start or end a session</dd></div>
+                  <div class="es-key"><dt data-keys="mod ↵"></dt><dd>What should I say?</dd></div>
+                  <div class="es-key"><dt data-keys="mod shift ↵"></dt><dd class="es-assist-label">Assist</dd></div>
+                  <div class="es-key"><dt data-keys="mod H"></dt><dd>Solve the coding problem on screen</dd></div>
+                  <div class="es-key"><dt data-keys="mod shift /"></dt><dd>Hide or show</dd></div>
+                </dl>
+              </div>
+              <div class="es-variant es-listening">
+                <span class="es-live-dot" aria-hidden="true"></span>
+                <div class="es-copy">
+                  <p class="es-body">Listening. The interviewer’s question will appear below; press <span data-combo="↵">↵</span> to answer.</p>
+                </div>
+              </div>
+              <div class="es-variant es-mic-only">
+                <span class="es-live-dot" aria-hidden="true"></span>
+                <div class="es-copy">
+                  <p class="es-body">Listening to your microphone only. Turn on Meeting audio in Settings › Audio to hear the other side.</p>
+                </div>
+              </div>
+            </div>
 
             <div id="action-row">
-              <button class="act act-primary" data-mode="say"
-                title="Suggests what to say next based on the conversation">
-                <span class="ic"></span><span>What should I say?</span>
-                <span class="shortcut-hint" id="say-shortcut-hint"></span>
+              <button type="button" class="act act-primary" data-mode="say" title="Suggests what to say next based on the conversation (⌘↵)">
+                <span class="act-label">What should I say?</span><span class="shortcut-hint" id="say-shortcut-hint" aria-hidden="true" data-combo="mod ↵">⌘↵</span>
               </button>
-              <span class="sep">•</span>
-              <button class="act act-secondary" data-mode="assist"
-                title="Scans your screen and conversation to decide what you need">
-                <span class="ic"></span><span>Smart assist</span>
-                <span class="shortcut-hint" id="assist-shortcut-hint"></span>
+              <button type="button" class="act act-secondary" data-mode="assist" title="Scans your screen and conversation to decide what you need (⌘⇧↵)">
+                <span class="act-label">Assist</span><span class="shortcut-hint" id="assist-shortcut-hint" aria-hidden="true" data-combo="mod shift ↵">⌘⇧↵</span>
               </button>
-              <span class="sep">•</span>
-              <button class="act" data-mode="recap"><span class="ic"></span><span>Recap</span></button>
+              <button type="button" class="act" data-mode="recap" title="Sums up the conversation so far">
+                <span class="act-label">Recap</span>
+              </button>
+              <div id="stt-status" class="stt-status stt-disconnected" role="status">
+                <span class="stt-dot" aria-hidden="true"></span><span class="stt-label"></span>
+              </div>
             </div>
 
             <div id="composer">
               <div id="input-area">
-                <div id="placeholder">Ask about your screen or conversation, or <span class="keycap">⌘</span><span class="keycap">⇧</span><span class="keycap">⏎</span> for Smart assist</div>
-                <textarea id="input" rows="1" spellcheck="false"></textarea>
+                <div id="placeholder">Ask about your screen or the conversation</div>
+                <div class="input-ghost hidden" aria-hidden="true"></div>
+                <textarea id="input" rows="1" spellcheck="false" aria-label="Ask about your screen or the conversation"></textarea>
               </div>
               <div id="composer-bottom">
-                <button id="smart-toggle" class="smart-pill"><span class="ic"></span><span>Smart</span></button>
-                <button id="history-btn" class="history-btn" title="Show everything said this session"><span class="ic"></span><span>Transcription history</span></button>
-                <button id="more-btn" class="more-btn" title="Settings"></button>
+                <button type="button" id="smart-toggle" class="chip smart-pill" aria-pressed="false">Smart</button>
+                <button type="button" id="history-btn" class="chip history-btn" aria-expanded="false" aria-controls="transcript-sidebar" title="Show everything said this session">Transcript</button>
+                <button type="button" id="more-btn" class="more-btn hidden" title="Settings">Settings</button>
                 <div class="spacer"></div>
-                <button id="send-btn" title="Send"></button>
+                <span class="composer-hint" aria-hidden="true">Ready · <span data-combo="↵">↵</span> to answer</span>
+                <button type="button" id="send-btn" title="Assist · looks at your screen (⌘⇧↵)"><span class="send-label">Send</span><span class="send-hint" aria-hidden="true" data-combo="↵">↵</span></button>
               </div>
             </div>
           </div>
-
         </div><!-- /panel-columns -->
       </div>
 
-      <!-- Transcript history sidebar — slides out from behind the panel's right edge -->
-      <div id="transcript-sidebar" class="transcript-sidebar">
+      <!-- Transcript sidebar: beside the panel (left of it with .left when the screen has no room on the right). Closed, it is click-through. -->
+      <aside id="transcript-sidebar" class="transcript-sidebar" aria-label="Transcript">
         <div class="ts-header">
-          <span class="ts-title">Transcription history</span>
-          <button class="ts-close-btn" id="close-sidebar-btn" title="Close history">✕</button>
+          <span class="ts-title">Transcript</span>
+          <button type="button" class="ts-close-btn" id="close-sidebar-btn" title="Close transcript" aria-label="Close transcript">Close</button>
         </div>
         <div id="ts-list" class="ts-list">
-          <div class="ts-placeholder">Conversation history will appear here when listening.</div>
+          <div class="ts-placeholder">Nothing yet. Start a session and the conversation shows up here.</div>
         </div>
         <div class="ts-footer">
-          <button class="ts-clear-btn" id="clear-transcript-btn" title="Clear all history">Clear History</button>
+          <button type="button" class="btn btn-ghost compact ts-clear-btn" id="clear-transcript-btn" title="Clear the transcript"><span class="ts-clear-label">Clear transcript</span></button>
         </div>
-      </div>
+      </aside>
     </div>
   </div>
 
-  <!-- Settings -->
+  <!-- Settings: the light workspace dialog over the dimmed overlay. -->
   <div id="settings-scrim" class="hidden">
-    <div id="settings" class="glass">
+    <div id="settings" class="ws-dialog theme-workspace" role="dialog" aria-modal="true" aria-labelledby="s-title">
       <div class="s-head">
-        <div class="s-title">Settings</div>
-        <button id="s-close" class="s-close">Done</button>
+        <h2 id="s-title" class="s-title">Settings</h2>
+        <button id="s-close" class="s-close btn btn-secondary compact">Done</button>
       </div>
 
-      <!-- Tab bar -->
-      <div class="s-tabs">
-        <button class="s-tab on" data-tab="keys">🔑 API Keys</button>
-        <button class="s-tab" data-tab="profile">👤 Profile</button>
-        <button class="s-tab" data-tab="knowledge">📚 Knowledge</button>
-        <button class="s-tab" data-tab="transcription">🔉 Audio</button>
-        <button class="s-tab" data-tab="style">✨ Style</button>
-        <button class="s-tab" data-tab="appearance">🌗 Appearance</button>
+      <!-- Tab bar: one row, roving tabindex. The data-tab order is unchanged. -->
+      <div class="s-tabs" role="tablist" aria-label="Settings sections">
+        <button class="s-tab on" data-tab="keys" role="tab" id="s-tab-keys" aria-selected="true" aria-controls="s-pane-keys" tabindex="0">API keys</button>
+        <button class="s-tab" data-tab="profile" role="tab" id="s-tab-profile" aria-selected="false" aria-controls="s-pane-profile" tabindex="-1">Profile</button>
+        <button class="s-tab" data-tab="knowledge" role="tab" id="s-tab-knowledge" aria-selected="false" aria-controls="s-pane-knowledge" tabindex="-1">Knowledge</button>
+        <button class="s-tab" data-tab="transcription" role="tab" id="s-tab-transcription" aria-selected="false" aria-controls="s-pane-transcription" tabindex="-1">Audio</button>
+        <button class="s-tab" data-tab="style" role="tab" id="s-tab-style" aria-selected="false" aria-controls="s-pane-style" tabindex="-1">Style</button>
+        <button class="s-tab" data-tab="appearance" role="tab" id="s-tab-appearance" aria-selected="false" aria-controls="s-pane-appearance" tabindex="-1">Appearance</button>
       </div>
 
       <!-- Tab: Keys -->
-      <div class="s-body s-tab-pane" data-pane="keys">
-        <label class="s-label">Provider</label>
-        <div class="s-seg" id="provider-seg">
-          <button data-provider="publik" id="provider-publik" class="hidden">publik API <span class="s-default-badge">default</span></button>
-          <button data-provider="cerebras">Cerebras</button>
-          <button data-provider="openai">OpenAI</button>
-          <button data-provider="anthropic">Anthropic</button>
-          <button data-provider="gemini">Gemini</button>
-          <button data-provider="groq">Groq</button>
-          <button data-provider="custom">Custom</button>
-          <button data-provider="ollama">Ollama</button>
-          <button data-provider="minimax">MiniMax</button>
-          <button data-provider="deepseek">DeepSeek</button>
-          <button data-provider="azure">Azure AI</button>
-        </div>
-
-        <label class="s-label">API keys &amp; URLs <span class="s-hint">stored locally · never sent to any server</span></label>
-        <div class="s-field" data-key-for="cerebras"><span>Cerebras</span><input id="key-cerebras" type="password" placeholder="csk-..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="openai"><span>OpenAI</span><input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="anthropic"><span>Anthropic</span><input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="gemini"><span>Gemini</span><input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="deepgram"><span>Deepgram</span><input id="key-deepgram" type="password" placeholder="dg-..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="groq"><span>Groq</span><input id="key-groq" type="password" placeholder="gsk_..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="custom"><span>Custom</span><input id="key-custom" type="password" placeholder="optional" autocomplete="off" /></div>
-        <div class="s-field" data-key-for="minimax"><span>MiniMax</span><input id="key-minimax" type="password" placeholder="MiniMax API key" autocomplete="off" /></div>
-
-        <div id="minimax-region-settings" class="hidden">
-          <label class="s-label">MiniMax region <span class="s-hint">keys are region-bound — a Global key will 401 against China, and vice versa</span></label>
-          <div class="s-seg" id="minimax-region-seg">
-            <button data-region="global_en">Global</button>
-            <button data-region="cn_zh">China</button>
+      <div class="s-body s-tab-pane" data-pane="keys" role="tabpanel" id="s-pane-keys" aria-labelledby="s-tab-keys">
+        <section class="s-group">
+          <h3 class="s-eyebrow" id="s-provider-label">Provider</h3>
+          <div class="s-seg s-chips" id="provider-seg" role="group" aria-labelledby="s-provider-label">
+            <button data-provider="publik" id="provider-publik" class="hidden">publik API <span class="s-default-badge">default</span></button>
+            <button class="chip" data-provider="cerebras" aria-pressed="false">Cerebras</button>
+            <button class="chip" data-provider="openai" aria-pressed="false">OpenAI</button>
+            <button class="chip" data-provider="anthropic" aria-pressed="false">Anthropic</button>
+            <button class="chip" data-provider="gemini" aria-pressed="false">Gemini</button>
+            <button class="chip" data-provider="groq" aria-pressed="false">Groq</button>
+            <button class="chip" data-provider="custom" aria-pressed="false">Custom</button>
+            <button class="chip" data-provider="ollama" aria-pressed="false">Ollama</button>
+            <button class="chip" data-provider="minimax" aria-pressed="false">MiniMax</button>
+            <button class="chip" data-provider="deepseek" aria-pressed="false">DeepSeek</button>
+            <button class="chip" data-provider="azure" aria-pressed="false">Azure AI</button>
           </div>
-        </div>
+        </section>
 
-        <div id="custom-endpoint-settings" class="hidden">
-          <label class="s-label" for="base-url">Custom endpoint <span class="s-hint">OpenAI-compatible chat API</span></label>
-          <div class="s-field"><span>Base URL</span><input id="base-url" type="url" placeholder="http://127.0.0.1:18789/v1" autocomplete="off" spellcheck="false" /></div>
-          <div class="s-help">Your Custom key and LLM requests are sent to this URL. To also use it for speech-to-text, pick Custom on the Audio tab — otherwise transcription uses OpenAI or Groq.</div>
-        </div>
+        <!-- The pane's one Frost card: the chosen provider's key and endpoint fields only. -->
+        <section class="s-card s-key-card" aria-label="Provider key">
+          <div class="s-field" data-key-for="cerebras"><label for="key-cerebras">API key</label><input class="field" id="key-cerebras" type="password" placeholder="csk-..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="openai"><label for="key-openai">API key</label><input class="field" id="key-openai" type="password" placeholder="sk-..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="anthropic"><label for="key-anthropic">API key</label><input class="field" id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="gemini"><label for="key-gemini">API key</label><input class="field" id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="groq"><label for="key-groq">API key</label><input class="field" id="key-groq" type="password" placeholder="gsk_..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="custom"><label for="key-custom">API key</label><input class="field" id="key-custom" type="password" placeholder="optional" autocomplete="off" /></div>
+          <div class="s-field" data-key-for="minimax"><label for="key-minimax">API key</label><input class="field" id="key-minimax" type="password" placeholder="MiniMax API key" autocomplete="off" /></div>
 
-        <!-- publik API: the packaged-build default. Text and buttons are filled by
-             renderPublikBlock() from publik:state so the copy has one source. -->
-        <div id="publik-settings" class="publik-card hidden">
-          <div class="publik-line" id="publik-status-note">Not connected</div>
-          <div class="publik-line warn hidden" id="publik-low-note"></div>
-          <div class="s-note" id="publik-cost-note"></div>
-          <details class="publik-why" id="publik-why">
-            <summary id="publik-why-summary">Why it costs money</summary>
-            <div class="s-note" id="publik-why-text"></div>
-          </details>
-          <div class="s-note" id="publik-data-note"></div>
-          <div class="whisper-actions">
-            <button id="publik-setup" class="s-action hidden">Set up publik API</button>
-            <button id="publik-link" class="s-action primary hidden">Link this computer &amp; pick a plan</button>
-            <button id="publik-add-credit" class="s-action hidden">Add a plan or pack</button>
-            <button id="publik-reconnect" class="s-action hidden">Reconnect</button>
-            <button id="publik-pricing" class="s-action">How pricing works</button>
-            <button id="publik-byo" class="s-action">Use my own key instead</button>
-            <button id="publik-disconnect" class="s-action danger hidden">Disconnect publik API</button>
+          <div id="minimax-region-settings" class="s-field hidden">
+            <span class="s-field-label" id="s-minimax-region-label">Region</span>
+            <div class="s-field-stack">
+              <div class="s-seg s-chips" id="minimax-region-seg" role="group" aria-labelledby="s-minimax-region-label">
+                <button class="chip" data-region="global_en" aria-pressed="false">Global</button>
+                <button class="chip" data-region="cn_zh" aria-pressed="false">China</button>
+              </div>
+              <p class="s-help">Keys are region-bound: a Global key fails against China, and the other way round.</p>
+            </div>
           </div>
-        </div>
-        <div class="s-field" data-key-for="ollama"><span>Ollama URL</span><input id="key-ollama" type="text" placeholder="http://localhost:11434" autocomplete="off" /></div>
-        <div class="s-field" data-key-for="deepseek"><span>DeepSeek</span><input id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" /></div>
-        <div class="s-field" data-key-for="azure"><span>Azure AI Foundry</span><input id="key-azure" type="password" placeholder="azure key or Entra token" autocomplete="off" /></div>
 
-        <div id="azure-endpoint-settings" class="hidden">
-          <label class="s-label" for="azure-endpoint">Azure endpoint <span class="s-hint">Azure OpenAI: https://&lt;resource&gt;.openai.azure.com/openai · AI Foundry: https://&lt;host&gt;.cognitiveservices.azure.com (Onscreenly adds /openai/v1)</span></label>
-          <div class="s-field"><span>Endpoint</span><input id="azure-endpoint" type="text" placeholder="https://host.cognitiveservices.azure.com" autocomplete="off" /></div>
-        </div>
+          <div id="custom-endpoint-settings" class="s-field hidden">
+            <label for="base-url">Base URL</label>
+            <div class="s-field-stack">
+              <input class="field" id="base-url" type="url" placeholder="http://127.0.0.1:18789/v1" autocomplete="off" spellcheck="false" />
+              <p class="s-help">An OpenAI-compatible chat API. Your Custom key and questions go to this URL. To use it for speech-to-text too, pick Custom on the Audio tab.</p>
+            </div>
+          </div>
 
-        <label class="s-label">Models <span class="s-hint">fast = Smart off · smart = Smart on</span></label>
-        <div class="s-field"><span>Fast</span><input id="model-fast" type="text" autocomplete="off" /></div>
-        <div class="s-field"><span>Smart</span><input id="model-smart" type="text" autocomplete="off" /></div>
+          <!-- publik API: the packaged-build default. Text and buttons are filled by
+               renderPublikBlock() from publik:state so the copy has one source. -->
+          <div id="publik-settings" class="publik-card hidden">
+            <div class="publik-line" id="publik-status-note">Not connected</div>
+            <div class="publik-line warn hidden" id="publik-low-note"></div>
+            <div class="s-note" id="publik-cost-note"></div>
+            <details class="publik-why" id="publik-why">
+              <summary id="publik-why-summary">Why it costs money</summary>
+              <div class="s-note" id="publik-why-text"></div>
+            </details>
+            <div class="s-note" id="publik-data-note"></div>
+            <div class="whisper-actions s-actions">
+              <button id="publik-setup" class="s-action btn btn-secondary compact hidden">Set up publik API</button>
+              <button id="publik-link" class="s-action primary hidden">Link this computer &amp; pick a plan</button>
+              <button id="publik-add-credit" class="s-action btn btn-secondary compact hidden">Add a plan or pack</button>
+              <button id="publik-reconnect" class="s-action btn btn-secondary compact hidden">Reconnect</button>
+              <button id="publik-pricing" class="s-action btn btn-secondary compact">How pricing works</button>
+              <button id="publik-byo" class="s-action btn btn-secondary compact">Use my own key instead</button>
+              <button id="publik-disconnect" class="s-action danger btn btn-danger compact hidden">Disconnect publik API</button>
+            </div>
+          </div>
+          <div class="s-field" data-key-for="ollama"><label for="key-ollama">Server URL</label><input class="field" id="key-ollama" type="text" placeholder="http://localhost:11434" autocomplete="off" /></div>
+          <div class="s-field" data-key-for="deepseek"><label for="key-deepseek">API key</label><input class="field" id="key-deepseek" type="password" placeholder="sk-..." autocomplete="off" /></div>
+          <div class="s-field" data-key-for="azure"><label for="key-azure">API key</label><input class="field" id="key-azure" type="password" placeholder="Azure key or Entra token" autocomplete="off" /></div>
 
-        <label class="s-label">Assistant access <span class="s-hint">programs allowed to see what Onscreenly is doing</span></label>
-        <div class="s-callers" id="applink-callers"></div>
+          <div id="azure-endpoint-settings" class="s-field hidden">
+            <label for="azure-endpoint">Endpoint</label>
+            <div class="s-field-stack">
+              <input class="field" id="azure-endpoint" type="text" placeholder="https://host.cognitiveservices.azure.com" autocomplete="off" />
+              <p class="s-help">Azure OpenAI: https://&lt;resource&gt;.openai.azure.com/openai. AI Foundry: https://&lt;host&gt;.cognitiveservices.azure.com (Onscreenly adds /openai/v1).</p>
+            </div>
+          </div>
 
-        <label class="s-label">Your data</label>
-        <div class="s-note" id="key-storage-note"></div>
-        <div class="whisper-actions">
-          <button id="delete-all-data" class="s-action danger">Delete all my data…</button>
-        </div>
+          <p class="s-help s-key-note">Stored on this computer, encrypted when your system allows it, and sent only to the provider you pick.</p>
+        </section>
 
-        <div class="s-status" id="s-status"></div>
+        <section class="s-group">
+          <div class="s-group-head"><h3 class="s-eyebrow">Models</h3><span class="s-hint">Smart is used while the Smart toggle is on</span></div>
+          <div class="s-field"><label for="model-fast">Fast</label><input class="field" id="model-fast" type="text" autocomplete="off" spellcheck="false" /></div>
+          <div class="s-field"><label for="model-smart">Smart</label><input class="field" id="model-smart" type="text" autocomplete="off" spellcheck="false" /></div>
+        </section>
+
+        <section class="s-group">
+          <div class="s-group-head"><h3 class="s-eyebrow">Assistant access</h3><span class="s-hint">Programs that may see what Onscreenly is doing</span></div>
+          <div class="s-callers" id="applink-callers"></div>
+        </section>
+
+        <section class="s-group">
+          <h3 class="s-eyebrow">Your data</h3>
+          <p class="s-note" id="key-storage-note"></p>
+          <div class="whisper-actions s-actions">
+            <button id="delete-all-data" class="s-action danger btn btn-danger compact">Delete all my data…</button>
+          </div>
+        </section>
       </div>
 
       <!-- Tab: Profile -->
-      <div class="s-body s-tab-pane hidden" data-pane="profile">
-        <label class="s-label" for="resume-text">Résumé <span class="s-hint">PDF, DOCX, Markdown or text · used in every answer</span></label>
-        <textarea id="resume-text" rows="8" spellcheck="false" placeholder="Paste your résumé here, or import a file."></textarea>
-        <div class="whisper-actions">
-          <button id="resume-import" class="s-action">Import file…</button>
-          <button id="resume-analyse" class="s-action primary">Analyse my résumé</button>
-        </div>
+      <div class="s-body s-tab-pane hidden" data-pane="profile" role="tabpanel" id="s-pane-profile" aria-labelledby="s-tab-profile">
+        <section class="s-card s-resume-card">
+          <div class="s-group-head"><label class="s-eyebrow" for="resume-text">Résumé</label><span class="s-hint">PDF, DOCX, Markdown or text · used in every answer</span></div>
+          <textarea class="field" id="resume-text" rows="6" spellcheck="false" placeholder="Paste your résumé here, or import a file."></textarea>
+          <div class="whisper-actions s-actions">
+            <button id="resume-import" class="s-action btn btn-primary compact">Import file…</button>
+            <button id="resume-analyse" class="s-action btn btn-secondary compact">Analyse my résumé</button>
+          </div>
+        </section>
 
-        <label class="s-label" for="job-description">Target job <span class="s-hint">optional · the analysis scores your résumé against it</span></label>
-        <textarea id="job-description" rows="6" spellcheck="false" placeholder="Paste the job description."></textarea>
-        <div class="whisper-actions">
-          <button id="jd-import" class="s-action">Import file…</button>
-        </div>
+        <section class="s-group">
+          <div class="s-group-head"><label class="s-eyebrow" for="job-description">Target job</label><span class="s-hint">Optional · the analysis scores your résumé against it</span></div>
+          <textarea class="field" id="job-description" rows="4" spellcheck="false" placeholder="Paste the job description."></textarea>
+          <div class="whisper-actions s-actions">
+            <button id="jd-import" class="s-action btn btn-secondary compact">Import file…</button>
+          </div>
+        </section>
 
-        <details class="s-details" id="prep-details">
-          <summary>Interview prep answers <span class="s-hint">used when the conversation calls for them</span></summary>
-          <label class="s-label" for="star-stories">STAR stories</label>
-          <textarea id="star-stories" rows="5" spellcheck="false" placeholder="3–5 stories: Situation, Task, Action, Result."></textarea>
-          <label class="s-label" for="why-company">Why this company</label>
-          <textarea id="why-company" rows="2" spellcheck="false"></textarea>
-          <label class="s-label" for="why-leaving">Why you're leaving</label>
-          <textarea id="why-leaving" rows="2" spellcheck="false"></textarea>
-          <label class="s-label" for="work-style">Work style and values</label>
-          <textarea id="work-style" rows="2" spellcheck="false"></textarea>
-          <label class="s-label" for="salary-target">Salary target</label>
-          <textarea id="salary-target" rows="1" spellcheck="false" placeholder="e.g. $150k–$180k base + equity"></textarea>
-          <label class="s-label" for="questions-to-ask">Questions to ask them</label>
-          <textarea id="questions-to-ask" rows="3" spellcheck="false"></textarea>
+        <details class="s-details s-group" id="prep-details">
+          <summary><span class="s-eyebrow">Interview prep answers</span><span class="s-hint">Used when the conversation calls for them</span></summary>
+          <div class="s-details-body">
+            <div class="s-stack"><label for="star-stories">STAR stories</label><textarea class="field" id="star-stories" rows="4" spellcheck="false" placeholder="3–5 stories: Situation, Task, Action, Result."></textarea></div>
+            <div class="s-stack"><label for="why-company">Why this company</label><textarea class="field" id="why-company" rows="2" spellcheck="false"></textarea></div>
+            <div class="s-stack"><label for="why-leaving">Why you’re leaving</label><textarea class="field" id="why-leaving" rows="2" spellcheck="false"></textarea></div>
+            <div class="s-stack"><label for="work-style">Work style and values</label><textarea class="field" id="work-style" rows="2" spellcheck="false"></textarea></div>
+            <div class="s-stack"><label for="salary-target">Salary target</label><textarea class="field" id="salary-target" rows="1" spellcheck="false" placeholder="e.g. $150k–$180k base + equity"></textarea></div>
+            <div class="s-stack"><label for="questions-to-ask">Questions to ask them</label><textarea class="field" id="questions-to-ask" rows="3" spellcheck="false"></textarea></div>
+          </div>
         </details>
-        <div class="s-note">Stored on this computer. Sent only to your AI provider, as part of a question.</div>
-        <div class="s-status" id="profile-status"></div>
+
+        <p class="s-help">Stored on this computer. Sent only to your AI provider, as part of a question.</p>
+        <p class="s-status" id="profile-status" role="status"></p>
       </div>
 
       <!-- Tab: Knowledge -->
-      <div class="s-body s-tab-pane hidden" data-pane="knowledge">
-        <label class="s-label">Obsidian vault <span class="s-hint">read-only · Onscreenly never changes your notes</span></label>
-        <div class="s-note" id="vault-path">No vault chosen.</div>
-        <div class="whisper-actions">
-          <button id="vault-pick" class="s-action primary">Choose vault folder…</button>
-          <button id="vault-reindex" class="s-action">Re-index</button>
-          <button id="vault-forget" class="s-action danger">Remove</button>
-        </div>
-        <div class="s-field"><span>Use notes</span><label class="s-check"><input id="knowledge-enabled" type="checkbox" /> Search my notes for every answer</label></div>
-        <div class="s-field"><span>Skip folders</span><input id="knowledge-exclude" type="text" placeholder="templates, Daily, Archive" autocomplete="off" spellcheck="false" /></div>
-        <div class="s-note">Comma-separated folder names or paths. Hidden folders such as .obsidian and .trash are always skipped.</div>
-        <div class="s-note" id="knowledge-status"></div>
+      <div class="s-body s-tab-pane hidden" data-pane="knowledge" role="tabpanel" id="s-pane-knowledge" aria-labelledby="s-tab-knowledge">
+        <section class="s-card s-vault-card">
+          <div class="s-group-head s-vault-head"><h3 class="s-eyebrow">Obsidian vault</h3><span class="tag s-vault-count hidden" id="vault-count"></span></div>
+          <div class="s-vault-row">
+            <div class="s-vault-text">
+              <p class="s-vault-path" id="vault-path">No vault chosen.</p>
+              <p class="s-help">Read-only: Onscreenly never changes your notes.</p>
+            </div>
+          </div>
+          <div class="whisper-actions s-actions">
+            <button id="vault-pick" class="s-action btn btn-primary compact">Choose vault folder…</button>
+            <button id="vault-reindex" class="s-action btn btn-secondary compact">Re-index</button>
+            <button id="vault-forget" class="s-action danger btn btn-danger compact">Remove</button>
+          </div>
+        </section>
 
-        <label class="s-label" for="knowledge-test">Test search <span class="s-hint">see which notes a question would use</span></label>
-        <div class="s-field"><span>Question</span><input id="knowledge-test" type="text" placeholder="e.g. How did I scale the payments service?" autocomplete="off" spellcheck="false" /></div>
-        <div id="knowledge-results" class="k-results"></div>
-        <div class="s-note">With notes on, the best-matching excerpts (about 3,000 characters at most) are sent to your AI provider with each question. Recap and coding solves never use them.</div>
+        <section class="s-group">
+          <div class="s-field"><span class="s-field-label">Use notes</span><label class="s-check"><input id="knowledge-enabled" class="check" type="checkbox" /> Search my notes for every answer</label></div>
+          <div class="s-field">
+            <label for="knowledge-exclude">Skip folders</label>
+            <div class="s-field-stack">
+              <input class="field" id="knowledge-exclude" type="text" placeholder="templates, Daily, Archive" autocomplete="off" spellcheck="false" />
+              <p class="s-help">Comma-separated folder names or paths. Hidden folders such as .obsidian and .trash are always skipped.</p>
+            </div>
+          </div>
+          <p class="s-note s-indent" id="knowledge-status"></p>
+        </section>
+
+        <section class="s-group">
+          <div class="s-group-head"><label class="s-eyebrow" for="knowledge-test">Test search</label><span class="s-hint">See which notes a question would use</span></div>
+          <input class="field" id="knowledge-test" type="text" placeholder="e.g. How did I scale the payments service?" autocomplete="off" spellcheck="false" />
+          <div id="knowledge-results" class="k-results"></div>
+          <p class="s-help">With notes on, the best-matching excerpts (about 3,000 characters at most) are sent to your AI provider with each question. Recap and coding solves never use them.</p>
+        </section>
       </div>
 
-      <!-- Tab: Transcription -->
-      <div class="s-body s-tab-pane hidden" data-pane="transcription">
-        <label class="s-label">Speech-to-text provider</label>
-        <div class="s-seg s-seg-wrap" id="stt-provider-seg">
-          <button data-stt-provider="auto">Auto</button>
-          <button data-stt-provider="local">Local</button>
-          <button data-stt-provider="openai">OpenAI</button>
-          <button data-stt-provider="custom">Custom</button>
-        </div>
-        <div class="s-note">Local mode keeps microphone and meeting audio on this computer. It never silently falls back to a cloud transcription provider. Custom sends audio to the Base URL and Custom key set on the API Keys tab (requires both).</div>
+      <!-- Tab: Transcription (labelled "Audio") -->
+      <div class="s-body s-tab-pane hidden" data-pane="transcription" role="tabpanel" id="s-pane-transcription" aria-labelledby="s-tab-transcription">
+        <section class="s-group">
+          <div class="s-group-head"><h3 class="s-eyebrow" id="s-stt-label">Speech-to-text</h3><span class="s-hint">Auto tries Deepgram, OpenAI, Groq, then Gemini</span></div>
+          <div class="s-seg s-chips" id="stt-provider-seg" role="group" aria-labelledby="s-stt-label">
+            <button class="chip" data-stt-provider="auto" aria-pressed="false">Auto</button>
+            <button class="chip" data-stt-provider="local" aria-pressed="false">Local</button>
+            <button class="chip" data-stt-provider="openai" aria-pressed="false">OpenAI</button>
+            <button class="chip" data-stt-provider="custom" aria-pressed="false">Custom</button>
+          </div>
+          <p class="s-help">Local keeps your microphone and meeting audio on this computer and never falls back to a cloud provider. Custom sends audio to the Base URL and key set on the API keys tab.</p>
+          <div class="s-field"><label for="key-deepgram">Deepgram key</label><input class="field" id="key-deepgram" type="password" placeholder="dg-..." autocomplete="off" /></div>
+        </section>
 
-        <label class="s-label">Meeting audio <span class="s-hint">transcribe the other side of a call</span></label>
-        <div class="s-seg" id="meeting-audio-seg">
-          <button data-meeting-audio="off">Off</button>
-          <button data-meeting-audio="on">On</button>
-        </div>
-        <div class="s-note" id="meeting-audio-note"></div>
+        <section class="s-group">
+          <div class="s-group-head"><h3 class="s-eyebrow" id="s-meeting-label">Meeting audio</h3><span class="s-hint">Transcribe the other side of a call</span></div>
+          <div class="s-seg s-chips" id="meeting-audio-seg" role="group" aria-labelledby="s-meeting-label">
+            <button class="chip" data-meeting-audio="off" aria-pressed="false">Off</button>
+            <button class="chip" data-meeting-audio="on" aria-pressed="false">On</button>
+          </div>
+          <p class="s-help" id="meeting-audio-note"></p>
+        </section>
 
-        <div class="whisper-card">
+        <!-- The pane's one Frost card: the local whisper.cpp model. -->
+        <section class="s-card whisper-card">
           <div class="whisper-runtime-row">
-            <span class="s-label">whisper.cpp runtime</span>
-            <span id="whisper-runtime-status" class="whisper-badge">Checking…</span>
+            <h3 class="s-eyebrow">Local model</h3>
+            <span id="whisper-runtime-status" class="whisper-badge tag">Checking…</span>
           </div>
-
-          <label class="s-label" for="whisper-model">Local model</label>
-          <select id="whisper-model" class="s-select"></select>
-          <div id="whisper-model-detail" class="s-note"></div>
-
-          <div id="whisper-progress-wrap" class="whisper-progress-wrap hidden">
+          <div class="s-field">
+            <label for="whisper-model">Model</label>
+            <div class="s-field-stack">
+              <div class="s-select"><select class="field" id="whisper-model"></select></div>
+              <p id="whisper-model-detail" class="s-help"></p>
+            </div>
+          </div>
+          <div id="whisper-progress-wrap" class="whisper-progress-wrap s-indent hidden">
             <progress id="whisper-progress" max="100" value="0"></progress>
-            <span id="whisper-progress-label">0%</span>
+            <span id="whisper-progress-label" class="num">0%</span>
           </div>
-
-          <div class="whisper-actions">
-            <button id="whisper-download" class="s-action">Download</button>
-            <button id="whisper-cancel" class="s-action hidden">Cancel</button>
-            <button id="whisper-import" class="s-action">Import…</button>
-            <button id="whisper-delete" class="s-action danger" disabled>Delete</button>
-          </div>
-
-          <div class="s-field">
-            <span>Language</span>
-            <select id="whisper-language" class="s-select compact">
-              <option value="auto">Auto-detect</option>
-              <option value="en">English</option>
-            </select>
+          <div class="whisper-actions s-actions s-indent">
+            <button id="whisper-download" class="s-action btn btn-secondary compact">Download</button>
+            <button id="whisper-cancel" class="s-action btn btn-secondary compact hidden">Cancel</button>
+            <button id="whisper-import" class="s-action btn btn-secondary compact">Import…</button>
+            <button id="whisper-delete" class="s-action danger btn btn-danger compact" disabled>Delete</button>
           </div>
           <div class="s-field">
-            <span>CPU threads</span>
-            <input id="whisper-threads" type="number" min="0" max="64" step="1" value="0" />
+            <label for="whisper-language">Language</label>
+            <div class="s-select">
+              <select id="whisper-language" class="field">
+                <option value="auto">Auto-detect</option>
+                <option value="en">English</option>
+              </select>
+            </div>
           </div>
-          <div class="s-note">Use 0 for whisper.cpp's default. English-only models always use English regardless of the language setting.</div>
-        </div>
+          <div class="s-field">
+            <label for="whisper-threads">CPU threads</label>
+            <div class="s-field-stack">
+              <input class="field s-num" id="whisper-threads" type="number" min="0" max="64" step="1" value="0" />
+              <p class="s-help">0 uses whisper.cpp’s default. English-only models always use English.</p>
+            </div>
+          </div>
+        </section>
 
-        <div class="s-status" id="whisper-status"></div>
+        <p class="s-status" id="whisper-status" role="status"></p>
 
-        <label class="s-label">Meeting slides <span class="s-hint">opt-in · auto-captions while listening · memory-only</span></label>
-        <div class="s-field"><span>Track slides</span><input id="slides-enabled" type="checkbox" style="width:auto;" /></div>
-        <div class="s-field"><span>Check every (ms)</span><input id="slides-interval" type="number" min="1500" max="15000" step="500" value="3000" /></div>
-        <div class="s-note">Captures a tiny hash every few seconds, captions only on stable change with your chat model. No images stored; clear with transcript.</div>
+        <section class="s-group">
+          <div class="s-group-head"><h3 class="s-eyebrow">Meeting slides</h3><span class="s-hint">Opt-in · memory only</span></div>
+          <div class="s-field"><span class="s-field-label">Track slides</span><label class="s-check"><input id="slides-enabled" class="check" type="checkbox" /> Caption slides while listening</label></div>
+          <div class="s-field">
+            <label for="slides-interval">Check every</label>
+            <div class="s-inline"><input class="field s-num" id="slides-interval" type="number" min="1500" max="15000" step="500" value="3000" /><span class="s-unit">ms</span></div>
+          </div>
+          <p class="s-help s-indent">Compares a tiny hash every few seconds and captions only a stable change, with your chat model. No images are stored; clearing the transcript clears them.</p>
+        </section>
       </div>
 
       <!-- Tab: Style -->
-      <div class="s-body s-tab-pane hidden" data-pane="style">
-        <label class="s-label">AI rules <span class="s-hint">how the AI should write its responses</span></label>
-        <textarea id="ai-rules" rows="10" spellcheck="false" maxlength="2000" placeholder="e.g.
+      <div class="s-body s-tab-pane hidden" data-pane="style" role="tabpanel" id="s-pane-style" aria-labelledby="s-tab-style">
+        <section class="s-group">
+          <div class="s-group-head"><label class="s-eyebrow" for="ai-rules">AI rules</label><span class="s-hint">How the AI should write its answers</span></div>
+          <textarea class="field" id="ai-rules" rows="8" spellcheck="false" maxlength="2000" placeholder="e.g.
 - Never use em-dashes.
 - Reply in 2-3 short bullet points.
 - Use a casual, first-person tone.
 - Avoid jargon; explain technical terms.
 - Don&#39;t start with &quot;I&quot;.
 "></textarea>
-        <div class="s-counter"><span id="ai-rules-count">0</span> / 2000</div>
-        <div class="s-hint-block">
-          These rules tell Onscreenly <strong>how</strong> to write, not <strong>what</strong> to say. Use one imperative sentence per line (e.g. <em>Never use em-dashes.</em>). They apply to every mode except coding-problem solves (LeetCode), which stays strict. Stored locally; never sent anywhere except the AI provider when Onscreenly answers a question.
+          <div class="s-counter"><span id="ai-rules-count">0</span> / 2000</div>
+        </section>
+        <div class="s-hint-block s-card">
+          These rules tell Onscreenly <strong>how</strong> to write, not <strong>what</strong> to say. Use one imperative sentence per line, such as <em>Never use em-dashes.</em> They apply to every mode except coding-problem solves, which stay strict. Stored on this computer and sent only to your AI provider with a question.
         </div>
       </div>
 
       <!-- Tab: Appearance -->
-      <div class="s-body s-tab-pane hidden" data-pane="appearance">
-        <label class="s-label" for="s-opacity-slider">Opacity <span class="s-hint">how see-through the overlay is</span></label>
-        <div class="s-opacity-row">
-          <input type="range" id="s-opacity-slider" min="20" max="100" step="1" value="100" />
-          <span id="s-opacity-value">100%</span>
-        </div>
+      <div class="s-body s-tab-pane hidden" data-pane="appearance" role="tabpanel" id="s-pane-appearance" aria-labelledby="s-tab-appearance">
+        <section class="s-group">
+          <div class="s-group-head"><label class="s-eyebrow" for="s-opacity-slider">Opacity</label><span class="s-hint">How see-through the overlay is</span></div>
+          <div class="s-opacity-row">
+            <input type="range" id="s-opacity-slider" min="20" max="100" step="1" value="100" aria-valuetext="100%" />
+            <span id="s-opacity-value" class="num">100%</span>
+          </div>
+          <p class="s-help">Applies to the toolbar, the answer panel and these dialogs. Shortcuts keep working at any opacity.</p>
+        </section>
       </div>
 
-
+      <!-- Footer: the save status, visible from every tab. -->
+      <div class="s-foot">
+        <p class="s-status" id="s-status" role="status"></p>
+      </div>
     </div>
   </div>
 
   <!-- First-run tutorial / walkthrough -->
   <div id="onboard-scrim" class="hidden">
-    <div id="onboard" class="glass">
-      <div class="ob-dots" id="ob-dots"></div>
-      <div class="ob-icon" id="ob-icon"></div>
-      <div class="ob-title" id="ob-title"></div>
+    <div id="onboard" class="ws-dialog theme-workspace" role="dialog" aria-modal="true" aria-labelledby="ob-title" aria-describedby="ob-lede">
+      <div class="ob-head">
+        <!-- Kept for the app's hooks; text only, so it stays empty and hidden. -->
+        <div class="ob-icon hidden" id="ob-icon" aria-hidden="true"></div>
+        <div class="ob-eyebrow" id="ob-eyebrow"></div>
+        <h2 class="ob-title" id="ob-title"></h2>
+        <p class="ob-lede" id="ob-lede"></p>
+      </div>
       <div class="ob-body" id="ob-body"></div>
       <div class="ob-buttons" id="ob-buttons"></div>
       <div class="ob-actions">
-        <button id="ob-skip" class="ob-ghost">Skip</button>
-        <div class="spacer"></div>
-        <button id="ob-back" class="ob-ghost">Back</button>
-        <button id="ob-next" class="ob-primary">Next</button>
+        <button id="ob-skip" class="ob-ghost btn btn-ghost">Skip</button>
+        <div class="ob-progress">
+          <span class="ob-dots" id="ob-dots" aria-hidden="true"></span>
+          <span class="ob-count" id="ob-count" role="status">Step 1 of 4</span>
+        </div>
+        <div class="ob-nav">
+          <button id="ob-back" class="ob-ghost btn btn-ghost">Back</button>
+          <button id="ob-next" class="ob-primary btn btn-primary">Next</button>
+        </div>
       </div>
     </div>
   </div>
@@ -373,17 +469,17 @@
        Onscreenly hides its dock icon, so an OS panel never comes forward and cannot be
        clicked. -->
   <div id="consent-scrim" class="hidden">
-    <div id="consent" class="glass">
-      <div class="cs-title" id="cs-title"></div>
-      <div class="cs-body" id="cs-body"></div>
+    <div id="consent" class="ws-dialog theme-workspace" role="alertdialog" aria-modal="true" aria-labelledby="cs-title" aria-describedby="cs-body">
+      <p class="cs-eyebrow">Assistant access</p>
+      <h2 class="cs-title" id="cs-title"></h2>
+      <p class="cs-body" id="cs-body"></p>
       <div class="cs-actions">
-        <button id="cs-deny" class="ob-ghost">Don’t allow</button>
-        <button id="cs-allow" class="ob-primary">Allow</button>
+        <button id="cs-deny" class="ob-ghost btn btn-secondary">Don’t allow</button>
+        <button id="cs-allow" class="ob-primary btn btn-primary">Allow</button>
       </div>
     </div>
   </div>
 
-  <script src="icons.js"></script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

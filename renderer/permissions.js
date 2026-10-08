@@ -1,97 +1,92 @@
-// Permission gate window: shows microphone / screen permission state and
-// links to the OS privacy settings. Loaded as a file so the page's CSP can
-// forbid inline scripts.
+// Permission window: shows the microphone and screen permission state, links
+// to the OS privacy settings, and lets the user check again or continue.
+// Loaded as a file so the page's CSP can forbid inline scripts.
+//
+// macOS opens it on first run while a permission is missing; the overlay
+// starts once both are allowed. Windows opens it only for a returning user
+// whose microphone is off, beside the running overlay, so it asks for the
+// microphone alone and Continue always works ("Continue without microphone"
+// until it is on). Linux never opens it.
 (function () {
   const onscreenly = window.onscreenly;
+  const isWindows = onscreenly.platform === 'win32';
 
-  const statusMic = document.getElementById('status-mic');
-  const statusScreen = document.getElementById('status-screen');
-  const rowMic = document.getElementById('row-mic');
-  const rowScreen = document.getElementById('row-screen');
-  const badgeMic = document.getElementById('badge-mic');
-  const badgeScreen = document.getElementById('badge-screen');
-  const btnMic = document.getElementById('btn-mic');
-  const btnScreen = document.getElementById('btn-screen');
-  const checkBtn = document.getElementById('check-btn');
-  const continueBtn = document.getElementById('continue-btn');
-  const quitBtn = document.getElementById('quit-btn');
+  const $ = (id) => document.getElementById(id);
+  const checkBtn = $('check-btn');
+  const continueBtn = $('continue-btn');
 
-  function updateUI(status) {
-    const micOk = status.mic === 'granted';
-    const screenOk = status.screen === 'granted';
+  const STATUS = { granted: 'Allowed', 'not-determined': 'Not requested yet' };
 
-    // Mic
-    rowMic.className = 'perm-row no-drag ' + (micOk ? 'granted' : 'denied');
-    statusMic.textContent = micOk
-      ? 'Granted'
-      : status.mic === 'not-determined'
-        ? 'Not yet requested'
-        : 'Not granted — open Settings to allow';
-    statusMic.className = 'perm-status ' + (micOk ? 'ok' : 'bad');
-    badgeMic.textContent = micOk ? '✓' : '✗';
-    badgeMic.className = 'perm-badge ' + (micOk ? 'ok' : 'bad');
-    btnMic.classList.toggle('hidden', micOk);
+  // The pages behind each row's "Open settings" button. Windows shows no screen row:
+  // screen capture needs no permission there.
+  const PANES = isWindows
+    ? { mic: 'ms-settings:privacy-microphone' }
+    : {
+        mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+        screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+      };
 
-    // Screen
-    rowScreen.className = 'perm-row no-drag ' + (screenOk ? 'granted' : 'denied');
-    statusScreen.textContent = screenOk
-      ? 'Granted'
-      : status.screen === 'not-determined'
-        ? 'Not yet requested'
-        : 'Not granted — open Settings to allow';
-    statusScreen.className = 'perm-status ' + (screenOk ? 'ok' : 'bad');
-    badgeScreen.textContent = screenOk ? '✓' : '✗';
-    badgeScreen.className = 'perm-badge ' + (screenOk ? 'ok' : 'bad');
-    btnScreen.classList.toggle('hidden', screenOk);
-
-    // Continue
-    continueBtn.disabled = !(micOk && screenOk);
+  // One blue button per view: Continue is primary unless it is the way past a missing microphone.
+  function setKind(button, kind) {
+    button.classList.remove('btn-primary', 'btn-secondary');
+    button.classList.add(`btn-${kind}`);
   }
 
-  async function checkPermissions() {
-    checkBtn.classList.add('checking');
-    checkBtn.textContent = 'Checking…';
-    try {
-      const status = await onscreenly.permissionsCheck();
-      updateUI(status);
-    } catch (e) {
-      onscreenly.log('permissions check error: ' + e);
-    } finally {
-      checkBtn.classList.remove('checking');
-      checkBtn.textContent = 'Check Again';
+  function paintCopy() {
+    $('perm-eyebrow').textContent = isWindows ? 'Before you start' : 'Welcome to Onscreenly';
+    $('perm-title').textContent = isWindows ? 'Allow microphone access' : 'Allow microphone and screen recording';
+    $('perm-desc').textContent = isWindows
+      ? 'Onscreenly needs your microphone to hear the conversation. Screen capture needs no permission on Windows.'
+      : 'Onscreenly needs to hear the conversation and see your screen to answer.';
+    $('perm-note-text').textContent = isWindows
+      ? 'After you switch the microphone on, click Check again.'
+      : 'After you switch a permission on, click Check again. macOS may need Onscreenly to restart before screen recording works.';
+    $('row-screen').classList.toggle('hidden', isWindows);
+  }
+
+  // Each row shows an "Allowed" tag, or its "Open settings" button while the permission is missing.
+  function updateUI(status) {
+    const micOk = status.mic === 'granted';
+    const screenOk = isWindows || status.screen === 'granted';
+    for (const [key, ok] of [
+      ['mic', micOk],
+      ['screen', screenOk]
+    ]) {
+      $(`status-${key}`).textContent = STATUS[status[key]] || 'Not allowed yet';
+      $(`badge-${key}`).classList.toggle('hidden', !ok);
+      $(`btn-${key}`).classList.toggle('hidden', ok);
+    }
+    if (isWindows) {
+      continueBtn.disabled = false;
+      continueBtn.textContent = micOk ? 'Continue' : 'Continue without microphone';
+      setKind(continueBtn, micOk ? 'primary' : 'secondary');
+    } else {
+      continueBtn.disabled = !(micOk && screenOk);
     }
   }
 
-  // Open settings buttons — deep-link to the OS privacy pane. macOS uses the
-  // x-apple.systempreferences: scheme; Windows has its own ms-settings: URIs
-  // (opened the same way, via shell.openExternal in main). Windows has no
-  // per-app "Screen Recording" privacy pane the way macOS does, so that
-  // button lands on the general Privacy & security page instead.
-  const isWin = onscreenly.platform === 'win32';
-  btnMic.addEventListener('click', () => {
-    onscreenly.openPane(
-      isWin
-        ? 'ms-settings:privacy-microphone'
-        : 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
-    );
-  });
-  btnScreen.addEventListener('click', () => {
-    onscreenly.openPane(
-      isWin ? 'ms-settings:privacy' : 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
-    );
-  });
+  async function checkPermissions() {
+    checkBtn.disabled = true;
+    checkBtn.setAttribute('aria-busy', 'true');
+    checkBtn.textContent = 'Checking…';
+    try {
+      updateUI(await onscreenly.permissionsCheck());
+    } catch (e) {
+      onscreenly.log('permissions check error: ' + e);
+    } finally {
+      checkBtn.disabled = false;
+      checkBtn.removeAttribute('aria-busy');
+      checkBtn.textContent = 'Check again';
+    }
+  }
 
-  // Check again
+  $('btn-mic').addEventListener('click', () => onscreenly.openPane(PANES.mic));
+  $('btn-screen').addEventListener('click', () => onscreenly.openPane(PANES.screen));
   checkBtn.addEventListener('click', checkPermissions);
+  // Continue: close this window and start (or bring forward) the overlay.
+  continueBtn.addEventListener('click', () => onscreenly.permissionsContinue());
+  $('quit-btn').addEventListener('click', () => onscreenly.quit());
 
-  // Continue — close permission window and launch the real app
-  continueBtn.addEventListener('click', () => {
-    onscreenly.permissionsContinue();
-  });
-
-  // Quit
-  quitBtn.addEventListener('click', () => onscreenly.quit());
-
-  // Initial check on page load
+  paintCopy();
   checkPermissions();
 })();

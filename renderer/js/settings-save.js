@@ -1,12 +1,24 @@
-// Saving settings and the example conversation.
+// Saving settings.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
-import { addUserBubble, clearMessages, messages } from './chat.js';
 import { clampOpacity } from './toolbar.js';
 import { updateSmartTooltip } from './settings-panel.js';
-import { statusText } from './settings-form.js';
+import { paintReadiness, setStatus, statusText } from './settings-form.js';
 import { readProfile } from './profile-settings.js';
 import { readKnowledge } from './knowledge-settings.js';
+
+// "Couldn’t save: …" with main's reason, unwrapped from what ipcRenderer.invoke adds ("Error invoking
+// remote method 'settings:set': Error: …"). The field main rejects is the Custom base URL; it sits on
+// the API keys tab, which need not be the one showing, so the status names the tab.
+function saveErrorText(error) {
+  const raw = error && error.message ? error.message : String(error);
+  const reason = raw
+    .replace(/^Error invoking remote method '[^']*': /, '')
+    .replace(/^\w*Error: /, '')
+    .replace(/\.$/, '');
+  if (/^Base URL\b/.test(reason)) return `Couldn’t save: the Custom base URL${reason.slice(8)} (API keys).`;
+  return `Couldn’t save: ${reason}.`;
+}
 
 async function saveSettings() {
   // Keys
@@ -64,26 +76,15 @@ async function saveSettings() {
   if (opacitySlider) state.settings.opacity = clampOpacity(Number(opacitySlider.value) / 100);
   try {
     state.settings = await onscreenly.settingsSet(state.settings);
-    $('#s-status').textContent = statusText();
+    setStatus(`Saved · ${statusText()}`, 'ok');
     updateSmartTooltip();
+    paintReadiness();
     return true;
   } catch (error) {
-    const message = error && error.message ? error.message : String(error);
-    $('#s-status').textContent = message;
+    setStatus(saveErrorText(error), 'error');
     $('#base-url').focus();
     return false;
   }
 }
 
-// ---- example conversation (matches the reference screenshot) ------------
-function showExample() {
-  clearMessages();
-  addUserBubble('What should I say?');
-  const ai = document.createElement('div');
-  ai.className = 'ai-text';
-  ai.textContent =
-    '“A discounted cash flow model values a company by projecting future free cash flows and discounting them to present value using the weighted average cost of capital.”';
-  messages.appendChild(ai);
-}
-
-export { saveSettings, showExample };
+export { saveSettings };

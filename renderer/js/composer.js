@@ -1,12 +1,12 @@
 // The question box: smart auto-fill from speech, question history, sending and keyboard shortcuts.
 import { state } from './state.js';
-import { $, isWindows, onscreenly } from './core.js';
+import { $, combo, onscreenly } from './core.js';
 import { runMode, showToast } from './chat.js';
-import { clearInputInterim } from './events.js';
 
 const input = $('#input');
 const placeholder = $('#placeholder');
 const composer = $('#composer');
+const ghost = $('.input-ghost');
 
 // ========== SMART AUTO-FILL SYSTEM ==========
 // Track whether the current input text came from STT auto-fill (Them channel)
@@ -100,7 +100,8 @@ function updateQuestionReadyState() {
   updateSendButtonState(); // FIX #9: Keep send button in sync
 }
 
-// FIX #9: Send button visual "ready" state
+// FIX #9: Send button visual "ready" state. Send always reads "Send"; its title says what it does
+// now: with text it sends it, empty it runs Assist on the screen.
 function updateSendButtonState() {
   const sendBtn = document.getElementById('send-btn');
   if (!sendBtn) return;
@@ -110,6 +111,35 @@ function updateSendButtonState() {
 
   sendBtn.classList.toggle('ready', hasText && isReady);
   sendBtn.classList.toggle('has-text', hasText);
+  sendBtn.title = hasText ? `Send (${combo('↵')})` : `Assist · looks at your screen (${combo('mod', 'shift', '↵')})`;
+}
+
+// ---- Live speech as ghost text ----
+// The other side's words show once, as one line of ghost text in the empty composer, until they
+// settle into the question (stt:final) or the user types. The newest words stay in view.
+function showGhost(text) {
+  if (!text || input.value.length) {
+    clearGhost();
+    return;
+  }
+  let words = ghost.querySelector('.ghost-text > span');
+  if (!words) {
+    const line = document.createElement('span');
+    line.className = 'ghost-text';
+    words = document.createElement('span');
+    line.append(words);
+    ghost.replaceChildren(line);
+  }
+  words.textContent = text;
+  ghost.classList.remove('hidden');
+  syncPlaceholder();
+}
+
+function clearGhost() {
+  if (ghost.classList.contains('hidden')) return;
+  ghost.classList.add('hidden');
+  ghost.replaceChildren();
+  syncPlaceholder();
 }
 
 // ---- Save question to history for undo ----
@@ -141,10 +171,10 @@ function restoreLastQuestion() {
     composer.classList.add('stt-filling');
     updateQuestionReadyState();
     syncPlaceholder();
-    showToast('Question restored', 1500);
+    showToast('Question restored', 1500, 'ok');
     return true;
   }
-  showToast('No question to restore', 1500);
+  showToast('Nothing to restore', 1500);
   return false;
 }
 
@@ -172,11 +202,10 @@ function autoFillInputFromSTT(text) {
   // Reset the idle timer — after 2s of silence, check if question is complete
   clearTimeout(questionFinalizeTimer);
   questionFinalizeTimer = setTimeout(() => {
+    // A question that looks complete is ready: the composer says "Ready · ↵ to answer".
     if (isLikelyCompleteQuestion(input.value)) {
       composer.classList.add('stt-ready');
       updateSendButtonState(); // FIX #9: Update send button when ready
-      // Subtle notification that question is ready
-      showToast('Press Enter to answer', 2500);
     }
   }, 1800);
 
@@ -243,14 +272,13 @@ function hardClearSTTFill(showUndoHint = false) {
   clearTimeout(softClearTimer);
   clearTimeout(questionFinalizeTimer);
   clearTimeout(sttFillTimer);
-  clearInputInterim(); // FIX #5: Clear interim when clearing input
+  clearGhost(); // FIX #5: Clear live speech when clearing input
   syncPlaceholder();
   updateSendButtonState(); // FIX #9
 
   // FIX #10: Show undo hint when explicitly cleared
   if (showUndoHint && hadContent) {
-    const undoHint = isWindows ? 'Ctrl+Z to undo' : '⌘Z to undo';
-    showToast(`Cleared · ${undoHint}`, 2000);
+    showToast(`Cleared · ${combo('mod', 'Z')} to undo`, 2000);
   }
 }
 
@@ -263,9 +291,12 @@ function cancelSoftClear() {
 }
 
 function syncPlaceholder() {
-  placeholder.classList.toggle('hidden', input.value.length > 0 || document.activeElement === input);
+  placeholder.classList.toggle(
+    'hidden',
+    input.value.length > 0 || document.activeElement === input || !ghost.classList.contains('hidden')
+  );
   input.style.height = 'auto';
-  input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
 }
 
 // FIX #6: Track last STT value to detect substantial edits vs minor corrections
@@ -298,9 +329,6 @@ function send() {
   runMode(wasFromSTT ? 'answerThis' : 'ask', text);
 }
 
-// FIX #4: Add tooltip with keyboard shortcuts to send button
-const sendBtn = document.getElementById('send-btn');
-
 // Smart toggle
 const smartBtn = $('#smart-toggle');
 
@@ -308,8 +336,8 @@ export function init() {
   input.addEventListener('input', () => {
     const currentValue = input.value;
 
-    // FIX #5: Clear interim text when user starts typing
-    clearInputInterim();
+    // FIX #5: Clear live speech when user starts typing
+    clearGhost();
 
     // FIX #6: Only detach from STT mode if edit is substantial
     // Minor corrections (typo fixes, small additions) should keep STT mode
@@ -384,13 +412,10 @@ export function init() {
       }
     }
   });
-  if (sendBtn) {
-    const forceKey = isWindows ? 'Ctrl+Shift+A' : '⌘⇧A';
-    sendBtn.title = `Send · ${forceKey} to force answer`;
-  }
   smartBtn.addEventListener('click', async () => {
     state.settings.smart = !state.settings.smart;
     smartBtn.classList.toggle('on', state.settings.smart);
+    smartBtn.setAttribute('aria-pressed', String(state.settings.smart));
     await onscreenly.settingsSet({ smart: state.settings.smart });
   });
 }
@@ -398,11 +423,13 @@ export function init() {
 export {
   autoFillInputFromSTT,
   cancelSoftClear,
+  clearGhost,
   composer,
   hardClearSTTFill,
   input,
   inputFromSTT,
   placeholder,
+  showGhost,
   smartBtn,
   softClearSTTFill,
   syncPlaceholder,

@@ -1,6 +1,9 @@
 // Window behaviour: global keys, scroll lock, click-through and dragging.
 import { $, onscreenly } from './core.js';
 import { closeSettings, openSettings, scrim } from './settings-panel.js';
+import { safeFocus, topDialog } from './a11y.js';
+import { toggleOpacityPopover } from './toolbar.js';
+import { hideSidebar, sidebarOpen } from './transcript.js';
 
 // ---- click-through: only the UI blocks the mouse; empty gaps pass to your screen ----
 let ignoring = null;
@@ -15,10 +18,26 @@ function setIgnore(v) {
 // ---- window drag: press anywhere on the toolbar that isn't a control ----
 const toolbar = $('#toolbar');
 
+// ---- Escape, one layer per press ----------------------------------------------
+// Consent and onboarding take Escape in the capture phase, Settings closes in the key listener
+// below, and the composer clears its text with preventDefault. After those, Escape closes the
+// opacity popover, then the transcript sidebar, and gives focus back to the button that opened it.
+function closeTopLayer() {
+  if (!$('#opacity-popover').classList.contains('hidden')) {
+    toggleOpacityPopover(false);
+    safeFocus($('#opacity-btn'));
+  } else if (sidebarOpen) {
+    hideSidebar();
+    safeFocus($('#history-btn'));
+  }
+}
+
 export function init() {
   // ---- global keys -------------------------------------------------------
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !scrim.classList.contains('hidden')) void closeSettings();
+    // closeSettings hides its scrim only after saving, so an open dialog still shows here.
+    if (e.key === 'Escape' && !e.defaultPrevented && !topDialog()) closeTopLayer();
     if ((e.metaKey || e.ctrlKey) && e.key === ',') {
       e.preventDefault();
       openSettings();
