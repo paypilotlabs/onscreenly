@@ -97,6 +97,10 @@ function renderPublikBlock() {
 }
 
 export function init() {
+  // The provider chip and the plan button keep their markup as it was; the shared control classes
+  // are added here.
+  $('#provider-publik').classList.add('chip');
+  $('#publik-link').classList.add('btn', 'btn-primary', 'compact');
   $('#publik-setup').addEventListener('click', () => showPublikDisclosure());
   $('#publik-link').addEventListener('click', () => {
     const cta = state.publikState && state.publikState.settingsCta;

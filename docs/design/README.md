@@ -20,7 +20,7 @@ Download `prototype.html` (or use your checkout) and open it in a current Chrome
 
 Platform, desktop and opacity are under Stage A. Links such as `prototype.html#scene-3` or `#tokens` open a scene or a sheet directly.
 
-The production stylesheets inside it are the files in `renderer/css/`, copied verbatim; the prototype adds only its own page chrome, in a last `proto` layer.
+The production stylesheets inside it are the files in `renderer/css/`, copied verbatim; the prototype adds only its own page chrome, in a last `proto` layer. One value differs: the app's onboarding frame is 504px tall, not 502px. The publik disclosure step needs 1px more than 502px leaves it, which the prototype's screenshots never showed because headless Chromium hides scrollbars; in the app the 10px scrollbar appeared, the text rewrapped, and the terms sentence dropped out of view.
 
 ## Decisions
 
@@ -113,7 +113,7 @@ The prototype was built, reviewed and fixed before approval. These changes from 
 - **Scrolling:** the log follows a new answer until its question reaches the top, then stops. A finished answer that only just overflows, or one that ends in an error, shows its end, so its fix button or card actions stay in view.
 - **Composer:** "Ready · ↵ to answer" sits in the bottom row, left of Send. Ghost text has a breathing live dot, and its ellipsis falls at the start so the newest words stay visible. The dimmed state dims only the text, so Send stays crisp.
 - **Send** is neutral while no AI provider is set up, so "Open settings" is the one accent (a carve-out from item 13's "always").
-- **Onboarding:** one fixed 536px frame for all four steps, so Next never moves; the progress ("Step n of 4" and the dots) sits beside Skip.
+- **Onboarding:** one fixed frame for all four steps (504px, see above), so Next never moves; the progress ("Step n of 4" and the dots) sits beside Skip.
 - **Settings** keeps one height (552px) on every tab.
 - **Copy:** typographic apostrophes in UI text; key fields are labelled "API key" (the chip names the provider); step 2's in-row buttons read "Open settings" with a full `aria-label`; the publik terms link is the last words of main's sentence rather than a repeated label.
 - **Clear transcript** is disabled while the transcript is empty.

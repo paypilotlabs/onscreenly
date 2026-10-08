@@ -56,15 +56,20 @@ function applyOpacity(value, persist) {
   const tbVal = $('#tb-opacity-value');
   const s = $('#s-opacity-slider');
   const sVal = $('#s-opacity-value');
+  // The filled part of each slider's track, from the 20% floor to 100%.
+  const floor = OPACITY_MIN * 100;
+  const fill = ((percent - floor) / (100 - floor)) * 100 + '%';
   if (tb) {
     tb.value = String(percent);
     tb.setAttribute('aria-valuetext', percent + '%');
-    // The filled part of the track, from the 20% floor to 100%.
-    const floor = OPACITY_MIN * 100;
-    tb.style.setProperty('--pct', ((percent - floor) / (100 - floor)) * 100 + '%');
+    tb.style.setProperty('--pct', fill);
   }
   if (tbVal) tbVal.textContent = percent + '%';
-  if (s) s.value = String(percent);
+  if (s) {
+    s.value = String(percent);
+    s.setAttribute('aria-valuetext', percent + '%');
+    s.style.setProperty('--fill', fill);
+  }
   if (sVal) sVal.textContent = percent + '%';
   if (persist) persistOpacitySoon();
 }

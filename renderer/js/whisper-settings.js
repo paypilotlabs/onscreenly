@@ -44,6 +44,7 @@ async function refreshWhisperModels() {
     state.whisperOverview = await onscreenly.whisperModels();
     const runtimeBadge = $('#whisper-runtime-status');
     runtimeBadge.classList.toggle('ready', state.whisperOverview.runtime.available);
+    runtimeBadge.classList.toggle('is-ok', state.whisperOverview.runtime.available);
     runtimeBadge.classList.toggle('error', !state.whisperOverview.runtime.available);
     runtimeBadge.textContent = state.whisperOverview.runtime.available
       ? `Ready · v${state.whisperOverview.runtime.version} · ${state.whisperOverview.runtime.target}`

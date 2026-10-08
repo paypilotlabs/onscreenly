@@ -59,6 +59,14 @@ function paintShortcuts() {
   quitButton.title = `Quit Onscreenly (${combo('mod', 'shift', 'X')})`;
 }
 
+// ---- buttons -------------------------------------------------------------
+// A button's look is one of the shared kinds (primary, secondary, ghost, danger). A view has at most
+// one primary, so some buttons change kind with the state they are in.
+function setButtonKind(el, kind) {
+  el.classList.remove('btn-primary', 'btn-secondary', 'btn-ghost', 'btn-danger');
+  el.classList.add('btn', `btn-${kind}`);
+}
+
 // ---- session button ----------------------------------------------------
 // "Start session" / "End session", with the live dot beside the label while a session runs.
 function setSessionButton(active) {
@@ -78,4 +86,4 @@ export function init() {
   setSessionButton(false);
 }
 
-export { $, combo, isMac, isWindows, kbd, keyText, modKey, onscreenly, setSessionButton };
+export { $, combo, isMac, isWindows, kbd, keyText, modKey, onscreenly, setButtonKind, setSessionButton };

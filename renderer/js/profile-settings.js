@@ -1,7 +1,7 @@
 // Settings › Profile: résumé, target job and interview-prep answers, file
 // import, and the "Analyse my résumé" action.
 import { state } from './state.js';
-import { $, onscreenly } from './core.js';
+import { $, onscreenly, setButtonKind } from './core.js';
 import { runMode } from './chat.js';
 import { closeSettings, scrim } from './settings-panel.js';
 
@@ -18,8 +18,12 @@ const PROFILE_FIELDS = [
   ['#questions-to-ask', 'questionsToAsk']
 ];
 
+// The pane's primary action: Import while the résumé is empty, Analyse once it has text.
 function updateAnalyseButton() {
-  $('#resume-analyse').disabled = !$('#resume-text').value.trim();
+  const hasText = !!$('#resume-text').value.trim();
+  $('#resume-analyse').disabled = !hasText;
+  setButtonKind($('#resume-import'), hasText ? 'secondary' : 'primary');
+  setButtonKind($('#resume-analyse'), hasText ? 'primary' : 'secondary');
 }
 
 function fillProfile() {

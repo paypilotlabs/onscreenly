@@ -290,6 +290,35 @@ test('#app carries the overlay theme, and no theme class sits on html, body or a
   }
 });
 
+const themesOf = (el) => classesOf(el).filter((k) => k.startsWith('theme-'));
+
+test('Settings, onboarding and consent are light workspace dialogs, and themes never nest', () => {
+  for (const id of ['settings', 'onboard', 'consent']) {
+    const found = querySelectorAll(index.root, `#${id}`);
+    assert.equal(found.length, 1, `#${id}`);
+    assert.ok(classesOf(found[0]).includes('ws-dialog'), `#${id} is a .ws-dialog`);
+    assert.deepEqual(themesOf(found[0]), ['theme-workspace'], `#${id} carries the workspace theme`);
+    assert.equal(found[0].parent.attrs.id, `${id}-scrim`, `#${id} sits directly in its scrim`);
+  }
+  assert.deepEqual(
+    querySelectorAll(index.root, '.theme-workspace')
+      .map((el) => el.attrs.id)
+      .sort(),
+    ['consent', 'onboard', 'settings']
+  );
+  for (const page of [index, permissions]) {
+    for (const el of elements(page.root)) {
+      const themes = themesOf(el);
+      if (!themes.length) continue;
+      const where = `${relative(page.file)}: <${el.tag}${el.attrs.id ? ` id="${el.attrs.id}"` : ''}>`;
+      assert.equal(themes.length, 1, `${where} carries ${themes.join(' and ')}`);
+      for (let n = el.parent; n && n.tag !== '#root'; n = n.parent) {
+        assert.deepEqual(themesOf(n), [], `${where} sits inside another theme`);
+      }
+    }
+  }
+});
+
 test('--main-w and --side-w match MAIN_W and SIDE_W in app/main/window.js', () => {
   const windowJs = fs.readFileSync(path.join(ROOT, 'app', 'main', 'window.js'), 'utf8');
   const constant = (name) => {

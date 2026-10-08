@@ -36,9 +36,13 @@ function updateSmartTooltip() {
 
 // ---- settings ----------------------------------------------------------
 const scrim = $('#settings-scrim');
-function openSettings() {
+// `tab` picks the tab to show (keys, profile, knowledge, transcription, style or appearance);
+// without one, Settings opens where it was left. Click listeners pass an event, never a tab.
+function openSettings(tab) {
   fillSettings();
   scrim.classList.remove('hidden');
+  // After the scrim shows: a pane inside a hidden scrim keeps its old scroll position.
+  if (typeof tab === 'string') selectTab(tab);
   refreshWhisperModels();
 }
 // Only hide after a successful save. A second closeSettings used to shadow
@@ -54,6 +58,21 @@ async function closeSettings() {
   } finally {
     closingSettings = false;
   }
+}
+
+// Shows one tab's pane. The tabs are a tablist with one tab stop: the selected tab.
+function selectTab(name) {
+  const tab = document.querySelector(`.s-tab[data-tab="${name}"]`);
+  if (!tab) return;
+  document.querySelectorAll('.s-tab').forEach((t) => {
+    const on = t === tab;
+    t.classList.toggle('on', on);
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll('.s-tab-pane').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== name));
+  const pane = document.querySelector(`.s-tab-pane[data-pane="${name}"]`);
+  if (pane) pane.scrollTop = 0;
 }
 
 function updateCustomProviderFields() {
@@ -76,7 +95,7 @@ export function init() {
   $('#tb-settings-btn').addEventListener('click', openSettings);
   // The empty state's setup buttons (shown when no provider or no speech-to-text is set up).
   $('#empty-setup').addEventListener('click', () => openSettings());
-  $('#empty-audio').addEventListener('click', () => openSettings());
+  $('#empty-audio').addEventListener('click', () => openSettings('transcription'));
   $('#s-close').addEventListener('click', () => {
     void closeSettings();
   });
@@ -89,11 +108,7 @@ export function init() {
     tab.addEventListener('click', async () => {
       if (tab.classList.contains('on')) return;
       if (!(await saveSettings())) return;
-      document.querySelectorAll('.s-tab').forEach((t) => t.classList.remove('on'));
-      document.querySelectorAll('.s-tab-pane').forEach((p) => p.classList.add('hidden'));
-      tab.classList.add('on');
-      const pane = document.querySelector(`.s-tab-pane[data-pane="${tab.dataset.tab}"]`);
-      if (pane) pane.classList.remove('hidden');
+      selectTab(tab.dataset.tab);
     });
   });
 }

@@ -5,7 +5,7 @@ import { smartBtn, syncPlaceholder, updateSendButtonState } from './composer.js'
 import { applyOpacity } from './toolbar.js';
 import { setLiveDotState } from './transcript.js';
 import { updateSmartTooltip } from './settings-panel.js';
-import { OB_STEPS, publikStep, showOnboard } from './onboarding.js';
+import { OB_STEPS, publikStep, setWindows10, showOnboard } from './onboarding.js';
 
 export function init() {
   // ---- boot --------------------------------------------------------------
@@ -20,17 +20,9 @@ export function init() {
 
     // R6: smart tooltip
     updateSmartTooltip();
-    // Fix 3: Adjust permission buttons based on actual Windows version.
-    // ms-settings:privacy-screenrecorder only exists on Windows 11.
-    // On Windows 10, screen capture needs no permission — so replace the button
-    // with a more helpful note instead of an invalid settings link.
-    if (isWindows && platformInfo.winBuild > 0 && platformInfo.winBuild < 22000) {
-      // Windows 10: update the onboarding screen recording button to be more helpful
-      const ob = OB_STEPS[1];
-      ob.buttons = ob.buttons.filter((b) => !b.label.toLowerCase().includes('screen'));
-      ob.body =
-        'Onscreenly needs microphone permission to hear you. Click the button below to open Windows microphone settings and allow onscreenly.<br><br><strong>Screen capture works automatically on Windows 10</strong> — no additional permission needed.<ul><li><strong>Microphone</strong> — to hear you</li><li><strong>Screen recording</strong> — works automatically on Windows 10</li></ul>';
-    }
+    // ms-settings:privacy-screenrecorder only exists on Windows 11. On Windows 10
+    // screen capture needs no permission, so onboarding asks for the microphone only.
+    setWindows10(isWindows && platformInfo.winBuild > 0 && platformInfo.winBuild < 22000);
 
     smartBtn.classList.toggle('on', !!state.settings.smart);
     smartBtn.setAttribute('aria-pressed', String(!!state.settings.smart));

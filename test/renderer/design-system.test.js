@@ -394,12 +394,6 @@ const LAYERS = ['fonts', 'tokens', 'base', 'layout', 'controls', 'overlay', 'wor
 const SHEETS = rendererCssFiles().map(readCss);
 const TOKENS_FILE = 'renderer/css/tokens.css';
 const OTHERS = SHEETS.filter((sheet) => sheet.name !== TOKENS_FILE);
-// TODO(stage B): workspace.css still holds the pre-redesign dark dialog rules, moved there
-// unchanged when the styles were split into layers. The checks that it breaks (colour
-// literals, radii, box-shadows) skip it until stage B replaces it with the light workspace;
-// then delete this exemption so they cover every stylesheet.
-const LEGACY = new Set(['renderer/css/workspace.css']);
-const DESIGNED = OTHERS.filter((sheet) => !LEGACY.has(sheet.name));
 
 /** Every declaration in a sheet, with where it is: style rules, then at-rule blocks (keyframe steps too). */
 function declarations(sheet) {
@@ -497,9 +491,9 @@ test('every var() names a property some stylesheet declares, or carries a fallba
 });
 
 test('no colour literal outside tokens.css: every colour is a token', () => {
-  assert.ok(DESIGNED.length >= 6, 'expected the layer files');
+  assert.ok(OTHERS.length >= 6, 'expected the layer files');
   const found = [];
-  for (const sheet of DESIGNED) {
+  for (const sheet of OTHERS) {
     for (const d of declarations(sheet)) {
       const literals = colourLiterals(d.value);
       if (literals.length) found.push(`${where(sheet, d)} → ${literals.join(', ')}`);
@@ -541,7 +535,9 @@ const CARD_CLASSES = new Set([
   'k-result',
   'publik-card',
   'whisper-card',
-  's-card'
+  's-card',
+  'ws-rows',
+  'ob-features'
 ]);
 const isCard = (c) =>
   c.pseudos.every((p) => !p.startsWith('::')) &&
@@ -550,7 +546,7 @@ const isCard = (c) =>
 test('radii come only from --radius-* tokens, and cards and dialogs use 12, 16 or 24', () => {
   const covered = new Set();
   const problems = [];
-  for (const sheet of DESIGNED) {
+  for (const sheet of OTHERS) {
     for (const rule of sheet.rules) {
       for (const d of rule.declarations.filter((x) => /^border(?:-[a-z]+)*-radius$/.test(x.prop))) {
         const parts = d.value.split(/\s+(?![^(]*\))/);
@@ -559,6 +555,9 @@ test('radii come only from --radius-* tokens, and cards and dialogs use 12, 16 o
         }
         for (const list of compounds(rule.selector)) {
           const subject = list[list.length - 1];
+          // 24px is the Welcome feature card's alone.
+          if (d.value === 'var(--radius-feature-cards)' && !subject.classes.includes('ob-features'))
+            problems.push(`${sheet.name}:${rule.line} ${rule.selector}: only the Welcome feature card is 24px`);
           if (!isCard(subject)) continue;
           covered.add(
             subject.id
@@ -574,7 +573,17 @@ test('radii come only from --radius-* tokens, and cards and dialogs use 12, 16 o
     }
   }
   assert.deepEqual(problems, []);
-  for (const sel of ['#panel', '.transcript-sidebar', '.ai-card', '.ai-error', '#onscreenly-status', 'pre']) {
+  for (const sel of [
+    '#panel',
+    '.transcript-sidebar',
+    '.ai-card',
+    '.ai-error',
+    '#onscreenly-status',
+    'pre',
+    '.ws-dialog',
+    '.s-card',
+    '.ob-features'
+  ]) {
     assert.ok(covered.has(sel), `no radius found for ${sel}; is the check still looking at it?`);
   }
 });
@@ -587,7 +596,7 @@ const layersOf = (value) => value.split(/,(?![^(]*\))/).map((s) => s.trim());
 
 test('box-shadows come from the allowlist, and none of them casts an outer blur', () => {
   const problems = [];
-  for (const sheet of DESIGNED) {
+  for (const sheet of OTHERS) {
     for (const d of declarations(sheet).filter((x) => x.prop === 'box-shadow')) {
       if (!layersOf(d.value).every((layer) => SHADOWS.includes(layer))) problems.push(where(sheet, d));
     }
