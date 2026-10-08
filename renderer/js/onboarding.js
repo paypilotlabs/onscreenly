@@ -216,7 +216,7 @@ const OB_STEPS = [
 function publikStep() {
   const c = state.publikState.copy.disclosure;
   // The terms sentence ends with its own link ("…agree to the publik API terms.").
-  const link = '<a id="ob-publik-terms">publik API terms</a>';
+  const link = '<a id="ob-publik-terms" href="#">publik API terms</a>';
   const terms = esc(c.terms).includes('publik API terms')
     ? esc(c.terms).replace('publik API terms', link)
     : `${esc(c.terms)} ${link}`;
@@ -370,7 +370,12 @@ function renderOnboard() {
   body.innerHTML = typeof step.body === 'function' ? step.body() : step.body || '';
   body.scrollTop = 0;
   const termsLink = $('#ob-publik-terms');
-  if (termsLink) termsLink.addEventListener('click', () => onscreenly.publikOpen(state.publikState.links.terms));
+  // href="#" puts the link in the Tab order; the click opens the terms in the browser instead.
+  if (termsLink)
+    termsLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      onscreenly.publikOpen(state.publikState.links.terms);
+    });
   const btns = $('#ob-buttons');
   btns.innerHTML = '';
   (step.buttons || []).forEach((b) => {

@@ -1,6 +1,7 @@
 // Speech status (the live dot and the action row's status) and the transcript sidebar.
 import { $ } from './core.js';
 import { updateFades } from './chat.js';
+import { safeFocus } from './a11y.js';
 
 // ---- live dot and speech status ------------------------------------------
 let sttState = 'disconnected';
@@ -228,7 +229,10 @@ function clearTranscriptSidebar() {
 
 export function init() {
   historyBtn.addEventListener('click', toggleSidebar);
-  closeSidebarBtn.addEventListener('click', hideSidebar);
+  closeSidebarBtn.addEventListener('click', () => {
+    hideSidebar();
+    safeFocus(historyBtn);
+  });
   const list = document.getElementById('ts-list');
   list.addEventListener('scroll', () => updateFades(list), { passive: true });
   syncTranscriptList();

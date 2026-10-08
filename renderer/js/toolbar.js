@@ -169,4 +169,4 @@ export function init() {
   }
 }
 
-export { applyOpacity, clampOpacity, markUnread };
+export { applyOpacity, clampOpacity, markUnread, toggleOpacityPopover };
