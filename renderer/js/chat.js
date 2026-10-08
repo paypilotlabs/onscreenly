@@ -375,6 +375,9 @@ function armBusyFailsafe() {
   clearTimeout(busyFailsafe);
   busyFailsafe = setTimeout(() => setBusy(false), 40000);
 }
+function isBusy() {
+  return busy;
+}
 function setBusy(v) {
   busy = v;
   $('#send-btn').classList.toggle('busy', v);
@@ -472,6 +475,7 @@ export {
   esc,
   failAi,
   finalizeAi,
+  isBusy,
   messages,
   noteStreamActivity,
   runMode,
