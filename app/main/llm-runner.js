@@ -21,6 +21,8 @@ async function runFeature(mode, userText) {
   if (!def) return;
   state.busy = true;
   let streamSettled = false; // drop stray tokens from a stream we've already abandoned
+  let streamStarted = false;
+  let receivedTokens = false;
   try {
     const settings = store.getSettings();
     const llm = createLLM(settings);
@@ -33,10 +35,17 @@ async function runFeature(mode, userText) {
             ? `"${(userText || '').slice(0, 60)}${userText && userText.length > 60 ? '…' : ''}"`
             : null;
     const category = mode !== 'leetcode' && !def.ownContext ? detectCategory(transcript) : null;
-    send('llm:start', { userBubble, small: !!def.small, category, layout: def.layout || null });
+    // `mode` picks the renderer's thinking label ("Reading the conversation…").
+    send('llm:start', { userBubble, small: !!def.small, category, layout: def.layout || null, mode });
 
+    // Every error the user can fix carries a `code`; the renderer turns it into one button under the
+    // answer (Open settings, Open Profile, Start session, Try again). An `action` (publik) instead
+    // opens the banner or the card that owns the next step, so it never gets a code.
     if (def.needsResume && !String(settings.resumeText || '').trim()) {
-      send('llm:error', { message: 'Add your résumé in Settings › Profile first, then try again.' });
+      send('llm:error', {
+        message: 'Add your résumé in Settings › Profile first, then try again.',
+        code: 'needs-resume'
+      });
       return;
     }
 
@@ -54,7 +63,7 @@ async function runFeature(mode, userText) {
         send('llm:error', { message, action });
         return;
       }
-      send('llm:error', { message });
+      send('llm:error', { message, code: 'no-provider' });
       return;
     }
     // Never a silent starter (CONTRACT §12.4): the first-run card — balance,
@@ -99,11 +108,18 @@ async function runFeature(mode, userText) {
     // every feature actually ran with.
     console.log(`[llm] mode=${mode} transcriptTurns=${transcript.length} capturing=${state.capturing}`);
     if (def.transcriptRequired && transcript.length === 0) {
-      send('llm:error', {
-        message: state.capturing
-          ? 'Nothing has been transcribed yet — say something (or let the other side talk) and try again.'
-          : 'Nothing captured yet — press the listen button first so Onscreenly can hear the conversation.'
-      });
+      send(
+        'llm:error',
+        state.capturing
+          ? {
+              message: 'Nothing has been transcribed yet. Say something, or let the other side talk, then try again.',
+              code: 'needs-speech'
+            }
+          : {
+              message: 'Nothing has been captured yet. Start a session so Onscreenly can hear the conversation.',
+              code: 'needs-session'
+            }
+      );
       return;
     }
 
@@ -141,6 +157,9 @@ async function runFeature(mode, userText) {
       };
       rearm();
     });
+    // A failure from here on is the provider's, and worth a retry. Once part of the answer has
+    // arrived, the answer was interrupted rather than refused.
+    streamStarted = true;
     try {
       await Promise.race([
         llm.stream({
@@ -151,6 +170,7 @@ async function runFeature(mode, userText) {
           onToken: (t) => {
             if (streamSettled) return;
             rearm();
+            receivedTokens = true;
             send('llm:token', { text: t });
           },
           onResponse:
@@ -177,7 +197,8 @@ async function runFeature(mode, userText) {
       context: { mode, provider: store.getSettings().provider }
     });
     const action = e && e.action ? e.action : null;
-    send('llm:error', { message: e && e.message ? e.message : String(e), action });
+    const code = action || !streamStarted ? undefined : receivedTokens ? 'interrupted' : 'provider-failed';
+    send('llm:error', { message: e && e.message ? e.message : String(e), action, code });
     if (action) publikController.publikHandleErrorAction(action);
   } finally {
     streamSettled = true;

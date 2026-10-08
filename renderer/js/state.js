@@ -7,5 +7,6 @@ export const state = {
   aiEl: null,
   caretEl: null,
   responseCount: 0,
+  lastRun: null, // { mode, text } of the latest answer, for "Try again"
   transcriptInterimEl: null
 };

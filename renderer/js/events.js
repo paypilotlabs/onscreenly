@@ -1,17 +1,18 @@
 // Events pushed from the main process: capture, transcription, answers and status messages.
 import { state } from './state.js';
-import { onscreenly, setSessionButton } from './core.js';
+import { $, onscreenly, setSessionButton } from './core.js';
 import {
   MAX_RESPONSES,
   addAnswerExtras,
   appendToken,
   clearTranscriptInterim,
+  failAi,
   finalizeAi,
   messages,
   noteStreamActivity,
+  runMode,
   setBusy,
   showToast,
-  startAi,
   startResponseGroup
 } from './chat.js';
 import {
@@ -27,6 +28,7 @@ import { startMic, stopMic, stopSystemAudio } from './audio.js';
 import { appendTranscriptHistoryTurn, setLiveDotState, setSttState, sttState, updateSttStatus } from './transcript.js';
 import { publikActionButton } from './publik-settings.js';
 import { showPublikCard } from './onboarding.js';
+import { openSettings } from './settings-panel.js';
 
 // The banner above the action row: a message, at most one action, and Dismiss.
 let statusTimer = null;
@@ -65,6 +67,38 @@ function showStatus(message, button) {
   el.classList.add('show');
   clearTimeout(statusTimer);
   statusTimer = setTimeout(() => el.classList.remove('show'), button ? 30000 : 11000);
+}
+
+// ---- answer errors ---------------------------------------------------------
+// The button under a failed answer, from the code main gave the error. No code, no button: an error
+// with an action (publik) leaves the next step to its banner or card.
+function fixFor(code, run) {
+  switch (code) {
+    case 'no-provider':
+      return { label: 'Open settings', run: () => openSettings('keys') };
+    case 'needs-resume':
+      return { label: 'Open Profile', run: () => openSettings('profile') };
+    case 'needs-session':
+      return {
+        label: 'Start session',
+        run: () => {
+          const stop = $('#stop-btn');
+          if (!stop.classList.contains('active')) stop.click();
+        }
+      };
+    case 'needs-speech':
+      return noSpeechToText() ? { label: 'Open Audio settings', run: () => openSettings('transcription') } : null;
+    case 'provider-failed':
+    case 'interrupted':
+      return run ? { label: 'Try again', run: () => runMode(run.mode, run.text) } : null;
+    default:
+      return null;
+  }
+}
+
+// Nothing can transcribe: no speech-to-text key and no local model (#panel[data-listen], boot.js).
+function noSpeechToText() {
+  return $('#panel').dataset.listen === 'none';
 }
 
 export function init() {
@@ -132,7 +166,7 @@ export function init() {
     const title = last && last.caption ? last.caption.split('\n')[0].slice(0, 80) : 'Slide ' + count;
     showToast(`Slide ${count} captured · ${title}`, 3000);
   });
-  onscreenly.on('llm:start', ({ userBubble, small, category, layout }) => {
+  onscreenly.on('llm:start', ({ userBubble, small, category, layout, mode }) => {
     state.responseCount++;
     if (state.responseCount > MAX_RESPONSES) {
       const oldest = messages.querySelector('.response-group');
@@ -142,7 +176,9 @@ export function init() {
     // The log scrolls itself (chat.js), never with scrollIntoView(): that scrolls every scrollable
     // ancestor too, and once the panel is tall enough it scrolls the document, pushing #toolbar
     // out of view. html/body are overflow:hidden, so nothing would bring the controls back.
-    startResponseGroup({ question: userBubble, category, small, cards: layout === 'cards' });
+    startResponseGroup({ question: userBubble, category, small, cards: layout === 'cards', mode });
+    // A global shortcut asks from main, not through runMode: "Try again" repeats it too.
+    if (mode && (!state.lastRun || state.lastRun.mode !== mode)) state.lastRun = { mode, text: '' };
     setBusy(true);
   });
   onscreenly.on('llm:token', ({ text }) => {
@@ -154,10 +190,13 @@ export function init() {
     if (el) addAnswerExtras(el, sources);
     setBusy(false);
   });
-  onscreenly.on('llm:error', ({ message, action }) => {
-    if (!state.aiEl) startAi(true);
-    state.aiEl.dataset.raw = message;
-    finalizeAi();
+  onscreenly.on('llm:error', ({ message, action, code }) => {
+    // Without speech-to-text, "say something" would not help: say why nothing was heard.
+    const text =
+      code === 'needs-speech' && noSpeechToText()
+        ? 'Nothing has been transcribed. No speech-to-text is set up, so Onscreenly can’t hear the conversation.'
+        : message;
+    failAi(text, { code, fix: action ? null : fixFor(code, state.lastRun) });
     setBusy(false);
     // publik errors carry one action: the renderer's markdown emits no anchors,
     // so a link needs a real button (same pattern as the mic banner).

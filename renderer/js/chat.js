@@ -140,7 +140,8 @@ function createEl(tag, className, text) {
 // ---- scrolling -----------------------------------------------------------
 // The log follows the newest answer until its question reaches the top, then stops, so a long
 // answer is read from its start. Scrolling by hand takes over until the next answer. A finished
-// answer that only just overflows shows its end, so its card actions or sources stay in view.
+// answer that only just overflows, or one that failed, shows its end, so its card actions, sources
+// or fix button stay in view.
 let following = true;
 
 // Where a group's question line starts (below the hairline that separates it from the previous one).
@@ -154,7 +155,7 @@ function followNewest() {
   if (following && group) {
     const max = messages.scrollHeight - messages.clientHeight;
     const top = groupTop(group);
-    const showEnd = group.dataset.state === 'done' && max - top <= 48;
+    const showEnd = group.dataset.state === 'error' || (group.dataset.state === 'done' && max - top <= 48);
     messages.scrollTop = Math.max(0, showEnd ? max : Math.min(top, max));
   }
   updateFades(messages);
@@ -173,9 +174,24 @@ function updateFades(list) {
   list.classList.toggle('fade-bottom', max - top > 2);
 }
 
+// ---- answers -------------------------------------------------------------
+// What an answer says while it waits for its first words, by mode. After 8s it adds "· still working".
+const THINKING = {
+  say: 'Reading the conversation…',
+  assist: 'Looking at your screen…',
+  ask: 'Looking at your screen…',
+  leetcode: 'Reading the problem on screen…',
+  answerThis: 'Drafting an answer…',
+  recap: 'Summarising the conversation…',
+  resumeAnalysis: 'Analysing your résumé…'
+};
+const STILL_WORKING_MS = 8000;
+let stillWorkingTimer = null;
+
 // One answer: a meta row (the question as a quiet line, its category and the time), then the
-// answer itself, streaming behind a caret. Older answers step back once a newer one arrives.
-function startResponseGroup({ question, category, small, cards } = {}) {
+// answer itself, thinking until its first words arrive. Older answers step back once a newer one
+// arrives.
+function startResponseGroup({ question, category, small, cards, mode } = {}) {
   messages.querySelectorAll('.response-group').forEach((g) => g.classList.add('older'));
   const now = new Date();
   const time = createEl('time', 'response-sep', now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -186,15 +202,19 @@ function startResponseGroup({ question, category, small, cards } = {}) {
     createEl('span', 'category-pill', category ? category.charAt(0).toUpperCase() + category.slice(1) : ''),
     time
   );
-  state.aiEl = createEl('div', 'ai-text' + (small ? ' small' : '') + (cards ? ' cards' : ''));
+  state.aiEl = createEl('div', 'ai-text is-thinking' + (small ? ' small' : '') + (cards ? ' cards' : ''));
   state.aiEl.dataset.raw = '';
+  state.aiEl.dataset.label = THINKING[mode] || 'Thinking…';
   state.caretEl = createEl('span', 'ai-caret');
   state.caretEl.setAttribute('aria-hidden', 'true');
-  state.aiEl.appendChild(state.caretEl);
   const group = createEl('div', 'response-group');
-  group.dataset.state = 'streaming';
+  group.dataset.state = 'thinking';
+  if (mode) group.dataset.mode = mode;
   group.append(meta, state.aiEl);
   messages.appendChild(group);
+  clearTimeout(stillWorkingTimer);
+  const thinking = state.aiEl;
+  stillWorkingTimer = setTimeout(() => thinking.classList.add('still-working'), STILL_WORKING_MS);
   following = true;
   followNewest();
   return group;
@@ -205,32 +225,104 @@ function startAi(small) {
   startResponseGroup({ small });
 }
 
+function stopThinking(el) {
+  clearTimeout(stillWorkingTimer);
+  el.classList.remove('is-thinking', 'still-working');
+  delete el.dataset.label;
+}
+
+// ---- streaming -----------------------------------------------------------
+// The answer is rendered as markdown while it streams: at most once per animation frame and at most
+// every 50ms, never while the user is selecting text in it, and as plain text past 20KB so a long
+// answer cannot make each new word slower. A structured answer becomes cards only once it is done.
+const RENDER_EVERY_MS = 50;
+const PLAIN_TEXT_OVER = 20000;
+let renderFrame = 0;
+let lastRenderAt = 0;
+
 function appendToken(t) {
   if (!state.aiEl) startAi(false);
-  state.aiEl.dataset.raw += t;
-  const span = document.createElement('span');
-  span.className = 'w';
-  span.textContent = t;
-  // Guard: caretEl must be a child of aiEl
-  if (state.caretEl && state.caretEl.parentNode === state.aiEl) {
-    state.aiEl.insertBefore(span, state.caretEl);
-  } else {
-    state.aiEl.appendChild(span);
+  const el = state.aiEl;
+  if (el.classList.contains('is-thinking')) {
+    stopThinking(el);
+    el.closest('.response-group').dataset.state = 'streaming';
   }
+  el.dataset.raw += t;
+  if (!renderFrame) renderFrame = requestAnimationFrame(renderStreaming);
+}
+
+// Mid-stream, a bold run whose closing ** has not arrived yet shows as bold already, and a marker
+// with nothing after it yet is left out (never inside an open code block).
+function closeOpenBold(raw) {
+  if ((raw.match(/^\s*```/gm) || []).length % 2) return raw;
+  const line = raw.slice(raw.lastIndexOf('\n') + 1);
+  if ((line.match(/\*\*/g) || []).length % 2 === 0) return raw;
+  return /\*\*\s*$/.test(line) ? raw.replace(/\*\*\s*$/, '') : raw + '**';
+}
+
+function selectingIn(el) {
+  const selection = document.getSelection();
+  return !!selection && !selection.isCollapsed && selection.containsNode(el, true);
+}
+
+function renderStreaming(now) {
+  renderFrame = 0;
+  const el = state.aiEl;
+  if (!el) return;
+  if (now - lastRenderAt < RENDER_EVERY_MS || selectingIn(el)) {
+    renderFrame = requestAnimationFrame(renderStreaming);
+    return;
+  }
+  lastRenderAt = now;
+  const raw = el.dataset.raw || '';
+  if (raw.length > PLAIN_TEXT_OVER) el.textContent = raw;
+  else el.innerHTML = renderMarkdown(closeOpenBold(raw));
+  // The caret follows the last words: inside the last paragraph, list item or code block.
+  let tail = el;
+  while (tail.lastElementChild && /^(UL|OL|LI|PRE|P|H3|CODE)$/.test(tail.lastElementChild.tagName)) {
+    tail = tail.lastElementChild;
+  }
+  tail.appendChild(state.caretEl);
   followNewest();
 }
 
-function finalizeAi() {
+// The whole answer, rendered once more when it ends: 'done', or 'error' with what arrived so far.
+function finalizeAi(end = 'done') {
   const el = state.aiEl;
   if (!el) return null;
+  cancelAnimationFrame(renderFrame);
+  renderFrame = 0;
+  stopThinking(el);
   el.innerHTML = renderMarkdown(el.dataset.raw || '');
   if (el.classList.contains('cards')) groupIntoCards(el);
   state.aiEl = null;
   state.caretEl = null;
   const group = el.closest('.response-group');
-  if (group) group.dataset.state = 'done';
+  if (group) group.dataset.state = end;
   followNewest();
   return el;
+}
+
+// An answer that failed keeps what it had said, and below it a callout says why, with at most one
+// button that fixes it: `fix` is { label, run }, chosen by events.js from the error's code.
+function failAi(message, { code, fix } = {}) {
+  if (!state.aiEl) startAi(true);
+  const answer = finalizeAi('error');
+  const block = createEl('div', 'ai-error is-error');
+  block.setAttribute('role', 'alert');
+  block.dataset.code = code || '';
+  block.append(createEl('span', 'ai-error-eyebrow', 'Couldn’t answer'), createEl('p', 'ai-error-msg', message));
+  if (fix) {
+    const button = createEl('button', 'btn btn-secondary compact ai-fix', fix.label);
+    button.type = 'button';
+    button.dataset.code = code;
+    button.addEventListener('click', fix.run);
+    const row = createEl('div', 'ai-fix-row');
+    row.append(button);
+    block.append(row);
+  }
+  answer.after(block);
+  followNewest();
 }
 
 // Under a finished answer: Copy / Save as Markdown… for a structured answer, and the vault notes
@@ -343,10 +435,12 @@ function showToast(message, ms, tone) {
 }
 
 // ---- actions -----------------------------------------------------------
+// Asks main for an answer, and remembers what was asked for an error's "Try again".
 function runMode(mode, text) {
   if (busy) return;
   setBusy(true);
-  onscreenly.ask({ mode, text: text || '' });
+  state.lastRun = { mode, text: text || '' };
+  onscreenly.ask(state.lastRun);
 }
 
 export function init() {
@@ -367,6 +461,7 @@ export {
   appendToken,
   clearTranscriptInterim,
   esc,
+  failAi,
   finalizeAi,
   messages,
   noteStreamActivity,
