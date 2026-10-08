@@ -46,7 +46,7 @@ function fillSettings() {
   const meetingAudioNote = $('#meeting-audio-note');
   if (meetingAudioNote) {
     meetingAudioNote.textContent = isMac
-      ? 'macOS can only capture system audio through a screen-capture session. While this is on, the menu bar shows the screen-recording indicator and Control Center lists Onscreenly under \u201cCurrently Sharing\u201d \u2014 visible to everyone you screen-share with. Off by default; your microphone, screen capture and answers are unaffected.'
+      ? 'Needs macOS\u2019s System Audio Recording permission (Privacy & Security \u203a Screen & System Audio Recording); macOS asks the first time and may show its recording indicator while this is on. Off by default; your microphone, screen capture and answers are unaffected.'
       : 'Transcribes the other participants alongside your microphone. This platform\u2019s loopback capture shows no recording indicator.';
   }
   pressChip('#stt-provider-seg', (b) => b.dataset.sttProvider === (state.settings.sttProvider || 'auto'));

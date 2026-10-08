@@ -31,15 +31,12 @@ const { registerAppIpc } = require('./ipc');
 const { configure: configureKnowledge, registerKnowledgeIpc, stopKnowledge } = require('./knowledge');
 const { safeStorageBackend } = require('./secure-storage');
 
-// Since Electron 39, macOS meeting audio goes through Core Audio taps, which
-// need a separate "System Audio Recording" permission; without it the stream
-// is silent and nothing reports an error. Electron 39-44 can keep the
-// ScreenCaptureKit path that the Screen Recording grant already covers, which
-// is what Onscreenly used before. The switch does nothing from Electron 45, so
-// revisit this with the next major upgrade. Must run before app is ready.
-if (process.platform === 'darwin') {
-  app.commandLine.appendSwitch('disable-features', 'MacCatapLoopbackAudioForScreenShare');
-}
+// macOS meeting audio comes from a Core Audio tap (Electron's default since 39,
+// the only path from 45). The ScreenCaptureKit path it replaces kept a capture
+// of the whole display open for the entire call to carry the audio, and that
+// second capture broke the meeting app's own screen share (Teams showed the
+// other side a share that never loaded). A tap needs macOS's separate System
+// Audio Recording permission; renderer/js/audio.js says so when it is missing.
 
 // Linux runs natively on Wayland since Electron 38 (--ozone-platform defaults
 // to auto), so no Linux switches are needed.

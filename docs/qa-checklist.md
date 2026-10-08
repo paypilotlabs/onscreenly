@@ -39,7 +39,8 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 - [ ] **Start session**: the live dot turns on, and your speech appears as "You" in Transcription history.
 - [ ] **What should I say?** (Command/Ctrl+Enter) during a test conversation gives a reply to say.
 - [ ] **Recap** summarises what was said.
-- [ ] Meeting audio (Settings → Audio, on): in a Zoom, Meet or Teams test call, the other side appears as "Them". On macOS, the menu bar shows the screen-recording indicator while it is on.
+- [ ] Meeting audio (Settings → Audio, on): in a Zoom, Meet or Teams test call, the other side appears as "Them". On macOS, the first session asks for System Audio Recording; denying it shows "Meeting audio stopped" with Open Privacy settings.
+- [ ] With Meeting audio on, share your screen from Zoom, Meet and Teams: the other side sees the share, and "Them" is still transcribed.
 - [ ] **End session** stops listening and the indicator goes away.
 - [ ] ⌘⇧L / Ctrl+Shift+L from another app starts and ends a session.
 

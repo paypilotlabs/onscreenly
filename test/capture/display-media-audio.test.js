@@ -57,3 +57,11 @@ test('the display-media handler invokes its one-time callback exactly once', () 
       'exactly one place or Electron reports "One-time callback was called more than once"'
   );
 });
+
+// On the ScreenCaptureKit path a capture of the whole display stays open for the entire call to
+// carry the audio, and that second capture broke the meeting app's own screen share on macOS
+// (Teams showed a share that never loaded). Meeting audio has to come from a Core Audio tap.
+test('macOS meeting audio is not forced back onto a screen capture', () => {
+  const index = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'main', 'index.js'), 'utf8');
+  assert.doesNotMatch(index, /MacCatapLoopbackAudioForScreenShare/);
+});
