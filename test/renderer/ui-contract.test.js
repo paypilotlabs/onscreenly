@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const { readCss, rendererCssFiles, relative, RENDERER, ROOT } = require('../helpers/css');
+const { parseCss, readCss, rendererCssFiles, relative, RENDERER, ROOT } = require('../helpers/css');
 const {
   classesOf,
   elements,
@@ -316,6 +316,63 @@ test('Settings, onboarding and consent are light workspace dialogs, and themes n
         assert.deepEqual(themesOf(n), [], `${where} sits inside another theme`);
       }
     }
+  }
+});
+
+// The permissions window has no overlay. It loads permissions.css (the shared layers it needs, in
+// the main window's order) and permissions.js, nothing else, and its own <style> holds only the
+// page geometry, which must not sit in a layer (it frames the card for whichever layer styles it).
+test('the permissions window links only permissions.css, keeps its geometry inline, and loads no icon set', () => {
+  assert.deepEqual(
+    querySelectorAll(permissions.root, 'link').map((el) => [el.attrs.rel, el.attrs.href]),
+    [['stylesheet', 'permissions.css']]
+  );
+  assert.deepEqual(
+    querySelectorAll(permissions.root, 'script').map((el) => el.attrs.src),
+    ['permissions.js']
+  );
+  assert.doesNotMatch(permissions.html, /icons\.js/);
+
+  const inline = [...permissions.html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]);
+  assert.equal(inline.length, 1, 'one inline <style>');
+  const geometry = parseCss(inline[0]);
+  assert.deepEqual([...geometry.statements, ...geometry.atBlocks], [], 'the inline <style> has no @-rules');
+  const selectors = new Set(geometry.rules.flatMap((rule) => splitSelectorList(rule.selector)));
+  assert.deepEqual([...selectors].sort(), ['#perm-root', 'body', 'html']);
+
+  const sheet = readCss(path.join(RENDERER, 'permissions.css'));
+  assert.deepEqual(sheet.rules, [], 'permissions.css has style rules');
+  const order = sheet.statements
+    .find((st) => st.name === 'layer')
+    .prelude.split(',')
+    .map((name) => name.trim());
+  assert.deepEqual(order, ['fonts', 'tokens', 'base', 'controls', 'workspace', 'utilities', 'motion']);
+  assert.deepEqual(
+    sheet.statements.filter((st) => st.name === 'import').map((st) => st.prelude),
+    order.map((layer) => `url('css/${layer}.css') layer(${layer})`)
+  );
+});
+
+test('the permissions card is a light workspace dialog holding every id permissions.js uses', () => {
+  const cards = querySelectorAll(permissions.root, '.perm-card');
+  assert.equal(cards.length, 1);
+  assert.ok(classesOf(cards[0]).includes('ws-dialog'));
+  assert.deepEqual(themesOf(cards[0]), ['theme-workspace']);
+
+  const src = fs.readFileSync(path.join(RENDERER, 'permissions.js'), 'utf8');
+  const ids = new Set([...src.matchAll(/\$\(\s*'([\w-]+)'\s*\)/g)].map((m) => m[1]));
+  for (const m of src.matchAll(/\$\(\s*`([\w-]+)-\$\{key\}`\s*\)/g)) {
+    for (const key of ['mic', 'screen']) ids.add(`${m[1]}-${key}`);
+  }
+  assert.ok(ids.size > 10, 'found too few ids in permissions.js; is the scan broken?');
+  const inCard = (el) => {
+    for (let n = el.parent; n; n = n.parent) if (n === cards[0]) return true;
+    return false;
+  };
+  for (const id of ids) {
+    const found = querySelectorAll(permissions.root, `#${id}`);
+    assert.equal(found.length, 1, `#${id}`);
+    assert.ok(inCard(found[0]), `#${id} sits outside the card`);
   }
 });
 

@@ -84,7 +84,32 @@ async function requestPermissions() {
   return status.mic === 'granted' && status.screen === 'granted';
 }
 
-function createPermissionsWindow() {
+/**
+ * What launch does about missing OS permissions. Pure, so each platform's branch is unit-tested.
+ *  - 'gate': macOS. The permissions window is the first screen, and the overlay starts only after
+ *    Continue, once both permissions are allowed.
+ *  - 'beside': Windows, for a returning user whose microphone is off. The overlay starts at once and
+ *    the window shows above it; Continue closes it with or without the microphone.
+ *  - 'none': everything is allowed; Linux, which asks for nothing; or a first run on Windows, where
+ *    onboarding's permissions step asks instead, so first run never shows two windows.
+ */
+function permissionGatePlan({ platform, onboarded, allGranted }) {
+  if (allGranted) return 'none';
+  if (platform === 'darwin') return 'gate';
+  if (platform === 'win32' && onboarded) return 'beside';
+  return 'none';
+}
+
+/**
+ * Opens the permissions window, or shows it if it is already open. With `above` (the overlay window,
+ * on Windows) it stays on top of the overlay: both are always on top, and on Windows the one shown
+ * last is above, so it is raised again whenever the overlay shows.
+ */
+function createPermissionsWindow({ above = null } = {}) {
+  if (permWin && !permWin.isDestroyed()) {
+    permWin.show();
+    return;
+  }
   const { workArea } = screen.getPrimaryDisplay();
   const W = 500,
     H = 540;
@@ -106,23 +131,33 @@ function createPermissionsWindow() {
       sandbox: true
     }
   });
-  permWin.loadFile(rendererPage('permissions.html'));
-  permWin.webContents.on('did-finish-load', () => permWin.show());
+  const win = permWin;
+  if (above) {
+    win.setAlwaysOnTop(true, 'screen-saver', 2);
+    const raise = () => {
+      if (!win.isDestroyed()) win.moveTop();
+    };
+    above.on('show', raise);
+    win.once('closed', () => {
+      if (!above.isDestroyed()) above.removeListener('show', raise);
+    });
+  }
+  win.loadFile(rendererPage('permissions.html'));
+  win.webContents.on('did-finish-load', () => win.show());
 }
 
-// onGranted runs once both permissions are granted and the user clicks Continue.
+// onGranted runs when the user clicks Continue: on macOS once both permissions are granted, on
+// Windows always (the overlay is already running, and the microphone is the user's choice there).
 function registerPermissionsIpc({ onGranted }) {
   handle('permissions:check', () => getPermissionStatus());
   handle('permissions:request', () => requestPermissions());
   on('permissions:continue', async () => {
-    const status = await getPermissionStatus();
-    if (status.mic === 'granted' && status.screen === 'granted') {
-      if (permWin) {
-        permWin.close();
-        permWin = null;
-      }
-      onGranted();
+    if (process.platform !== 'win32') {
+      const status = await getPermissionStatus();
+      if (status.mic !== 'granted' || status.screen !== 'granted') return;
     }
+    closePermissionsWindow();
+    onGranted();
   });
 }
 
@@ -130,6 +165,7 @@ module.exports = {
   hasPermissionsWindow,
   closePermissionsWindow,
   requestPermissions,
+  permissionGatePlan,
   createPermissionsWindow,
   registerPermissionsIpc
 };

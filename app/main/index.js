@@ -21,6 +21,7 @@ const {
   hasPermissionsWindow,
   closePermissionsWindow,
   requestPermissions,
+  permissionGatePlan,
   createPermissionsWindow,
   registerPermissionsIpc
 } = require('./permissions');
@@ -151,31 +152,28 @@ app.whenReady().then(async () => {
   const keyStorage = await store.initSecureStorage(safeStorageBackend);
   console.log(`[onscreenly] API key storage: ${keyStorage.mode}`);
 
-  if (isMac) {
-    const allGranted = await requestPermissions();
-    if (!allGranted) {
-      // Show the permissions gate — the dock stays visible so the user can find the app
-      createPermissionsWindow();
-      app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow();
-      });
-      return;
-    }
-  } else if (isWindows) {
-    // Windows has no OS-level modal permission dialog to block startup on —
-    // there is no askForMediaAccess() equivalent, and the only way to change
-    // the mic toggle is to leave the app and use Settings — so unlike macOS
-    // this never withholds the main window. It surfaces the same in-app
-    // gate as an informational window alongside the app instead of leaving
-    // the user with no option at all to see or act on the permission state
-    // ("not able to give permission ... coz there is no option").
-    const allGranted = await requestPermissions();
-    if (!allGranted) {
-      createPermissionsWindow();
-    }
+  // macOS asks for both permissions here and, while one is missing, shows the permissions window
+  // first, with the dock visible so the user can find the app. Windows has no OS-level modal
+  // permission dialog to block startup on (no askForMediaAccess() equivalent; the mic toggle lives in
+  // Settings), so it never withholds the overlay: on a first run onboarding's permissions step asks,
+  // and a returning user whose mic is off gets the window beside the overlay instead of no way at all
+  // to see or act on it ("not able to give permission ... coz there is no option"). See
+  // permissionGatePlan.
+  const plan = permissionGatePlan({
+    platform: process.platform,
+    onboarded: !!store.getSettings().onboarded,
+    allGranted: await requestPermissions()
+  });
+  if (plan === 'gate') {
+    createPermissionsWindow();
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createPermissionsWindow();
+    });
+    return;
   }
 
   launchApp();
+  if (plan === 'beside') createPermissionsWindow({ above: getWin() });
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
