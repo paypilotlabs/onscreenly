@@ -12,7 +12,7 @@ const session = {
   // false when another application already owns the combination, and nothing used
   // to look at that — so the only symptom was a key that did nothing. Iris reads
   // this and can say which key is taken instead of guessing from a screenshot.
-  shortcutState: { assist: false, say: false, leetcode: false, quit: false }
+  shortcutState: { assist: false, say: false, leetcode: false, hide: false, listening: false, quit: false }
 };
 
 const MAX_TRANSCRIPT_TURNS = 200; // ~30–40 minutes of conversation at normal pace

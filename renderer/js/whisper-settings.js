@@ -1,6 +1,7 @@
 // Local Whisper model list, download, import and delete.
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
+import { paintReadiness } from './settings-form.js';
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
@@ -67,6 +68,8 @@ async function refreshWhisperModels() {
       ? 'Model files are verified before they can be loaded.'
       : state.whisperOverview.runtime.message;
     renderWhisperModelState();
+    // A model that finished downloading changes what the empty state offers.
+    paintReadiness();
   } catch (error) {
     status.textContent = `Could not load local model information: ${error.message}`;
   }

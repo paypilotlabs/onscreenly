@@ -3,7 +3,7 @@ import { state } from './state.js';
 import { $, onscreenly } from './core.js';
 import { clampOpacity } from './toolbar.js';
 import { updateSmartTooltip } from './settings-panel.js';
-import { statusText } from './settings-form.js';
+import { paintReadiness, statusText } from './settings-form.js';
 import { readProfile } from './profile-settings.js';
 import { readKnowledge } from './knowledge-settings.js';
 
@@ -65,6 +65,7 @@ async function saveSettings() {
     state.settings = await onscreenly.settingsSet(state.settings);
     $('#s-status').textContent = statusText();
     updateSmartTooltip();
+    paintReadiness();
     return true;
   } catch (error) {
     const message = error && error.message ? error.message : String(error);

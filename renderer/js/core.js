@@ -68,16 +68,23 @@ function setButtonKind(el, kind) {
 }
 
 // ---- session button ----------------------------------------------------
-// "Start session" / "End session", with the live dot beside the label while a session runs.
-function setSessionButton(active) {
+// "Start session" / "End session", with the live dot beside the label while a session runs, and a
+// spinner with "Starting…" while one starts.
+function setSessionButton(active, pending = false) {
   const btn = $('#stop-btn');
-  const text = active ? 'End session' : 'Start session';
-  btn.classList.toggle('active', active);
+  const text = pending ? 'Starting…' : active ? 'End session' : 'Start session';
+  btn.classList.toggle('active', active && !pending);
+  btn.classList.toggle('is-pending', pending);
+  if (pending) btn.setAttribute('aria-busy', 'true');
+  else btn.removeAttribute('aria-busy');
   btn.querySelector('.tb-stop-label').textContent = text;
-  btn.title = `${text} (${combo('mod', 'shift', 'L')})`;
+  btn.title = pending ? text : `${text} (${combo('mod', 'shift', 'L')})`;
   btn.setAttribute('aria-label', text);
-  // The empty state follows the session: "Ready when you are" or "Listening".
-  $('#panel').dataset.capture = active ? 'on' : 'off';
+  // The empty state follows the session: "Ready when you are", or "Listening" once one runs. A
+  // session that nothing can transcribe is 'no-stt' (set with the speech status, transcript.js).
+  const panel = $('#panel');
+  if (!active && !pending) panel.dataset.capture = 'off';
+  else if (panel.dataset.capture === 'off') panel.dataset.capture = 'on';
 }
 
 export function init() {

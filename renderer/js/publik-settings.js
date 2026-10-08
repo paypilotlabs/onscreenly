@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
 import { showStatus } from './events.js';
-import { statusText } from './settings-form.js';
+import { paintReadiness, statusText } from './settings-form.js';
 import { showPublikCard, showPublikDisclosure } from './onboarding.js';
 
 // ---- publik API (packaged-build default) --------------------------------
@@ -129,6 +129,7 @@ export function init() {
   onscreenly.on('publik:state', (next) => {
     state.publikState = next;
     renderPublikBlock();
+    paintReadiness();
     maybeShowLowStarter(next);
   });
 }

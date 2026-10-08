@@ -1,10 +1,18 @@
 // Toolbar controls: collapse/expand, opacity, start/end session and clearing the transcript.
 import { state } from './state.js';
-import { $, combo, onscreenly } from './core.js';
+import { $, combo, onscreenly, setSessionButton } from './core.js';
 import { showToast } from './chat.js';
 import { hardClearSTTFill, inputFromSTT } from './composer.js';
 import { startSystemAudio, stopSystemAudio } from './audio.js';
-import { clearTranscriptSidebar, fitActionRow, hideSidebar, showSidebar, sidebarOpen } from './transcript.js';
+import {
+  clearTranscriptSidebar,
+  fitActionRow,
+  hideSidebar,
+  setClearConfirm,
+  setSttState,
+  showSidebar,
+  sidebarOpen
+} from './transcript.js';
 
 // Hide / Show: the panel collapses; the toolbar (with the live dot) and any toast stay.
 let reopenSidebarOnExpand = false;
@@ -21,8 +29,43 @@ function toggleHide() {
     reopenSidebarOnExpand = sidebarOpen;
     if (sidebarOpen) hideSidebar();
   } else {
+    btn.classList.remove('has-unread');
     fitActionRow();
     if (reopenSidebarOnExpand) showSidebar();
+  }
+}
+
+// While the panel is hidden, a new answer puts a dot on Show; showing the panel clears it.
+function markUnread() {
+  if ($('#panel-wrap').classList.contains('collapsed')) $('#hide-btn').classList.add('has-unread');
+}
+
+// ---- session -------------------------------------------------------------
+// Start or end a session: the button and ⌘⇧L (session:toggle from main) both come here. Meeting
+// audio is opened first, while a click's user gesture is fresh (getDisplayMedia needs one), and the
+// button shows "Starting…" until main's capture:state says the session is up.
+async function toggleSession() {
+  const btn = $('#stop-btn');
+  if (btn.classList.contains('is-pending')) return;
+  const turningOn = !btn.classList.contains('active');
+  if (turningOn) {
+    setSessionButton(false, true);
+    setSttState('connecting');
+    // startSystemAudio may fail (user cancels, no permission) — that's OK,
+    // mic will still work and capture will toggle regardless
+    try {
+      await startSystemAudio();
+    } catch (_) {
+      /* handled inside startSystemAudio */
+    }
+  }
+  const active = await onscreenly.captureToggle();
+  if (!turningOn) return;
+  if (!active) stopSystemAudio();
+  // Normally capture:state has already ended "Starting…"; when the start failed, nothing did.
+  if (btn.classList.contains('is-pending')) {
+    setSessionButton(active);
+    if (!active) setSttState('disconnected');
   }
 }
 
@@ -107,24 +150,15 @@ export function init() {
     el.addEventListener('change', () => applyOpacity(Number(el.value) / 100, true));
   });
 
-  // Stop = start/stop listening. Kick off system-audio capture straight from the click so
-  // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
-  $('#stop-btn').addEventListener('click', async () => {
-    const turningOn = !$('#stop-btn').classList.contains('active');
-    if (turningOn) {
-      // startSystemAudio may fail (user cancels, no permission) — that's OK,
-      // mic will still work and capture will toggle regardless
-      try {
-        await startSystemAudio();
-      } catch (_) {
-        /* handled inside startSystemAudio */
-      }
-    }
-    const active = await onscreenly.captureToggle();
-    if (turningOn && !active) stopSystemAudio();
-  });
+  $('#stop-btn').addEventListener('click', toggleSession);
+  onscreenly.on('session:toggle', toggleSession);
   if (clearTranscriptBtn) {
     clearTranscriptBtn.addEventListener('click', async () => {
+      if (!clearTranscriptBtn.classList.contains('confirm')) {
+        setClearConfirm(true);
+        return;
+      }
+      setClearConfirm(false);
       await onscreenly.clearTranscript();
       state.transcriptInterimEl = null;
       clearTranscriptSidebar();
@@ -135,4 +169,4 @@ export function init() {
   }
 }
 
-export { applyOpacity, clampOpacity };
+export { applyOpacity, clampOpacity, markUnread };

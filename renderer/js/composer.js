@@ -171,10 +171,10 @@ function restoreLastQuestion() {
     composer.classList.add('stt-filling');
     updateQuestionReadyState();
     syncPlaceholder();
-    showToast('Question restored', 1500);
+    showToast('Question restored', 1500, 'ok');
     return true;
   }
-  showToast('No question to restore', 1500);
+  showToast('Nothing to restore', 1500);
   return false;
 }
 
@@ -202,11 +202,10 @@ function autoFillInputFromSTT(text) {
   // Reset the idle timer — after 2s of silence, check if question is complete
   clearTimeout(questionFinalizeTimer);
   questionFinalizeTimer = setTimeout(() => {
+    // A question that looks complete is ready: the composer says "Ready · ↵ to answer".
     if (isLikelyCompleteQuestion(input.value)) {
       composer.classList.add('stt-ready');
       updateSendButtonState(); // FIX #9: Update send button when ready
-      // Subtle notification that question is ready
-      showToast('Press Enter to answer', 2500);
     }
   }, 1800);
 

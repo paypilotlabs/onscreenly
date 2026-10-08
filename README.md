@@ -29,15 +29,16 @@ These are the shortcuts registered by the current app. On Windows/Linux, use Ctr
 
 | Action | macOS | Windows/Linux |
 |---|---|---|
+| Start or end a session | Command+Shift+L | Ctrl+Shift+L |
 | What should I say? | Command+Enter | Ctrl+Enter |
-| Smart assist | Command+Shift+Enter | Ctrl+Shift+Enter |
+| Assist | Command+Shift+Enter | Ctrl+Shift+Enter |
 | Solve the coding problem on screen | Command+H | Ctrl+H |
 | Collapse/expand the answer panel | Command+Shift+/ | Ctrl+Shift+/ |
 | Quit | Command+Shift+X | Ctrl+Shift+X |
 
-Use **Start session / End session** to toggle listening, or type a question and press Enter. Settings are available from the input area's menu; Command/Ctrl+, works while the app is focused.
+Use **Start session / End session** (or Command/Ctrl+Shift+L from any app) to toggle listening, or type a question and press Enter. Settings are available from the input area's menu; Command/Ctrl+, works while the app is focused. If another app already holds a shortcut (Safari uses Command+Shift+L for its sidebar), that key does nothing in Onscreenly, but the toolbar button still works.
 
-The Mac Dock icon is already hidden after the permission gate. Collapse keeps the toolbar visible; minimum opacity is 20%. This rename does **not** add a fully hidden mode, permanent whole-window click-through, or a listening hotkey. `CommandOrControl+Shift+L` is declared in a helper module but is not registered by the running app.
+The Mac Dock icon is already hidden after the permission gate. Collapse keeps the toolbar visible; minimum opacity is 20%. This rename does **not** add a fully hidden mode or permanent whole-window click-through.
 
 ## Screen capture and platform limits
 

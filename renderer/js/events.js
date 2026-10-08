@@ -29,16 +29,16 @@ import { appendTranscriptHistoryTurn, setLiveDotState, setSttState, sttState, up
 import { publikActionButton } from './publik-settings.js';
 import { showPublikCard } from './onboarding.js';
 import { openSettings } from './settings-panel.js';
+import { markUnread } from './toolbar.js';
 
-// The banner above the action row: a message, at most one action, and Dismiss.
+// The banner above the action row: a message, at most one action, and Dismiss. `tone` is 'info',
+// 'warn' or 'error' (read out at once).
 let statusTimer = null;
-function showStatus(message, button) {
+function showStatus(message, button, tone = 'info') {
   let el = document.getElementById('onscreenly-status');
   if (!el) {
     el = document.createElement('div');
     el.id = 'onscreenly-status';
-    el.setAttribute('role', 'status');
-    el.dataset.tone = 'info';
     const text = document.createElement('span');
     text.className = 'banner-msg';
     const dismiss = document.createElement('button');
@@ -46,13 +46,12 @@ function showStatus(message, button) {
     dismiss.className = 'banner-close';
     dismiss.title = 'Dismiss this message';
     dismiss.textContent = 'Dismiss';
-    dismiss.addEventListener('click', () => {
-      clearTimeout(statusTimer);
-      el.classList.remove('show');
-    });
+    dismiss.addEventListener('click', hideStatus);
     el.append(text, dismiss);
     document.getElementById('panel-main').insertBefore(el, document.getElementById('action-row'));
   }
+  el.dataset.tone = tone;
+  el.setAttribute('role', tone === 'error' ? 'alert' : 'status');
   el.querySelector('.banner-msg').textContent = message;
   const previous = el.querySelector('.banner-action');
   if (previous) previous.remove();
@@ -66,7 +65,24 @@ function showStatus(message, button) {
   void el.offsetWidth;
   el.classList.add('show');
   clearTimeout(statusTimer);
-  statusTimer = setTimeout(() => el.classList.remove('show'), button ? 30000 : 11000);
+  statusTimer = setTimeout(hideStatus, button ? 30000 : 11000);
+}
+
+function hideStatus() {
+  clearTimeout(statusTimer);
+  const el = document.getElementById('onscreenly-status');
+  if (el) el.classList.remove('show');
+}
+
+// A warning about listening, with the way to fix it: Settings › Audio.
+function showAudioStatus(message) {
+  const button = document.createElement('button');
+  button.textContent = 'Open Audio settings';
+  button.addEventListener('click', () => {
+    hideStatus();
+    openSettings('transcription');
+  });
+  showStatus(message, button, 'warn');
 }
 
 // ---- answer errors ---------------------------------------------------------
@@ -161,10 +177,16 @@ export function init() {
   onscreenly.on('vad:state', ({ channel, speaking }) => {
     setLiveDotState(speaking ? 'speaking' : 'idle');
   });
+  // "Slide 3 · <caption>": on screen the caption stops at 60 characters; screen readers get all of it.
   onscreenly.on('slides:update', ({ count, last }) => {
     if (!count) return;
-    const title = last && last.caption ? last.caption.split('\n')[0].slice(0, 80) : 'Slide ' + count;
-    showToast(`Slide ${count} captured · ${title}`, 3000);
+    const caption = last && last.caption ? last.caption.split('\n')[0].trim() : '';
+    if (!caption) {
+      showToast(`Slide ${count}`, 3000);
+      return;
+    }
+    const shown = caption.length > 60 ? caption.slice(0, 60).trimEnd() + '…' : caption;
+    showToast(`Slide ${count} · ${caption}`, 3000, null, `Slide ${count} · ${shown}`);
   });
   onscreenly.on('llm:start', ({ userBubble, small, category, layout, mode }) => {
     state.responseCount++;
@@ -177,6 +199,7 @@ export function init() {
     // ancestor too, and once the panel is tall enough it scrolls the document, pushing #toolbar
     // out of view. html/body are overflow:hidden, so nothing would bring the controls back.
     startResponseGroup({ question: userBubble, category, small, cards: layout === 'cards', mode });
+    markUnread();
     // A global shortcut asks from main, not through runMode: "Try again" repeats it too.
     if (mode && (!state.lastRun || state.lastRun.mode !== mode)) state.lastRun = { mode, text: '' };
     setBusy(true);
@@ -226,8 +249,14 @@ export function init() {
       appendTranscriptHistoryTurn(t.channel, t.text, false);
     }
   });
-  onscreenly.on('status', ({ message }) => {
+  onscreenly.on('status', ({ message, code }) => {
     onscreenly.log('[status] ' + message);
+    // A session that nothing can transcribe: "No speech-to-text", and the way to set it up.
+    if (code === 'stt-unavailable') {
+      setSttState('unavailable');
+      showAudioStatus(message);
+      return;
+    }
     showStatus(message);
     if (sttState !== 'disconnected') {
       const lower = message.toLowerCase();
@@ -236,4 +265,4 @@ export function init() {
   });
 }
 
-export { showStatus };
+export { showAudioStatus, showStatus };

@@ -160,6 +160,58 @@ function statusText() {
   return `${labels[state.settings.provider] || state.settings.provider}${publikPart} · STT: ${stt}`;
 }
 
+// ---- readiness -------------------------------------------------------------
+// What the empty state offers depends on two things: whether answers can work, and whether a session
+// can hear anything. Both are read from the settings as saved, so they are hints, not guarantees.
+
+// Answers: the chosen provider has what src/llm/llm.js needs to start. Saved keys arrive masked.
+function providerLooksReady(settings = state.settings) {
+  const provider = settings.provider;
+  const keys = settings.apiKeys || {};
+  if (provider === 'publik') {
+    return !!(state.publikState ? state.publikState.connected : settings.publik && settings.publik.connected);
+  }
+  // Ollama is a local server: its field holds a URL, and no key is needed.
+  if (provider === 'ollama') return true;
+  if (provider === 'custom') {
+    const models = (settings.models && settings.models.custom) || {};
+    return !!settings.baseUrl && !!(settings.smart ? models.smart : models.fast);
+  }
+  if (provider === 'azure') return !!keys.azure && !!settings.azureEndpoint;
+  return !!keys[provider];
+}
+
+// Listening: 'none' when nothing can transcribe a session (src/stt picks from the same keys),
+// 'mic-only' on macOS while Meeting audio is off, otherwise 'ready'. A local model whose state is
+// not known yet counts as ready, so the app never warns about something it hasn't checked.
+function listenReadiness(settings, whisperOverview) {
+  const keys = settings.apiKeys || {};
+  const choice = settings.sttProvider || 'auto';
+  let canTranscribe;
+  if (choice === 'local') canTranscribe = localModelReady(settings, whisperOverview);
+  else if (choice === 'auto') canTranscribe = ['deepgram', 'openai', 'groq', 'gemini'].some((p) => keys[p]);
+  else if (choice === 'custom') canTranscribe = !!keys.custom && !!settings.baseUrl;
+  else canTranscribe = !!keys[choice];
+  if (!canTranscribe) return 'none';
+  return isMac && !settings.meetingAudio ? 'mic-only' : 'ready';
+}
+
+// The chosen local model is downloaded and the runtime that runs it is available.
+function localModelReady(settings, whisperOverview) {
+  if (!whisperOverview) return true;
+  const modelId = (settings.localWhisper && settings.localWhisper.modelId) || 'base.en';
+  const model = whisperOverview.models.find((candidate) => candidate.id === modelId);
+  return !!whisperOverview.runtime.available && !!(model && model.installed);
+}
+
+// #panel[data-setup] and [data-listen] pick the empty state (overlay.css).
+function paintReadiness() {
+  if (!state.settings) return;
+  const panel = $('#panel');
+  panel.dataset.setup = String(!providerLooksReady());
+  panel.dataset.listen = listenReadiness(state.settings, state.whisperOverview);
+}
+
 export function init() {
   $('#delete-all-data').addEventListener('click', () => {
     onscreenly.deleteAllData().catch(() => {});
@@ -198,4 +250,4 @@ export function init() {
   );
 }
 
-export { fillSettings, statusText };
+export { fillSettings, listenReadiness, paintReadiness, providerLooksReady, statusText };

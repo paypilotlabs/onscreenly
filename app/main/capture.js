@@ -25,6 +25,14 @@ let flushTimer = null;
 let desiredCaptureState = false;
 let captureTransition = Promise.resolve(false);
 
+// A session with nothing to transcribe it still answers about the screen. The code turns the
+// renderer's speech status into "No speech-to-text", with a button to Settings › Audio.
+const STT_UNAVAILABLE = {
+  message:
+    'No speech-to-text is set up. Add a Deepgram, OpenAI, Groq or Gemini key, or download a local model, in Settings › Audio. Screen answers still work.',
+  code: 'stt-unavailable'
+};
+
 // -------- streaming STT state --------
 let streamingSTT = { you: null, them: null }; // streaming STT instances per channel
 let streamingMode = false; // true when using WebSocket streaming STT
@@ -67,10 +75,7 @@ async function flushChannel(channel) {
     if (!stt.available) {
       if (!session.sttDisabled) {
         session.sttDisabled = true;
-        send('status', {
-          message:
-            'No transcription key set. Add an OpenAI (Whisper) or Groq key in Settings to enable listening. Screen/LeetCode features work without it.'
-        });
+        send('status', STT_UNAVAILABLE);
       }
       return;
     }
@@ -297,6 +302,11 @@ async function setCapturing(active) {
     console.log('[onscreenly] capture started, mode:', streaming ? 'streaming' : 'batch');
     send('capture:state', { active: true, streaming: streamingMode, mode: streaming ? 'streaming' : 'batch' });
     send('slides:update', { count: 0, last: null });
+    // Say so now rather than when the first words go unheard.
+    if (!streaming && !createSTT(settings).available) {
+      session.sttDisabled = true;
+      send('status', STT_UNAVAILABLE);
+    }
     return true;
   }
 

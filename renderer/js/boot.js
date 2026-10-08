@@ -5,6 +5,7 @@ import { smartBtn, syncPlaceholder, updateSendButtonState } from './composer.js'
 import { applyOpacity } from './toolbar.js';
 import { setLiveDotState } from './transcript.js';
 import { updateSmartTooltip } from './settings-panel.js';
+import { paintReadiness } from './settings-form.js';
 import { OB_STEPS, publikStep, setWindows10, showOnboard } from './onboarding.js';
 
 export function init() {
@@ -30,6 +31,12 @@ export function init() {
     updateSendButtonState(); // Initialize send button state
 
     applyOpacity(state.settings.opacity, false);
+
+    // The empty state follows the setup. Whether a local model is downloaded is checked next; until
+    // then (or if it can't be read) it counts as ready, so nothing warns about what wasn't checked.
+    paintReadiness();
+    state.whisperOverview = await onscreenly.whisperModels().catch(() => null);
+    paintReadiness();
 
     const st = await onscreenly.captureState();
     setLiveDotState(st.active ? 'idle' : 'off');

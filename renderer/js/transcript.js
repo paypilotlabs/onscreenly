@@ -17,8 +17,9 @@ const DOT_TITLES = {
 function setLiveDotState(dotState) {
   const dot = document.getElementById('live-dot');
   if (!dot) return;
-  // A transcription error holds until the session ends, whatever the voice detector says.
-  const next = dotState !== 'off' && sttState === 'error' ? 'error' : dotState;
+  // A transcription error, or a session nothing can transcribe, holds until the session ends,
+  // whatever the voice detector says.
+  const next = dotState !== 'off' && (sttState === 'error' || sttState === 'unavailable') ? 'error' : dotState;
   dot.className = next;
   dot.title = DOT_TITLES[next] || '';
 }
@@ -32,8 +33,11 @@ const STT_LABELS = {
   batch: 'Listening',
   local: 'Listening',
   stopping: 'Stopping…',
-  error: 'Transcription error'
+  error: 'Transcription error',
+  unavailable: 'No speech-to-text'
 };
+const UNAVAILABLE_DETAIL =
+  'No speech-to-text is set up. Add a Deepgram, OpenAI, Groq or Gemini key, or download a local model, in Settings › Audio. Screen answers still work.';
 
 function setSttState(state) {
   sttState = state;
@@ -41,12 +45,20 @@ function setSttState(state) {
   if (!status) return;
   status.className = 'stt-status stt-' + state;
   status.querySelector('.stt-label').textContent = STT_LABELS[state];
-  if (state === 'error') setLiveDotState('error');
+  if (state === 'unavailable') status.title = UNAVAILABLE_DETAIL;
+  else status.removeAttribute('title');
+  if (state === 'error' || state === 'unavailable') setLiveDotState('error');
+  // A running session that nothing can transcribe shows the transcription setup instead of
+  // "Listening" (#panel[data-capture='no-stt']).
+  const panel = $('#panel');
+  if (panel.dataset.capture !== 'off') panel.dataset.capture = state === 'unavailable' ? 'no-stt' : 'on';
   fitActionRow();
 }
 
+// A session starting with no speech-to-text set up (#panel[data-listen='none']) says so at once.
 function updateSttStatus({ active, streaming } = {}) {
   if (active === false) setSttState('disconnected');
+  else if (active === true && $('#panel').dataset.listen === 'none') setSttState('unavailable');
   else if (active === true) setSttState(streaming ? 'connecting' : 'batch');
 }
 
@@ -98,6 +110,18 @@ function hideSidebar() {
   historyBtn.classList.remove('active');
   historyBtn.setAttribute('aria-expanded', 'false');
   sidebarOpen = false;
+  setClearConfirm(false);
+}
+
+// Clearing takes two clicks: the first asks again ("Click again to clear") for 3s.
+let clearConfirmTimer = null;
+function setClearConfirm(on) {
+  const button = $('#clear-transcript-btn');
+  clearTimeout(clearConfirmTimer);
+  button.classList.toggle('confirm', on);
+  button.querySelector('.ts-clear-label').textContent = on ? 'Click again to clear' : 'Clear transcript';
+  button.title = on ? 'Click again to clear the transcript' : 'Clear the transcript';
+  if (on) clearConfirmTimer = setTimeout(() => setClearConfirm(false), 3000);
 }
 
 function toggleSidebar() {
@@ -218,6 +242,7 @@ export {
   clearTranscriptSidebar,
   fitActionRow,
   hideSidebar,
+  setClearConfirm,
   setLiveDotState,
   setSttState,
   showSidebar,

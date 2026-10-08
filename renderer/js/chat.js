@@ -412,8 +412,10 @@ function clearTranscriptInterim() {
 // ---- toast helper ------------------------------------------------------
 // One toast at a time, centred under the toolbar; the latest replaces the last. While it shows, the
 // panel moves down by its height (overlay.css), so it never covers an answer. `tone` 'ok' adds a dot.
+// One line, cut with an ellipsis; `shown` is a shorter text for the screen, when the full message
+// is too long to read there (screen readers and the title still get all of it).
 let toastTimer = null;
-function showToast(message, ms, tone) {
+function showToast(message, ms, tone, shown = message) {
   let toast = document.getElementById('toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -423,7 +425,14 @@ function showToast(message, ms, tone) {
     document.getElementById('toolbar').appendChild(toast);
   }
   clearTimeout(toastTimer);
-  toast.textContent = message;
+  if (shown === message) {
+    toast.textContent = message;
+  } else {
+    const visible = document.createElement('span');
+    visible.setAttribute('aria-hidden', 'true');
+    visible.textContent = shown;
+    toast.replaceChildren(visible, createEl('span', 'sr-only', message));
+  }
   toast.title = message;
   if (tone) toast.dataset.tone = tone;
   else delete toast.dataset.tone;
