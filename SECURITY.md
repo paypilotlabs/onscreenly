@@ -4,11 +4,11 @@ Onscreenly is a desktop Electron app that can handle microphone audio, screen im
 
 ## Reporting a vulnerability
 
-The repository is currently private. Collaborators should contact the repository owner, [@squid-beast](https://github.com/squid-beast), through an existing private channel. If you do not have one, open an issue titled **Security contact requested**, without exploit details or sensitive attachments, to arrange a private conversation. Repository issues are visible to everyone with repository access.
+Report vulnerabilities privately through GitHub: open the repository's **Security** tab and choose **Report a vulnerability**. Do not open a public issue for a security problem.
 
 Do not include API keys, real transcripts, screenshots of private meetings, personal documents, or other people's data. A useful private report includes the affected commit/build, operating system, a minimal reproduction using synthetic data, prerequisites, expected/actual behavior, and impact. Coordinate disclosure of exploitable details with the maintainer.
 
-A monitored security contact, response targets, and supported-release window have not yet been established. The current `main` branch is the assessment baseline; this does not promise maintenance of older Cue or Onscreenly builds. Before public distribution, the owner must establish a private reporting route and release-support policy. GitHub's [private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/report-privately) is available for public repositories when enabled; this document does not claim it is enabled here.
+Reports are handled by the PayPilotLabs maintainers on a best-effort basis; there is no formal response-time commitment yet. Only the latest release and `main` receive fixes. Older Cue or Onscreenly builds are not maintained.
 
 ## System and scope
 
