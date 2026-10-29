@@ -12,7 +12,7 @@ First public release under the PayPilotLabs organization.
 - "Delete all my data" in Settings → API Keys.
 - A session shortcut (⌘/Ctrl ⇧ L) and visible listening, thinking and streaming states.
 - Redesigned overlay, Settings, onboarding and consent screens, with keyboard navigation and contrast checks in both themes.
-- Signed-free release builds for macOS, Windows and Linux, with `SHA256SUMS`, build-provenance attestations and an install guide.
+- Release builds for macOS, Windows and Linux, with `SHA256SUMS`, build-provenance attestations and an install guide.
 
 ### Changed
 - macOS meeting audio comes from a Core Audio tap instead of a screen capture, so it no longer competes with the meeting app's screen share.
