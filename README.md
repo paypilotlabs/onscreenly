@@ -14,6 +14,10 @@
 
 <img src="docs/design/screens/overlay-answer.png" alt="The Onscreenly overlay: a toolbar above an answer panel with a question, the answer, and buttons for What should I say, Assist and Recap" width="640">
 
+
+https://github.com/user-attachments/assets/3802e939-0d4b-49a7-ab7c-2d7b222afaa6
+
+
 </div>
 
 ## What it does
