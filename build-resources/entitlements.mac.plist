@@ -4,14 +4,13 @@
 <dict>
   <!-- Entitlements required for an Electron app under the hardened runtime
        (which notarization requires). These allow Chromium's JIT and the
-       dynamic libraries Electron loads. -->
+       dynamic libraries Electron loads. allow-dyld-environment-variables is
+       deliberately absent: it would let DYLD_INSERT_LIBRARIES inject code. -->
   <key>com.apple.security.cs.allow-jit</key>
   <true/>
   <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
   <true/>
   <key>com.apple.security.cs.disable-library-validation</key>
-  <true/>
-  <key>com.apple.security.cs.allow-dyld-environment-variables</key>
   <true/>
 
   <!-- Onscreenly transcribes the microphone. The hardened runtime withholds audio

@@ -479,7 +479,15 @@ export function init() {
     btn.addEventListener('click', () => runMode(btn.dataset.mode, ''));
   });
   messages.addEventListener('scroll', () => updateFades(messages), { passive: true });
+  // Scrolling back to read stops following the newest answer: with the wheel, the keyboard (the log
+  // takes focus, so arrows and Page Up/Down scroll it) or by grabbing the scrollbar.
   messages.addEventListener('wheel', () => (following = false), { passive: true });
+  messages.addEventListener('keydown', (e) => {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) following = false;
+  });
+  messages.addEventListener('pointerdown', (e) => {
+    if (e.target === messages) following = false; // the scrollbar belongs to the log itself
+  });
   // A rising answer overflows the log for a moment; check the fades again once it settles.
   messages.addEventListener('animationend', () => updateFades(messages));
   // The log shrinks when a banner or toast appears beside it: keep the same part of the answer in view.

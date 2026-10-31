@@ -66,7 +66,8 @@ function showStatus(message, button, tone = 'info') {
   void el.offsetWidth;
   el.classList.add('show');
   clearTimeout(statusTimer);
-  statusTimer = setTimeout(hideStatus, button ? 30000 : 11000);
+  // Warnings and errors stay until dismissed: they can need reading slowly, or with a screen reader.
+  if (tone === 'info') statusTimer = setTimeout(hideStatus, button ? 30000 : 11000);
 }
 
 function hideStatus() {

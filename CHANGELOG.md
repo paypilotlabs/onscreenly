@@ -2,6 +2,30 @@
 
 All notable changes to Onscreenly. Versions follow [Semantic Versioning](https://semver.org/); releases are published on the [Releases page](https://github.com/paypilotlabs/onscreenly/releases).
 
+## [Unreleased]
+
+### Added
+- Settings › API keys › Your data › Meeting history: keep the last 10, 25, 50 or 100 meetings, or none, and delete the history.
+- Stop an answer that is on its way (Send or Esc); answers cut off at the length limit say so.
+- Settings › Appearance › Keyboard shortcuts: change any global shortcut.
+- Answers come from your Obsidian notes first, in your own wording.
+
+### Changed
+- Global shortcuts no longer take keys other apps rely on: "What should I say?" is ⌘⌥↵ / Ctrl+Alt+Enter and LeetCode ⌘⌥K / Ctrl+Alt+K.
+- macOS opens without asking for permissions; the microphone and Screen Recording are asked for when first needed.
+- Answers never invent experience, employers or numbers; missing details are marked [X].
+
+### Fixed
+- One copy per profile; Settings saves can no longer erase saved keys, move the window back, or switch away from Ollama/Custom.
+- Meeting history is saved atomically and owner-only, a damaged file is kept and recovered, and deleting it is final.
+- Requests are cancelled on Stop and on timeouts; bad keys, unreachable providers and HTML error pages read clearly.
+- Audio queues are bounded, nothing is uploaded after a key is rejected, and Deepgram keeps audio while it connects.
+- Keyboard scrolling of answers, focus after a failed save and in onboarding, and banners that no longer vanish before they can be read.
+
+### Security
+- The packaged app turns off the Electron fuses that let it run as plain Node or accept NODE_OPTIONS and --inspect; the macOS entitlements no longer allow DYLD_* injection.
+- CI fails on high or critical advisories in shipped dependencies, and runs the quit check.
+
 ## [0.2.4] - 2026-10-29
 
 First public release under the PayPilotLabs organization.
@@ -16,7 +40,7 @@ First public release under the PayPilotLabs organization.
 
 ### Changed
 - macOS meeting audio comes from a Core Audio tap instead of a screen capture, so it no longer competes with the meeting app's screen share.
-- Upgraded Electron 33 to 44; `npm audit` reports no vulnerable packages.
+- Upgraded Electron 33 to 44; at release, `npm audit` reported no vulnerable runtime dependencies.
 - Résumé PDFs are parsed with current pdf.js.
 
 ### Security

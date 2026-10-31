@@ -73,6 +73,8 @@
       updateUI(await onscreenly.permissionsCheck());
     } catch (e) {
       onscreenly.log('permissions check error: ' + e);
+      // Never leave "Checking…" up for good: say the check failed, and how to retry.
+      for (const id of ['status-mic', 'status-screen']) $(id).textContent = 'Couldn’t check. Try Check again.';
     } finally {
       checkBtn.disabled = false;
       checkBtn.removeAttribute('aria-busy');
@@ -89,4 +91,8 @@
 
   paintCopy();
   checkPermissions();
+  // Back from System Settings: look again, so a permission just allowed shows at once.
+  window.addEventListener('focus', () => {
+    if (!checkBtn.disabled) checkPermissions();
+  });
 })();

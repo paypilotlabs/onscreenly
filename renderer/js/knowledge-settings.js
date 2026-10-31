@@ -9,8 +9,11 @@ function formatTime(ms) {
   return ms ? new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
 }
 
+let knownStatus = null;
+
 function renderStatus(status) {
   if (!status) return;
+  knownStatus = status;
   const hasVault = !!status.vaultPath;
   // A chosen vault reads in body text, with its note count as a tag once it has been indexed.
   $('.s-vault-card').classList.toggle('is-set', hasVault);
@@ -91,7 +94,15 @@ function renderResults(results) {
   if (!results.length) {
     const empty = document.createElement('div');
     empty.className = 's-note';
-    empty.textContent = 'No matching notes.';
+    // Say why nothing came back: no vault, notes off, still indexing, or a real search with no match.
+    empty.textContent =
+      knownStatus && !knownStatus.vaultPath
+        ? 'Choose a vault folder first.'
+        : knownStatus && !knownStatus.enabled
+          ? 'Notes are off. Tick “Search my notes” first.'
+          : knownStatus && knownStatus.indexing && !knownStatus.indexedAt
+            ? 'Still indexing your notes…'
+            : 'No matching notes.';
     host.append(empty);
     return;
   }

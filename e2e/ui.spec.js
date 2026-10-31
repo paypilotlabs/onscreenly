@@ -257,3 +257,25 @@ test('a global shortcut can be changed in Settings, and every hint follows it', 
   await page.click('#shortcut-reset');
   await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+Enter');
 });
+
+test('typed model names survive switching provider chips, and the answer log takes keyboard focus', async ({
+  launch
+}) => {
+  const { page } = await launch();
+  await page.click('#tb-settings-btn');
+  await page.click('#provider-seg button[data-provider="openai"]');
+  await page.fill('#model-fast', 'my-fast-model');
+  await page.click('#provider-seg button[data-provider="ollama"]');
+  await page.click('#provider-seg button[data-provider="openai"]');
+  await expect(page.locator('#model-fast')).toHaveValue('my-fast-model');
+  await closeSettings(page);
+  await expect(page.locator('#messages')).toHaveAttribute('tabindex', '0');
+});
+
+test('the Knowledge test search says to choose a vault when there is none', async ({ launch }) => {
+  const { page } = await launch();
+  await page.click('#tb-settings-btn');
+  await page.click('.s-tab[data-tab="knowledge"]');
+  await page.fill('#knowledge-test', 'checkout latency');
+  await expect(page.locator('#knowledge-results')).toContainText('Choose a vault folder first.');
+});

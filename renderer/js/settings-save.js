@@ -2,7 +2,7 @@
 import { state } from './state.js';
 import { $, onscreenly } from './core.js';
 import { clampOpacity } from './toolbar.js';
-import { updateSmartTooltip } from './settings-panel.js';
+import { selectTab, updateSmartTooltip } from './settings-panel.js';
 import { paintReadiness, setStatus, statusText } from './settings-form.js';
 import { readProfile } from './profile-settings.js';
 import { readKnowledge } from './knowledge-settings.js';
@@ -59,6 +59,11 @@ async function saveSettings() {
     0,
     Math.min(64, Number.parseInt($('#whisper-threads').value, 10) || 0)
   );
+  const adjusted = [];
+  if (String(state.settings.localWhisper.threads) !== $('#whisper-threads').value.trim()) {
+    adjusted.push(`CPU threads set to ${state.settings.localWhisper.threads || 'automatic'} (0–64)`);
+    $('#whisper-threads').value = String(state.settings.localWhisper.threads);
+  }
   // Slides (opt-in, memory-only)
   if (!state.settings.slides) state.settings.slides = {};
   const slidesEnabledEl = $('#slides-enabled');
@@ -67,6 +72,10 @@ async function saveSettings() {
   if (slidesIntervalEl) {
     const v = Number.parseInt(slidesIntervalEl.value, 10) || 3000;
     state.settings.slides.intervalMs = Math.max(1500, Math.min(15000, v));
+    if (String(state.settings.slides.intervalMs) !== slidesIntervalEl.value.trim()) {
+      adjusted.push(`slide check set to ${state.settings.slides.intervalMs} ms (1500–15000)`);
+      slidesIntervalEl.value = String(state.settings.slides.intervalMs);
+    }
   }
   // Profile and Knowledge tabs
   readProfile();
@@ -78,13 +87,23 @@ async function saveSettings() {
   if (opacitySlider) state.settings.opacity = clampOpacity(Number(opacitySlider.value) / 100);
   try {
     state.settings = await onscreenly.settingsSet(state.settings);
-    setStatus(`Saved · ${statusText()}`, 'ok');
+    $('#base-url').removeAttribute('aria-invalid');
+    // A value outside its range is saved at the nearest allowed one, and the status says so.
+    setStatus(adjusted.length ? `Saved · ${adjusted.join('; ')}` : `Saved · ${statusText()}`, 'ok');
     updateSmartTooltip();
     paintReadiness();
     return true;
   } catch (error) {
     setStatus(saveErrorText(error), 'error');
-    $('#base-url').focus();
+    // Only a base-URL error points at a field: show its tab, mark it and focus it. Otherwise focus
+    // stays where it was; the status line says what went wrong.
+    if (/Base URL/i.test(String(error && error.message))) {
+      selectTab('keys');
+      const field = $('#base-url');
+      field.setAttribute('aria-invalid', 'true');
+      field.setAttribute('aria-describedby', 's-status');
+      field.focus();
+    }
     return false;
   }
 }

@@ -164,6 +164,7 @@ export {
   onSettingsClosed,
   openSettings,
   scrim,
+  selectTab,
   updateAiRulesCounter,
   updateCustomProviderFields,
   updateSmartTooltip

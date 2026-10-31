@@ -2,6 +2,7 @@
 import { state } from './state.js';
 import { $, combo, onscreenly, shortcutKeys } from './core.js';
 import { isBusy, runMode, showToast } from './chat.js';
+import { topDialog } from './a11y.js';
 
 const input = $('#input');
 const placeholder = $('#placeholder');
@@ -411,7 +412,8 @@ export function init() {
   // FIX #13: Global keyboard shortcut for force-answer (Ctrl+Shift+A / Cmd+Shift+A)
   document.addEventListener('keydown', (e) => {
     // Ctrl+Shift+A / Cmd+Shift+A: Force answer current question immediately
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+    // Not while Settings, onboarding or a consent prompt is open: it would send from behind them.
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a' && !topDialog()) {
       e.preventDefault();
       if (input.value.trim()) {
         send();

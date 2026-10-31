@@ -17,6 +17,9 @@ on:
       - 'build-resources/**'
       - 'scripts/after-pack.js'
       - 'scripts/prepare-whisper-runtime.js'
+      # Electron and dependency bumps: run the macOS and Windows app tests and packaging before merge.
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
