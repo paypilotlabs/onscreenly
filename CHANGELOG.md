@@ -4,6 +4,8 @@ All notable changes to Onscreenly. Versions follow [Semantic Versioning](https:/
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-31
+
 ### Added
 - Settings › API keys › Your data › Meeting history: keep the last 10, 25, 50 or 100 meetings, or none, and delete the history.
 - Stop an answer that is on its way (Send or Esc); answers cut off at the length limit say so.
@@ -52,4 +54,5 @@ First public release under the PayPilotLabs organization.
 - Settings could be changed before startup had read them.
 - Obsidian notes written by the app weren't always picked up by the vault watcher.
 
+[0.2.5]: https://github.com/paypilotlabs/onscreenly/releases/tag/v0.2.5
 [0.2.4]: https://github.com/paypilotlabs/onscreenly/releases/tag/v0.2.4
