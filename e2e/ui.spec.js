@@ -241,19 +241,45 @@ test('a rejected API key offers Open settings, not Try again', async ({ launch }
 
 test('a global shortcut can be changed in Settings, and every hint follows it', async ({ launch }) => {
   const { page } = await launch();
-  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+Enter');
+  // Hints read ⌘⌥↵ on macOS and Ctrl+Alt+Enter elsewhere.
+  const mac = process.platform === 'darwin';
+  const sayDefault = mac ? '⌘⌥↵' : 'Ctrl+Alt+Enter';
+  const sayNew = mac ? '⌘⌥J' : 'Ctrl+Alt+J';
+  await expect(page.locator('#say-shortcut-hint')).toHaveText(sayDefault);
   await page.click('#tb-settings-btn');
   await page.click('.s-tab[data-tab="appearance"]');
   await page.click('#shortcut-say');
   await expect(page.locator('#shortcut-say')).toHaveText('Press keys…');
   await page.keyboard.press('Control+Alt+KeyJ');
   await expect(page.locator('#shortcut-note')).toHaveText(/^Saved/);
-  await expect(page.locator('#shortcut-say')).toHaveText('Ctrl+Alt+J');
-  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+J');
+  await expect(page.locator('#shortcut-say')).toHaveText(sayNew);
+  await expect(page.locator('#say-shortcut-hint')).toHaveText(sayNew);
   // One already used elsewhere is refused.
   await page.click('#shortcut-say');
   await page.keyboard.press('Control+Shift+KeyL');
   await expect(page.locator('#shortcut-note')).toHaveText(/Already used for listening/);
   await page.click('#shortcut-reset');
-  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+Enter');
+  await expect(page.locator('#say-shortcut-hint')).toHaveText(sayDefault);
+});
+
+test('typed model names survive switching provider chips, and the answer log takes keyboard focus', async ({
+  launch
+}) => {
+  const { page } = await launch();
+  await page.click('#tb-settings-btn');
+  await page.click('#provider-seg button[data-provider="openai"]');
+  await page.fill('#model-fast', 'my-fast-model');
+  await page.click('#provider-seg button[data-provider="ollama"]');
+  await page.click('#provider-seg button[data-provider="openai"]');
+  await expect(page.locator('#model-fast')).toHaveValue('my-fast-model');
+  await closeSettings(page);
+  await expect(page.locator('#messages')).toHaveAttribute('tabindex', '0');
+});
+
+test('the Knowledge test search says to choose a vault when there is none', async ({ launch }) => {
+  const { page } = await launch();
+  await page.click('#tb-settings-btn');
+  await page.click('.s-tab[data-tab="knowledge"]');
+  await page.fill('#knowledge-test', 'checkout latency');
+  await expect(page.locator('#knowledge-results')).toContainText('Choose a vault folder first.');
 });

@@ -240,6 +240,15 @@ export function init() {
   });
   document.querySelectorAll('#provider-seg button').forEach((b) =>
     b.addEventListener('click', () => {
+      // Keep the model names typed for the provider being left, so coming back shows them again.
+      const leaving = state.settings.provider;
+      if (leaving && leaving !== b.dataset.provider) {
+        state.settings.models[leaving] = {
+          ...(state.settings.models[leaving] || {}),
+          fast: $('#model-fast').value.trim(),
+          smart: $('#model-smart').value.trim()
+        };
+      }
       state.settings.provider = b.dataset.provider;
       pressChip('#provider-seg', (x) => x === b);
       updateCustomProviderFields();

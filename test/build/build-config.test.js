@@ -122,3 +122,21 @@ test('the publik files ship: they live under src/, which the files allowlist pac
   assert.ok(fs.existsSync(path.join(__dirname, '..', '..', 'src', 'integrations', 'publik.js')));
   assert.ok(fs.existsSync(path.join(__dirname, '..', '..', 'src', 'integrations', 'publik-build.json')));
 });
+
+test('the packaged app cannot be run as plain Node or opened to an inspector', () => {
+  const config = require('../../electron-builder.cjs');
+  assert.deepEqual(config.electronFuses, {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false
+  });
+});
+
+test('macOS entitlements never allow DYLD_* code injection', () => {
+  const plist = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', '..', 'build-resources', 'entitlements.mac.plist'),
+    'utf8'
+  );
+  assert.doesNotMatch(plist, /<key>com\.apple\.security\.cs\.allow-dyld-environment-variables<\/key>/);
+  assert.match(plist, /com\.apple\.security\.device\.audio-input/);
+});

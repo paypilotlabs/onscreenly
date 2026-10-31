@@ -98,5 +98,14 @@ module.exports = {
   },
   deb: {
     artifactName: '${productName}-${version}-linux-${arch}.${ext}'
+  },
+  // Electron fuses, flipped in the packaged binary. With the defaults a shipped Onscreenly would run
+  // as a plain Node interpreter (ELECTRON_RUN_AS_NODE=1) and honour NODE_OPTIONS and --inspect, so
+  // anything that can set its environment or arguments could run code with its permissions
+  // (microphone, screen recording, keys). Nothing in the app uses them.
+  electronFuses: {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false
   }
 };

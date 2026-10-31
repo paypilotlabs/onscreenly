@@ -38,7 +38,7 @@
       <div id="panel" class="glass no-drag" data-setup="false" data-listen="ready" data-capture="off">
         <div id="panel-columns">
           <div id="panel-main">
-            <div id="messages" role="log" aria-live="polite" aria-label="Answers"></div>
+            <div id="messages" role="log" aria-live="polite" aria-label="Answers" tabindex="0"></div>
             <!-- Shown while #messages is empty. #panel[data-setup|data-listen|data-capture] picks the variant. -->
             <div id="empty-state" class="empty-state">
               <div class="es-variant es-setup">
@@ -341,7 +341,7 @@
         <section class="s-group">
           <div class="s-group-head"><label class="s-eyebrow" for="knowledge-test">Test search</label><span class="s-hint">See which notes a question would use</span></div>
           <input class="field" id="knowledge-test" type="text" placeholder="e.g. How did I scale the payments service?" autocomplete="off" spellcheck="false" />
-          <div id="knowledge-results" class="k-results"></div>
+          <div id="knowledge-results" class="k-results" aria-live="polite"></div>
           <p class="s-help">With notes on, the best-matching excerpts (about 3,000 characters at most) are sent to your AI provider with each question. Recap and coding solves never use them.</p>
         </section>
       </div>

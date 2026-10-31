@@ -396,6 +396,11 @@ function renderOnboard() {
   next.classList.toggle('hidden', !!step.hideNext);
   $('#ob-back').style.visibility = obIndex === 0 ? 'hidden' : 'visible';
   $('#ob-skip').style.visibility = last ? 'hidden' : 'visible';
+  // Back to step 1 (or on to the last step) hides the button that has focus: move focus to Next.
+  const active = document.activeElement;
+  if (active && (active.id === 'ob-back' || active.id === 'ob-skip') && active.style.visibility === 'hidden') {
+    next.focus({ preventScroll: true });
+  }
   $('#ob-count').textContent = `Step ${obIndex + 1} of ${OB_STEPS.length}`;
   const dots = $('#ob-dots');
   dots.innerHTML = '';
