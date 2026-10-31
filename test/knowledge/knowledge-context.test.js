@@ -106,3 +106,27 @@ test('the window cannot set the vault folder or the on/off switch through a gene
   assert.equal(k.enabled, true, 'a general Save cannot switch notes off; knowledge:set-enabled does');
   assert.deepEqual(k.exclude, ['Daily']);
 });
+
+test('notes answer the question in the user’s own words, or the answer says what is missing', () => {
+  const block = notesBlock(
+    [
+      {
+        relPath: 'My java interview facts.md',
+        title: 'My java interview facts',
+        heading: 'Streams',
+        text: 'I used streams to…'
+      }
+    ],
+    'c0ffee'
+  );
+  assert.match(block, /If a note answers the question, answer from it: keep its facts and the user’s own wording/);
+  assert.match(block, /STAR answer \(Situation → Task → Action → Result\) built only from these notes/);
+  assert.match(block, /\[X\] for any detail they do not give; never invent one/);
+  assert.match(block, /in the voice of these notes/);
+});
+
+test('the old default notes budget moves to the new one; a different value is kept', () => {
+  assert.equal(DEFAULT_KNOWLEDGE.maxChars, 6000);
+  assert.equal(normalizeKnowledge({ maxChars: 3000 }).maxChars, 6000);
+  assert.equal(normalizeKnowledge({ maxChars: 2500 }).maxChars, 2500);
+});

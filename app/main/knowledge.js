@@ -121,7 +121,7 @@ async function retrieveNotes(mode, ctx) {
   const query = notesQuery(mode, ctx);
   if (!query.trim()) return empty;
   if (!stopWatching && Date.now() - target.status().indexedAt > STALE_MS) await reindex();
-  const results = target.search(query, { limit: 5, maxChars: knowledgeSettings().maxChars });
+  const results = target.search(query, { limit: 6, maxChars: knowledgeSettings().maxChars });
   // A fresh marker per question, so a note cannot fake the end of the block.
   const marker = crypto.randomBytes(6).toString('hex');
   return { block: notesBlock(results, marker), sources: sourcesOf(results) };
