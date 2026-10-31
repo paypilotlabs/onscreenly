@@ -132,12 +132,13 @@ const SHORTCUTS = [
   ['What should I say?', 'say'],
   ['Assist', 'assist'],
   ['Solve the coding problem on screen', 'leetcode'],
+  ['Add screen of a long problem, then solve', 'leetcodeAdd'],
   ['Hide or show', 'hide']
 ];
 
 const OB_STEPS = [
   {
-    hero: true,
+    eyebrow: 'Getting started',
     title: 'Welcome to Onscreenly',
     lede: 'A quiet AI copilot that floats over your screen.',
     body: () =>
@@ -361,7 +362,6 @@ function renderOnboard() {
   const step = OB_STEPS[obIndex];
   const last = obIndex === OB_STEPS.length - 1;
   const ob = $('#onboard');
-  ob.classList.toggle('is-hero', !!step.hero);
   // The publik card has its own two buttons and no Next/Skip: leaving it any
   // other way would spend the starter without the card being acknowledged.
   ob.classList.toggle('card', !!step.publikCard);

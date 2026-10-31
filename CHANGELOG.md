@@ -14,6 +14,7 @@ All notable changes to Onscreenly. Versions follow [Semantic Versioning](https:/
 - Answers come from your Obsidian notes first, in your own wording.
 
 ### Changed
+- The guide (first run and Help) is part of the overlay: it opens in the answer panel's place under the toolbar, in the same dark theme, instead of a light card over a grey box. It also lists the Add screen shortcut.
 - Global shortcuts no longer take keys other apps rely on: "What should I say?" is ⌘⌥↵ / Ctrl+Alt+Enter and LeetCode ⌘⌥K / Ctrl+Alt+K.
 - macOS opens without asking for permissions; the microphone and Screen Recording are asked for when first needed.
 - Answers never invent experience, employers or numbers; missing details are marked [X].

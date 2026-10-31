@@ -647,13 +647,14 @@ test('backdrop-filter appears only on the three scrims', () => {
   assert.ok(seen > 0, 'the scrims blur what is behind them');
 });
 
-test('the serif display type and the hero gradient appear only on the onboarding welcome', () => {
-  const ONLY = {
-    '--type-display': '#onboard.is-hero #ob-title',
-    '--type-display-track': '#onboard.is-hero #ob-title',
-    '--gradient-hero': '#onboard.is-hero .ob-head'
-  };
+// The guide (onboarding, Help) is part of the dark overlay, so the serif display type and the hero
+// band it used to open with stay in tokens.css (and the design prototype) only.
+test('the app never uses the serif display type or the hero gradients', () => {
+  const ONLY = {};
   const NEVER = [
+    '--type-display',
+    '--type-display-track',
+    '--gradient-hero',
     '--gradient-hero-alt',
     '--ts-5xl-3',
     '--ts-5xl-3-track',
