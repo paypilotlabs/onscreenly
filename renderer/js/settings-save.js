@@ -44,8 +44,10 @@ async function saveSettings() {
   // this, `settings.provider` stays on its default ('openai') forever and
   // Onscreenly keeps reporting itself unconfigured even though a valid key was
   // saved for the provider the user actually meant to use.
-  if (!state.settings.apiKeys[state.settings.provider]) {
-    const keyedProviders = ['cerebras', 'openai', 'anthropic', 'gemini', 'groq', 'minimax', 'deepseek', 'azure'];
+  // Only from a provider that needs a key: Ollama, Custom and publik work without one, and saving
+  // must never move the user off them.
+  const keyedProviders = ['cerebras', 'openai', 'anthropic', 'gemini', 'groq', 'minimax', 'deepseek', 'azure'];
+  if (keyedProviders.includes(state.settings.provider) && !state.settings.apiKeys[state.settings.provider]) {
     const justFilled = keyedProviders.find((p) => state.settings.apiKeys[p]);
     if (justFilled) state.settings.provider = justFilled;
   }
