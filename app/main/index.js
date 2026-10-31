@@ -34,7 +34,7 @@ const {
   createPermissionsWindow,
   registerPermissionsIpc
 } = require('./permissions');
-const { registerShortcuts } = require('./shortcuts');
+const { registerShortcuts, registerShortcutsIpc } = require('./shortcuts');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
 const { configure: configureKnowledge, registerKnowledgeIpc, stopKnowledge } = require('./knowledge');
@@ -71,6 +71,7 @@ app.on('web-contents-created', (_event, contents) => {
 registerAppIpc();
 registerKnowledgeIpc();
 registerMeetingHistoryIpc();
+registerShortcutsIpc();
 registerPublikIpc();
 registerCaptureIpc();
 registerWhisperIpc();
@@ -196,8 +197,8 @@ app.whenReady().then(async () => {
   const keyStorage = await store.initSecureStorage(safeStorageBackend);
   console.log(`[onscreenly] API key storage: ${keyStorage.mode}`);
 
-  // macOS asks for both permissions here and, while one is missing, shows the permissions window
-  // first, with the dock visible so the user can find the app. Windows has no OS-level modal
+  // macOS starts straight away and asks for the microphone when a session starts and for Screen
+  // Recording when a screen feature first runs, so text-only use needs neither. Windows has no OS-level modal
   // permission dialog to block startup on (no askForMediaAccess() equivalent; the mic toggle lives in
   // Settings), so it never withholds the overlay: on a first run onboarding's permissions step asks,
   // and a returning user whose mic is off gets the window beside the overlay instead of no way at all
@@ -206,7 +207,9 @@ app.whenReady().then(async () => {
   const plan = permissionGatePlan({
     platform: process.platform,
     onboarded: !!store.getSettings().onboarded,
-    allGranted: await requestPermissions()
+    // Only Windows looks at permissions at launch (its window beside the overlay). macOS asks for
+    // each permission when it is first needed, so launch prompts for nothing there.
+    allGranted: process.platform === 'win32' ? await requestPermissions() : true
   });
   if (plan === 'gate') {
     createPermissionsWindow();

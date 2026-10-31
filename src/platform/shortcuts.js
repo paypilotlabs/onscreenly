@@ -2,22 +2,23 @@
 // Configurable global shortcuts. Kept dependency-free so it is unit-testable.
 // Accelerator strings follow Electron's format, e.g. 'CommandOrControl+Return'.
 
+// Global shortcuts work in every app while Onscreenly runs, so the defaults avoid combinations other
+// apps rely on: ⌘↵ sends in Slack/Teams and runs a cell in Jupyter, and ⌘H is macOS's Hide.
 const DEFAULTS = {
-  say: 'CommandOrControl+Return',
+  say: 'CommandOrControl+Alt+Return',
   assist: 'CommandOrControl+Shift+Return',
-  leetcode: 'CommandOrControl+H',
-  quit: 'CommandOrControl+Shift+X',
-  hide: 'Shift+Q', // Windows-only convenience (no Cmd key)
+  leetcode: 'CommandOrControl+Alt+K',
+  hide: 'CommandOrControl+Shift+/',
   listening: 'CommandOrControl+Shift+L',
-  passthrough: 'CommandOrControl+Shift+I',
-  screen: 'CommandOrControl+Shift+S'
+  quit: 'CommandOrControl+Shift+X'
 };
 
-// Every action that maps to a shortcut. Values = defaults; can be overridden via settings.
+// Every action that maps to a shortcut. Values = defaults; overrides from settings win when valid.
 function resolveShortcuts(overrides = {}) {
   const out = {};
   for (const [action, def] of Object.entries(DEFAULTS)) {
-    const v = (overrides && overrides[action]) || def;
+    const v =
+      overrides && typeof overrides[action] === 'string' && isValid(overrides[action]) ? overrides[action] : def;
     out[action] = v;
   }
   return out;

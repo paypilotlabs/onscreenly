@@ -1,6 +1,6 @@
 // First-run onboarding and the publik disclosure/card dialogs.
 import { state } from './state.js';
-import { $, isMac, isWindows, kbd, onscreenly, setButtonKind } from './core.js';
+import { $, isMac, isWindows, kbd, onscreenly, setButtonKind, shortcutKeys } from './core.js';
 import { esc } from './chat.js';
 import { rememberOpener, restoreFocus, safeFocus, topDialog } from './a11y.js';
 import { onSettingsClosed, openSettings } from './settings-panel.js';
@@ -126,12 +126,13 @@ function providerBody() {
   );
 }
 
+// The global shortcuts, by action: their keys come from the user's settings (core.js).
 const SHORTCUTS = [
-  ['Start or end a session', ['mod', 'shift', 'L']],
-  ['What should I say?', ['mod', '↵']],
-  ['Assist', ['mod', 'shift', '↵']],
-  ['Solve the coding problem on screen', ['mod', 'H']],
-  ['Hide or show', ['mod', 'shift', '/']]
+  ['Start or end a session', 'listening'],
+  ['What should I say?', 'say'],
+  ['Assist', 'assist'],
+  ['Solve the coding problem on screen', 'leetcode'],
+  ['Hide or show', 'hide']
 ];
 
 const OB_STEPS = [
@@ -158,7 +159,9 @@ const OB_STEPS = [
       return permissionsView().allOk ? 'Microphone and screen recording are on' : 'Let Onscreenly see and hear';
     },
     get lede() {
-      return permissionsView().allOk ? '' : 'Onscreenly needs to hear the conversation and see your screen to answer.';
+      return permissionsView().allOk
+        ? ''
+        : 'Live answers need to hear the conversation and see your screen. Typing a question or preparing your résumé works without either, and you can allow them later.';
     },
     body: permissionsBody
   },
@@ -186,7 +189,7 @@ const OB_STEPS = [
       '<div class="ob-rows ws-rows ob-keys">' +
       SHORTCUTS.map(
         ([label, keys]) =>
-          `<div class="ws-row ob-key-row"><span class="ob-key-label">${label}</span><span class="ob-keycaps">${kbd(...keys)}</span></div>`
+          `<div class="ws-row ob-key-row"><span class="ob-key-label">${label}</span><span class="ob-keycaps">${kbd(...shortcutKeys(keys))}</span></div>`
       ).join('') +
       '</div>',
     buttons: [

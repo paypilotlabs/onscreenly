@@ -1,6 +1,6 @@
 // The question box: smart auto-fill from speech, question history, sending and keyboard shortcuts.
 import { state } from './state.js';
-import { $, combo, onscreenly } from './core.js';
+import { $, combo, onscreenly, shortcutKeys } from './core.js';
 import { isBusy, runMode, showToast } from './chat.js';
 
 const input = $('#input');
@@ -111,7 +111,9 @@ function updateSendButtonState() {
 
   sendBtn.classList.toggle('ready', hasText && isReady);
   sendBtn.classList.toggle('has-text', hasText);
-  sendBtn.title = hasText ? `Send (${combo('↵')})` : `Assist · looks at your screen (${combo('mod', 'shift', '↵')})`;
+  sendBtn.title = hasText
+    ? `Send (${combo('↵')})`
+    : `Assist · looks at your screen (${combo(...shortcutKeys('assist'))})`;
 }
 
 // ---- Live speech as ghost text ----

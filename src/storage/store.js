@@ -107,6 +107,9 @@ const DEFAULTS = {
   // How many meetings to keep (0 = don't save meeting history). Changed through the
   // meetings:set-retention IPC, which confirms before deleting anything.
   meetingHistory: { keep: 50 },
+  // Global shortcuts the user changed (action -> Electron accelerator); the rest use the defaults in
+  // src/platform/shortcuts.js. Written through the shortcuts:set IPC, which validates them.
+  shortcuts: {},
   // Window position
   windowX: null,
   windowY: null,
@@ -155,7 +158,8 @@ const RENDERER_READ_ONLY = [
   'applinkSlidesConsentByApp',
   'windowX',
   'windowY',
-  'meetingHistory'
+  'meetingHistory',
+  'shortcuts'
 ];
 // Settings the renderer may write that have no default of their own (absent until first set).
 const RENDERER_EXTRA_FIELDS = { onboarded: false, sttModel: '', resumeContext: '' };

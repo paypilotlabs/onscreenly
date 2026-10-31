@@ -37,11 +37,13 @@ Keyboard shortcuts:
 |---|---|---|
 | Start or end a session | ⌘ ⇧ L | Ctrl Shift L |
 | Stop an answer that is on its way (or click Send) | Esc | Esc |
-| What should I say? | ⌘ Enter | Ctrl Enter |
+| What should I say? | ⌘ ⌥ Enter | Ctrl Alt Enter |
 | Assist | ⌘ ⇧ Enter | Ctrl Shift Enter |
-| Solve the coding problem on screen | ⌘ H | Ctrl H |
+| Solve the coding problem on screen | ⌘ ⌥ K | Ctrl Alt K |
 | Collapse / expand the answer panel | ⌘ ⇧ / | Ctrl Shift / |
 | Quit | ⌘ ⇧ X | Ctrl Shift X |
+
+These work in every app while Onscreenly runs. Change any of them in **Settings › Appearance › Keyboard shortcuts**; a combination another app already holds is refused.
 
 ## Install
 

@@ -26,13 +26,13 @@ If you prefer Terminal, this does the same as steps 2–3:
 xattr -dr com.apple.quarantine /Applications/Onscreenly.app
 ```
 
-Then grant the permissions Onscreenly asks for:
+Onscreenly opens without asking for anything: typing a question and résumé preparation need no permission. It asks for each one the first time a feature needs it:
 
-- **Microphone**, to transcribe you.
-- **Screen & System Audio Recording**, for screenshots.
+- **Microphone**, when you start a session, to transcribe you.
+- **Screen & System Audio Recording**, the first time an answer looks at your screen.
 - **System Audio Recording Only** (in the same pane), only if you switch on Meeting audio in Settings → Audio, to hear the other side of a call. macOS asks the first time a session starts with it on.
 
-Grant them in **System Settings → Privacy & Security**, then quit and reopen Onscreenly. The builds are ad-hoc signed: the signature is valid but does not identify a developer. After an update, macOS may ask for these permissions again.
+If you said no, allow them in **System Settings → Privacy & Security**, then quit and reopen Onscreenly. The builds are ad-hoc signed: the signature is valid but does not identify a developer. After an update, macOS may ask for these permissions again.
 
 ## Windows 10 and 11
 

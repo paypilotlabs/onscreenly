@@ -8,11 +8,10 @@ const { permissionGatePlan } = require('../../app/main/permissions');
 
 const plan = (platform, onboarded, allGranted) => permissionGatePlan({ platform, onboarded, allGranted });
 
-test('macOS gates launch on the permissions window whenever a permission is missing', () => {
-  assert.equal(plan('darwin', false, false), 'gate');
-  assert.equal(plan('darwin', true, false), 'gate');
-  assert.equal(plan('darwin', false, true), 'none');
-  assert.equal(plan('darwin', true, true), 'none');
+test('macOS never holds the app behind the permissions window: text-only use needs no permission', () => {
+  for (const onboarded of [false, true]) {
+    for (const allGranted of [false, true]) assert.equal(plan('darwin', onboarded, allGranted), 'none');
+  }
 });
 
 test('Windows never shows two windows on first run, and puts the window beside the overlay later', () => {

@@ -31,7 +31,10 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 
 - [ ] Type a question and press Enter: an answer streams in.
 - [ ] **Assist** (Command/Ctrl+Shift+Enter) answers about what is on screen.
-- [ ] **Solve the coding problem on screen** (Command/Ctrl+H) on a LeetCode page returns a solution.
+- [ ] **Solve the coding problem on screen** (⌘⌥K / Ctrl+Alt+K) on a LeetCode page returns a solution.
+- [ ] ⌘↵ in Slack or Teams and ⌘H on macOS still do what those apps expect while Onscreenly runs.
+- [ ] Settings › Appearance › Keyboard shortcuts: a new combination works at once in other apps, and the hints update; one already used is refused.
+- [ ] macOS, fresh install: the overlay opens without asking for any permission; starting a session asks for the microphone, and the first screen answer asks for Screen Recording.
 - [ ] Turn **Smart** on: the answer uses the smart model (slower, longer).
 
 ## 4. Listening

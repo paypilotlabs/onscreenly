@@ -238,3 +238,22 @@ test('a rejected API key offers Open settings, not Try again', async ({ launch }
     await mock.close();
   }
 });
+
+test('a global shortcut can be changed in Settings, and every hint follows it', async ({ launch }) => {
+  const { page } = await launch();
+  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+Enter');
+  await page.click('#tb-settings-btn');
+  await page.click('.s-tab[data-tab="appearance"]');
+  await page.click('#shortcut-say');
+  await expect(page.locator('#shortcut-say')).toHaveText('Press keys…');
+  await page.keyboard.press('Control+Alt+KeyJ');
+  await expect(page.locator('#shortcut-note')).toHaveText(/^Saved/);
+  await expect(page.locator('#shortcut-say')).toHaveText('Ctrl+Alt+J');
+  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+J');
+  // One already used elsewhere is refused.
+  await page.click('#shortcut-say');
+  await page.keyboard.press('Control+Shift+KeyL');
+  await expect(page.locator('#shortcut-note')).toHaveText(/Already used for listening/);
+  await page.click('#shortcut-reset');
+  await expect(page.locator('#say-shortcut-hint')).toHaveText('Ctrl+Alt+Enter');
+});

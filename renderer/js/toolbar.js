@@ -1,6 +1,6 @@
 // Toolbar controls: collapse/expand, opacity, start/end session and clearing the transcript.
 import { state } from './state.js';
-import { $, combo, onscreenly, setSessionButton } from './core.js';
+import { $, combo, onscreenly, setSessionButton, shortcutKeys } from './core.js';
 import { showToast } from './chat.js';
 import { hardClearSTTFill, inputFromSTT } from './composer.js';
 import { startSystemAudio, stopSystemAudio } from './audio.js';
@@ -22,7 +22,7 @@ function toggleHide() {
   const text = collapsed ? 'Show' : 'Hide';
   btn.classList.toggle('collapsed', collapsed);
   btn.querySelector('.tb-hide-label').textContent = text;
-  btn.title = `${text} (${combo('mod', 'shift', '/')})`;
+  btn.title = `${text} (${combo(...shortcutKeys('hide'))})`;
   btn.setAttribute('aria-label', text);
   btn.setAttribute('aria-expanded', String(!collapsed));
   if (collapsed) {
