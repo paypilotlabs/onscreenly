@@ -1,6 +1,6 @@
 {
   "name": "onscreenly",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Onscreenly: an open-source AI overlay for screen context, microphone transcription, and meeting assistance.",
   "license": "GPL-3.0-or-later",
   "author": "Lohith Kumar <lkneerukonda@gmail.com>",
