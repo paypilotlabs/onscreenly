@@ -243,6 +243,9 @@ class OpenAIRealtimeSTT {
 // Ultra-low latency, supports interim results, speaker diarization, punctuation
 // ============================================================================
 
+// About 10 s of 16 kHz mono audio in the renderer's ~100 ms chunks.
+const DEEPGRAM_MAX_PENDING_CHUNKS = 100;
+
 class DeepgramStreamingSTT {
   constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
@@ -260,6 +263,9 @@ class DeepgramStreamingSTT {
     this._keepAliveInterval = null;
     this._committed = ''; // is_final segments not yet closed out by speech_final
     this._closedByUs = false; // disconnect() was called: ignore the socket's dying breaths, never reconnect
+    // Audio that arrives while the socket connects or reconnects, sent once it opens (at most
+    // DEEPGRAM_MAX_PENDING_CHUNKS, the newest kept) instead of being dropped.
+    this._pendingAudio = [];
   }
 
   async connect() {
@@ -294,6 +300,9 @@ class DeepgramStreamingSTT {
         this.connected = true;
         this._reconnectAttempts = 0;
         this.onStatusChange('connected');
+        const pending = this._pendingAudio;
+        this._pendingAudio = [];
+        for (const chunk of pending) ws.send(chunk);
         // Keep-alive every 3 seconds to prevent timeout
         this._clearKeepAlive();
         this._keepAliveInterval = setInterval(() => {
@@ -375,7 +384,11 @@ class DeepgramStreamingSTT {
   sendAudio(pcmBuffer) {
     if (this.ws && this.ws.readyState === 1) {
       this.ws.send(Buffer.from(pcmBuffer));
+      return;
     }
+    if (this._closedByUs) return;
+    this._pendingAudio.push(Buffer.from(pcmBuffer));
+    if (this._pendingAudio.length > DEEPGRAM_MAX_PENDING_CHUNKS) this._pendingAudio.shift();
   }
 
   _clearKeepAlive() {
@@ -402,6 +415,7 @@ class DeepgramStreamingSTT {
   }
 
   disconnect() {
+    this._pendingAudio = [];
     this._closedByUs = true;
     if (this._reconnectTimer) {
       clearTimeout(this._reconnectTimer);

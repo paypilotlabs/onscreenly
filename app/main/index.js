@@ -24,7 +24,7 @@ const { session, send, MAX_TRANSCRIPT_TURNS } = require('./session');
 const { getWin, createWindow, registerWindowIpc } = require('./window');
 const { initWhisper, shutdownWhisper, registerWhisperIpc } = require('./whisper');
 const { stopSlideLoop, listSlides, registerSlidesIpc } = require('./slides');
-const { setCapturing, registerCaptureIpc } = require('./capture');
+const { requestCapture, registerCaptureIpc } = require('./capture');
 const { publikBuild, registerPublikIpc } = require('./publik-controller');
 const {
   hasPermissionsWindow,
@@ -145,7 +145,8 @@ function launchApp() {
       windowAlive: !!(getWin() && !getWin().isDestroyed()),
       slides: listSlides()
     }),
-    setCapturing,
+    // Through the same queue as the button, so the next press toggles from the right state.
+    setCapturing: requestCapture,
     getSlides: () => listSlides(),
     getSlidesConsent: (callerId) => store.getSlidesConsent(callerId),
     setSlidesConsent: (callerId, decision) => store.setSlidesConsent(callerId, decision),

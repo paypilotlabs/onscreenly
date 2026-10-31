@@ -72,7 +72,14 @@ async function startLocalWhisper(settings) {
       onSpeechState: (channel, speaking, durationMs) => {
         send('vad:state', { channel, speaking, durationMs });
       },
-      onStatus: (status) => send('stt:status', { provider: 'local', ...status }),
+      onStatus: (status) => {
+        // Falling behind is said once, as a banner; the speech status itself stays "transcribing".
+        if (status.status === 'behind') {
+          send('status', { message: status.message });
+          return;
+        }
+        send('stt:status', { provider: 'local', ...status });
+      },
       onError: (error) => {
         session.sttDisabled = true;
         console.log('[local-whisper] error', error && error.message);

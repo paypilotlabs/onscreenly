@@ -21,6 +21,9 @@ const buffers = { you: [], them: [] };
 const FLUSH_MS = 900;
 const MIN_BYTES = Math.floor(16000 * 2 * 0.12); // ~0.12s
 const RMS_GATE = 180;
+// Batch audio waiting for the next flush, per channel: 20 s of 16 kHz mono. A flush that is slow
+// or stuck must not let audio pile up without limit; past it the oldest audio is dropped.
+const MAX_BUFFERED_BYTES = 16000 * 2 * 20;
 let flushTimer = null;
 let desiredCaptureState = false;
 let captureTransition = Promise.resolve(false);
@@ -60,6 +63,11 @@ const ringBuffers = {
 
 // -------- STT flushing (batch mode fallback) --------
 async function flushChannel(channel) {
+  // Transcription was switched off (a rejected key, no provider): never upload audio again.
+  if (session.sttDisabled) {
+    buffers[channel] = [];
+    return;
+  }
   if (state.transcribing[channel]) return;
   const chunks = buffers[channel];
   if (!chunks.length) return;
@@ -253,10 +261,22 @@ function routeAudio(channel, pcmBuffer) {
   if (streamingMode && streamingSTT[channel]) {
     // Streaming mode: send raw PCM directly to the WebSocket
     streamingSTT[channel].sendAudio(pcmBuffer);
-  } else {
-    // Batch mode: accumulate in buffers for periodic flush
-    buffers[channel].push(buf);
+  } else if (!session.sttDisabled) {
+    // Batch mode: accumulate in buffers for periodic flush, keeping only the newest audio when
+    // nothing is draining it (no flush loop, or a slow provider).
+    const queue = buffers[channel];
+    queue.push(buf);
+    let bytes = queue.reduce((n, b) => n + b.length, 0);
+    while (bytes > MAX_BUFFERED_BYTES && queue.length > 1) bytes -= queue.shift().length;
   }
+}
+
+// Start or stop listening from anywhere (the button, the shortcut, a program using app-link): each
+// request is queued behind the last, so they apply in order and the button stays in step.
+function requestCapture(active) {
+  desiredCaptureState = !!active;
+  captureTransition = captureTransition.catch(() => state.capturing).then(() => setCapturing(!!active));
+  return captureTransition;
 }
 
 // -------- capture toggle --------
@@ -348,13 +368,11 @@ async function setCapturing(active) {
 function registerCaptureIpc() {
   handle('capture:toggle', () => {
     const targetState = !desiredCaptureState;
-    desiredCaptureState = targetState;
     const localWhisperTranscriber = whisper.getTranscriber();
     if (!targetState && !state.capturing && localWhisperTranscriber) {
       localWhisperTranscriber.forceStop().catch(() => {});
     }
-    captureTransition = captureTransition.catch(() => state.capturing).then(() => setCapturing(targetState));
-    return captureTransition;
+    return requestCapture(targetState);
   });
   handle('capture:state', () => ({ active: state.capturing }));
   on('mic:pcm', (_e, arrayBuffer) => {
@@ -365,4 +383,4 @@ function registerCaptureIpc() {
   });
 }
 
-module.exports = { setCapturing, registerCaptureIpc };
+module.exports = { setCapturing, requestCapture, registerCaptureIpc };

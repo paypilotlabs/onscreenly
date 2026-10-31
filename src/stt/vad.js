@@ -104,11 +104,10 @@ class AdaptiveVAD {
         } else {
           this.silenceFrameCount++;
           if (this.silenceFrameCount >= this.silenceFrames) {
-            // Confirmed end of speech
-            const wasSpeech = this.speechFrameCount >= this.minSpeechFrames;
-            if (wasSpeech) {
-              this.onSpeechEnd(this.speechFrameCount * this.frameDurationMs);
-            }
+            // Confirmed end of speech. A blip too short to be speech still ends what onSpeechStart
+            // began (marked short), or listeners would show "speaking" and collect audio forever.
+            const short = this.speechFrameCount < this.minSpeechFrames;
+            this.onSpeechEnd(this.speechFrameCount * this.frameDurationMs, { short });
             this.state = 'silence';
             this.speechFrameCount = 0;
             this.silenceFrameCount = 0;

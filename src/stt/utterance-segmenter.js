@@ -39,7 +39,7 @@ class UtteranceSegmenter {
       sampleRate,
       ...vadOptions,
       onSpeechStart: () => this._beginUtterance(),
-      onSpeechEnd: (durationMs) => this._requestUtteranceEnd(durationMs)
+      onSpeechEnd: (durationMs, info) => this._requestUtteranceEnd(durationMs, info)
     });
   }
 
@@ -52,6 +52,7 @@ class UtteranceSegmenter {
 
     this.startedDuringPush = false;
     this.endedDuringPush = false;
+    this.discardDuringPush = false;
     const wasCollecting = this.collecting;
 
     if (!wasCollecting) this.ringBuffer.write(chunk);
@@ -59,7 +60,19 @@ class UtteranceSegmenter {
 
     // A chunk that triggered speech start is already present in the pre-roll.
     if (wasCollecting) this._appendChunk(chunk);
-    if (this.endedDuringPush) this._finalizeUtterance();
+    if (this.endedDuringPush) {
+      if (this.discardDuringPush) this._discardUtterance();
+      else this._finalizeUtterance();
+    }
+  }
+
+  _discardUtterance() {
+    this.collecting = false;
+    this.endedDuringPush = false;
+    this.discardDuringPush = false;
+    this.utteranceChunks = [];
+    this.utteranceBytes = 0;
+    this.ringBuffer.clear();
   }
 
   stop() {
@@ -87,8 +100,10 @@ class UtteranceSegmenter {
     this.onSpeechState(this.channel, true);
   }
 
-  _requestUtteranceEnd(durationMs) {
+  _requestUtteranceEnd(durationMs, info) {
     this.endedDuringPush = true;
+    // A noise blip, not speech: drop what was collected rather than transcribe it.
+    if (info && info.short) this.discardDuringPush = true;
     this.onSpeechState(this.channel, false, durationMs);
   }
 

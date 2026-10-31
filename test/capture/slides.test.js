@@ -73,6 +73,24 @@ test('shouldEmitSlide debounces flicker until stable', () => {
   assert.strictEqual(r.emit, true);
 });
 
+test('after a slide is emitted, the next change has to be stable again before it costs a caption', () => {
+  const hashes = ['0'.repeat(16), 'f'.repeat(16), '0f'.repeat(8), 'f0'.repeat(8)];
+  let last = null;
+  let stableCount = 0;
+  let emitted = 0;
+  // A screen that changes on every poll (a video, scrolling): only the first frame, then one
+  // emit per run of requiredStable changed polls, never one per poll.
+  for (let i = 0; i < 12; i++) {
+    const r = shouldEmitSlide(last, hashes[i % hashes.length], { threshold: 5, stableCount, requiredStable: 3 });
+    stableCount = r.stableCount;
+    if (r.emit) {
+      emitted++;
+      last = hashes[i % hashes.length];
+    }
+  }
+  assert.ok(emitted <= 4, `emitted ${emitted} captions for 12 polls`);
+});
+
 test('slide store caps at maxSlides and clears', () => {
   const s = createSlideStore({ maxSlides: 3 });
   for (let i = 0; i < 5; i++) s.add({ hash: String(i), caption: 'c' + i, txStart: i, txEnd: i });
