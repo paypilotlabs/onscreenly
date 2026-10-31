@@ -52,12 +52,12 @@ const MODES = {
             BASE_RULES +
             'Look at the screenshot and the recent conversation, decide what the user needs RIGHT NOW, and deliver it directly with no preamble.\n\n' +
             'Detect the question type and respond accordingly:\n' +
-            '• BEHAVIORAL ("tell me about a time…"): Give a complete STAR answer (Situation, Task, Action, Result) using the candidate\'s real stories when available. Be specific, include metrics, 3–4 sentences.\n' +
+            '• BEHAVIORAL ("tell me about a time…"): Give a complete STAR answer (Situation, Task, Action, Result) from the candidate\'s real stories or background only; if none fits, say so instead of inventing one. Be specific, with metrics only where their material states them, 3–4 sentences.\n' +
             '• MOTIVATION ("why this company/role"): Give a genuine, specific answer using their stated reasons.\n' +
             '• SITUATIONAL ("what would you do if…"): Give a structured answer showing judgment and decision-making process.\n' +
             '• EXPERIENCE ("tell me about your role at X"): Draw from the resume to give a specific, proud answer.\n' +
             '• TECHNICAL/CONCEPTUAL: Explain clearly with examples. For LeetCode: short approach + solution + complexity.\n' +
-            '• COMPENSATION ("salary expectations"): Use their stated target, give a confident range.\n' +
+            '• COMPENSATION ("salary expectations"): Use their stated target as a confident range; if none is saved, say so rather than inventing a figure.\n' +
             '• "Any questions for us?": Offer 2–3 of their prepared questions.\n\n' +
             'Write in first person as if the candidate is speaking. No preamble, no "Here\'s what you could say". Just the answer.',
           contextBlock
@@ -86,11 +86,11 @@ const MODES = {
             '"Them" is the interviewer; "You" is the candidate.\n\n' +
             'Draft ONE natural, confident reply the candidate can say out loud, in first person.\n\n' +
             'Rules by question type:\n' +
-            '• BEHAVIORAL: Use a real STAR story from their background. Situation (1 sentence) → Task (1 sentence) → Action (2–3 sentences, specific steps) → Result (1 sentence with metric if possible). Never generic.\n' +
+            '• BEHAVIORAL: Use a real STAR story from their background. Situation (1 sentence) → Task (1 sentence) → Action (2–3 sentences, specific steps) → Result (1 sentence, with a metric only if their material states one). Never generic, never invented: with no fitting story, say what is missing.\n' +
             '• MOTIVATION: Specific reasons tied to the company/role, not "I want to grow".\n' +
             '• SITUATIONAL: Show structured thinking — "I\'d first X, then Y, because Z".\n' +
             '• EXPERIENCE: Reference the specific role/project from their resume.\n' +
-            '• COMPENSATION: State the target range confidently without over-explaining.\n' +
+            '• COMPENSATION: State their saved target range confidently without over-explaining; with none saved, deflect politely instead of inventing a figure.\n' +
             '• TECHNICAL: Give a clear, confident explanation. Use analogies for non-technical interviewers.\n\n' +
             'No quotes, no preamble. Write the actual words to say. 2–5 sentences.',
           contextBlock
@@ -176,11 +176,11 @@ const MODES = {
             BASE_RULES +
             "The interviewer's exact question is provided below. Focus ONLY on answering that question — ignore any other conversation context.\n\n" +
             'Rules:\n' +
-            '• BEHAVIORAL ("tell me about a time…"): STAR format using real stories from the candidate\'s background. Situation → Task → Action → Result. Include metrics if available.\n' +
+            '• BEHAVIORAL ("tell me about a time…"): STAR format using real stories from the candidate\'s background only. Situation → Task → Action → Result. Include metrics only where their material states them.\n' +
             '• MOTIVATION ("why this company/role"): Specific, genuine reasons from their stated preferences.\n' +
             '• TECHNICAL: Clear explanation with a concrete example from their experience.\n' +
             '• EXPERIENCE: Reference specific roles/projects from their resume.\n' +
-            '• COMPENSATION: State the salary target confidently in one sentence.\n' +
+            '• COMPENSATION: State their saved salary target confidently in one sentence; if none is saved, say so.\n' +
             '• SITUATIONAL: Structured thinking — "First I would X, then Y, because Z."\n\n' +
             'Write in first person, as the candidate speaking. No preamble. 2–5 sentences.',
           contextBlock
