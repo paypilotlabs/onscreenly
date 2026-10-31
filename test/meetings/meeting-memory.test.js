@@ -204,3 +204,89 @@ test('store: prune keeps the newest N and debounced saves coalesce until flush',
   s.flush();
   assert.equal(createMeetingStore({ file }).all().length, 2);
 });
+
+test('a very long conversation continues as a new record instead of growing one without bound', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-memory-'));
+  const store = createMeetingStore({ file: path.join(dir, 'meetings.json') });
+  const memory = createMeetingMemory({ store, llmFactory: () => null, now: () => 1, maxTranscriptChars: 100 });
+  for (let i = 0; i < 6; i++) memory.onTurn(turn('them', 'x'.repeat(40), 1));
+  const all = store.all();
+  assert.equal(all.length, 2);
+  assert.equal(all[0].transcript.length, 3);
+  assert.equal(all[1].transcript.length, 3, 'no turn is lost');
+  assert.equal(all[1].continuedFrom, all[0].id);
+  assert.ok(all[0].endedAt);
+});
+
+test('retention: 0 saves nothing; a lower number keeps only the newest meetings', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-memory-'));
+  const store = createMeetingStore({ file: path.join(dir, 'meetings.json') });
+  let keepCount = 0;
+  let clock = 1;
+  const memory = createMeetingMemory({ store, llmFactory: () => null, now: () => clock, getKeep: () => keepCount });
+  memory.onTurn(turn('them', 'hello', 1));
+  assert.equal(store.all().length, 0);
+  assert.equal(fs.existsSync(store.file), false);
+  assert.equal(memory.memoryBlock(), null);
+  keepCount = 2;
+  for (let i = 0; i < 4; i++) {
+    memory.onTurn(turn('them', `meeting ${i}`, clock));
+    memory.end();
+    clock += 1;
+  }
+  assert.deepEqual(
+    store.all().map((m) => m.transcript[0].text),
+    ['meeting 2', 'meeting 3']
+  );
+});
+
+test('notes that keep failing are not re-sent at every launch', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-memory-'));
+  const file = path.join(dir, 'meetings.json');
+  const store = createMeetingStore({ file });
+  const m = store.add();
+  for (let i = 0; i < 4; i++) store.addTurn(m.id, turn('them', `t${i}`, i));
+  store.update(m.id, { endedAt: 10 });
+  let calls = 0;
+  const failing = () => ({
+    ready: true,
+    stream: async () => {
+      calls++;
+      throw new Error('provider down');
+    }
+  });
+  for (let launch = 0; launch < 4; launch++) {
+    await createMeetingMemory({ store: createMeetingStore({ file }), llmFactory: failing }).catchUp();
+  }
+  assert.equal(calls, 2);
+});
+
+test('deleting while notes are being written does not bring the meeting back', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-memory-'));
+  const file = path.join(dir, 'meetings.json');
+  const store = createMeetingStore({ file, debounceMs: 20 });
+  let release;
+  const llm = { ready: true, stream: () => new Promise((r) => (release = r)) };
+  const memory = createMeetingMemory({ store, llmFactory: () => llm, now: () => 1, minTurnsForNotes: 1 });
+  memory.onTurn(turn('them', 'private', 1));
+  const notes = memory.end(); // notes on their way, a debounced save pending
+  memory.dispose();
+  store.clearAll();
+  release(NOTES);
+  assert.equal(await notes, null);
+  await new Promise((r) => setTimeout(r, 40));
+  await store.settle();
+  assert.equal(fs.existsSync(file), false);
+
+  // The same race with the history cleared but recording kept on.
+  const store2 = createMeetingStore({ file, debounceMs: 20 });
+  const memory2 = createMeetingMemory({ store: store2, llmFactory: () => llm, now: () => 1, minTurnsForNotes: 1 });
+  memory2.onTurn(turn('them', 'private', 1));
+  const notes2 = memory2.end();
+  memory2.clearHistory();
+  release(NOTES);
+  assert.equal(await notes2, null);
+  await new Promise((r) => setTimeout(r, 40));
+  await store2.settle();
+  assert.deepEqual(createMeetingStore({ file }).all(), []);
+});

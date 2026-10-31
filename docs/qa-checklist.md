@@ -78,6 +78,9 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 
 ## 10. Data
 
+- [ ] **Meeting history** under Your data shows the meeting count and size. Choosing a lower Keep asks before deleting the oldest; Cancel changes nothing. **Don’t save** stops recording new meetings.
+- [ ] **Delete meeting history…** asks first, removes every meeting, and new meetings are saved again afterwards.
+- [ ] Opening the app a second time while it runs shows the running copy instead of a second overlay.
 - [ ] **Delete all my data** asks first; Cancel changes nothing.
 - [ ] Confirming removes settings, keys, résumé and meeting history and restarts Onscreenly as new.
 

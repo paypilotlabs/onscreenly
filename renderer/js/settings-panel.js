@@ -6,6 +6,7 @@ import { renderPublikBlock } from './publik-settings.js';
 import { fillSettings } from './settings-form.js';
 import { refreshWhisperModels } from './whisper-settings.js';
 import { saveSettings } from './settings-save.js';
+import { refreshMeetingHistory } from './meeting-history-settings.js';
 
 // ---- prep status & smart tooltip helpers -------------------------------
 
@@ -45,6 +46,7 @@ function openSettings(tab) {
   if (!state.settings) return;
   const wasOpen = !scrim.classList.contains('hidden');
   fillSettings();
+  refreshMeetingHistory();
   if (!wasOpen) rememberOpener(dialog);
   scrim.classList.remove('hidden');
   // After the scrim shows: a pane inside a hidden scrim keeps its old scroll position.

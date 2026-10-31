@@ -257,6 +257,19 @@ export function init() {
       showAudioStatus(message);
       return;
     }
+    // Meeting history could not be saved or loaded: the controls are under Your data.
+    if (code === 'meetings') {
+      const button = document.createElement('button');
+      button.textContent = 'Open Your data';
+      button.addEventListener('click', () => {
+        hideStatus();
+        openSettings('keys');
+        const row = document.getElementById('meeting-history');
+        if (row) row.scrollIntoView({ block: 'center' });
+      });
+      showStatus(message, button, 'warn');
+      return;
+    }
     showStatus(message);
     if (sttState !== 'disconnected') {
       const lower = message.toLowerCase();

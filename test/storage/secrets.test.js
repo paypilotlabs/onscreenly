@@ -144,3 +144,30 @@ test('masks show at most the last four characters', () => {
   assert.equal(maskKey(OPENAI), '••••••••1234');
   assert.equal(describeKeyStorage('encrypted', 'darwin').message, 'API keys are encrypted with macOS Keychain.');
 });
+
+test('a failed encrypted write keeps the key out of the settings file and is reported until a write succeeds', async () => {
+  const dir = profileWithKeys({});
+  const store = openStoreAt(dir);
+  const backend = fakeBackend();
+  await store.initSecureStorage(backend);
+  const encrypt = backend.encrypt;
+  backend.encrypt = async () => {
+    throw new Error('key store busy');
+  };
+  store.setSettings({ apiKeys: { anthropic: 'sk-ant-api03-secretvalue' } });
+  await store.flushSecrets();
+  assert.match(String(store.secretsSaveError()), /key store busy/);
+  assert.equal(store.keyStorageStatus().mode, 'encrypted', 'storage is not downgraded to plain text');
+  for (const name of ['onscreenly-data.json', 'onscreenly-data.json.bak']) {
+    assert.doesNotMatch(fileText(dir, name), /sk-ant/, `${name} holds no key`);
+  }
+  assert.equal(store.getSettings().apiKeys.anthropic, 'sk-ant-api03-secretvalue', 'the key still works this session');
+
+  backend.encrypt = encrypt;
+  store.setSettings({ smart: true });
+  await store.flushSecrets();
+  assert.equal(store.secretsSaveError(), null, 'the next save retries and clears the error');
+  const next = openStoreAt(dir);
+  await next.initSecureStorage(fakeBackend());
+  assert.equal(next.getSettings().apiKeys.anthropic, 'sk-ant-api03-secretvalue');
+});

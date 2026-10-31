@@ -247,6 +247,27 @@
         <section class="s-group">
           <h3 class="s-eyebrow">Your data</h3>
           <p class="s-note" id="key-storage-note"></p>
+          <div id="meeting-history">
+            <div class="s-field">
+              <label for="meeting-keep">Meeting history</label>
+              <div class="s-field-stack">
+                <div class="s-select">
+                  <select id="meeting-keep" class="field">
+                    <option value="0">Don’t save</option>
+                    <option value="10">Keep the last 10</option>
+                    <option value="25">Keep the last 25</option>
+                    <option value="50">Keep the last 50</option>
+                    <option value="100">Keep the last 100</option>
+                  </select>
+                </div>
+                <p id="meeting-history-note" class="s-help" aria-live="polite"></p>
+              </div>
+            </div>
+            <div class="whisper-actions s-actions s-indent">
+              <button id="meeting-archive" class="s-action btn btn-secondary compact hidden">Archive and start fresh</button>
+              <button id="meeting-delete" class="s-action btn btn-secondary compact">Delete meeting history…</button>
+            </div>
+          </div>
           <div class="whisper-actions s-actions">
             <button id="delete-all-data" class="s-action danger btn btn-danger compact">Delete all my data…</button>
           </div>
