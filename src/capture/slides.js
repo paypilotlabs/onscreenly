@@ -84,11 +84,13 @@ function shouldEmitSlide(lastHash, newHash, opts = {}) {
   const requiredStable = opts.requiredStable != null ? opts.requiredStable : DEFAULT_STABLE_REQUIRED;
   const stableCount = opts.stableCount || 0;
   if (!newHash) return { emit: false, stableCount: 0 };
-  if (!lastHash) return { emit: true, stableCount: requiredStable };
+  // After an emit the count starts again from 0: carrying it over made every later change emit at
+  // once, so each flicker cost a paid caption.
+  if (!lastHash) return { emit: true, stableCount: 0 };
   const dist = hammingDistance(lastHash, newHash);
   if (dist <= threshold) return { emit: false, stableCount: 0, distance: dist };
   const next = stableCount + 1;
-  if (next >= requiredStable) return { emit: true, stableCount: next, distance: dist };
+  if (next >= requiredStable) return { emit: true, stableCount: 0, distance: dist };
   return { emit: false, stableCount: next, distance: dist };
 }
 

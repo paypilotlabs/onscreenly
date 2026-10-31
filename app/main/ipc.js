@@ -22,7 +22,7 @@ const {
   MAX_ANSWER_CHARS
 } = require('./ipc-policy');
 const slides = require('./slides');
-const { setCapturing } = require('./capture');
+const { requestCapture } = require('./capture');
 const { configure: configureKnowledge, stopKnowledge } = require('./knowledge');
 
 // -------- resume / job-description file import --------
@@ -55,7 +55,7 @@ async function deleteAllData() {
       'This removes your settings, saved API keys, résumé and profile text, meeting history, and the list of programs allowed to use Onscreenly from this computer, then restarts Onscreenly. Downloaded Whisper models are kept. This cannot be undone.'
   });
   if (response !== 1) return { deleted: false };
-  if (session.state.capturing) await setCapturing(false).catch(() => {});
+  if (session.state.capturing) await requestCapture(false).catch(() => {});
   stopKnowledge();
   session.transcript.splice(0, session.transcript.length);
   // Stop every writer first: a debounced save or meeting notes still on their way must not write

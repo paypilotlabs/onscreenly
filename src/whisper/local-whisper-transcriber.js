@@ -1,8 +1,13 @@
 const { UtteranceSegmenter } = require('../stt/utterance-segmenter');
 const { WhisperServerSession } = require('./whisper-server-session');
+const { looksLikeHallucination } = require('../stt/stt');
 
 const CHANNELS = Object.freeze(['you', 'them']);
 const DEFAULT_DRAIN_TIMEOUT_MS = 15000;
+// Utterances waiting for the model. Each is at most ~25 s of audio, so this bounds both memory and
+// how far behind the transcript can fall on a slow computer; past it, new speech is skipped and
+// the user is told.
+const DEFAULT_MAX_PENDING_JOBS = 6;
 
 class LocalWhisperTranscriber {
   /** Coordinate two audio channels through one sequential, persistent model session. */
@@ -11,6 +16,7 @@ class LocalWhisperTranscriber {
     sessionFactory = (options) => new WhisperServerSession(options),
     segmenterFactory = (options) => new UtteranceSegmenter(options),
     drainTimeoutMs = DEFAULT_DRAIN_TIMEOUT_MS,
+    maxPendingJobs = DEFAULT_MAX_PENDING_JOBS,
     onTranscript = () => {},
     onSpeechState = () => {},
     onStatus = () => {},
@@ -19,6 +25,8 @@ class LocalWhisperTranscriber {
     this.session = sessionFactory({ ...sessionOptions, onState: onStatus });
     this.segmenterFactory = segmenterFactory;
     this.drainTimeoutMs = drainTimeoutMs;
+    this.maxPendingJobs = maxPendingJobs;
+    this.skipped = 0; // utterances skipped since the queue was last below its limit
     this.onTranscript = onTranscript;
     this.onSpeechState = onSpeechState;
     this.onStatus = onStatus;
@@ -83,13 +91,27 @@ class LocalWhisperTranscriber {
   }
 
   _enqueue(channel, pcm) {
+    if (this.pendingJobs >= this.maxPendingJobs) {
+      this.skipped += 1;
+      if (this.skipped === 1) {
+        this.onStatus({
+          status: 'behind',
+          channel,
+          pending: this.pendingJobs,
+          message: 'Local transcription is falling behind on this computer, so some speech is being skipped.'
+        });
+      }
+      return Promise.resolve();
+    }
+    this.skipped = 0;
     this.pendingJobs += 1;
     this.onStatus({ status: 'transcribing', channel, pending: this.pendingJobs });
 
     const job = this.queueTail.then(async () => {
       if (this.discardPendingJobs) return;
       const text = await this.session.transcribe(pcm);
-      if (text) this.onTranscript(channel, text);
+      // The same filter the cloud paths use: Whisper invents "Thank you." over silence and noise.
+      if (text && !looksLikeHallucination(text)) this.onTranscript(channel, text);
     });
 
     this.queueTail = job

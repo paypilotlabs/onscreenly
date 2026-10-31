@@ -28,6 +28,7 @@ let slideStableCount = 0;
 let slideBusy = false;
 let slideDisabled = false; // set when the chat key rejects slide captions (stops cost spam)
 let slideTxCursor = 0; // transcript.length at last emitted slide
+let slideGeneration = 0; // bumped by a new or reset deck: a caption from before it is dropped
 
 function getSlidesConfig() {
   return clampSlidesConfig(store.getSettings().slides || {});
@@ -98,6 +99,7 @@ async function pollSlides() {
   slideStableCount = decision.stableCount;
   // Stable change: take one full-res frame and caption it.
   slideBusy = true;
+  const generation = slideGeneration;
   try {
     const imageDataUrl = await captureScreenshot();
     if (!imageDataUrl) return;
@@ -106,7 +108,7 @@ async function pollSlides() {
     const txEnd = transcript.length;
     const slice = transcript.slice(txStart, txEnd).slice(-8);
     const caption = ((await captionSlide(imageDataUrl, slice)) || '').trim();
-    if (!caption) return;
+    if (!caption || generation !== slideGeneration) return; // the deck it belonged to is gone
     const slide = slideStore.add({ hash: newHash, caption, txStart, txEnd });
     slideTxCursor = txEnd;
     send('slides:update', { count: slideStore.count(), last: slide });
@@ -142,6 +144,7 @@ function stopSlideLoop() {
 
 // A new listening session starts a fresh slide deck and begins polling.
 function startSlidesSession() {
+  slideGeneration++;
   slideDisabled = false;
   slideTxCursor = session.transcript.length;
   slideStore = createSlideStore({ maxSlides: getSlidesConfig().maxSlides });
@@ -151,6 +154,7 @@ function startSlidesSession() {
 }
 
 function resetSlidesSession() {
+  slideGeneration++;
   slideStore.clear();
   slideLastHash = null;
   slideStableCount = 0;

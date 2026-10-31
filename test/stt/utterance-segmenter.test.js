@@ -63,3 +63,36 @@ test('splits long speech into bounded segments with overlap', () => {
   assert.equal(utterances[1].length, FRAME_BYTES * 10);
   assert.ok(utterances.every((pcm) => pcm.length <= FRAME_BYTES * 10));
 });
+
+test('a short noise blip ends what it started and is not transcribed', () => {
+  const { AdaptiveVAD } = require('../../src/stt/vad');
+  const events = [];
+  const vad = new AdaptiveVAD({
+    onSpeechStart: () => events.push('start'),
+    onSpeechEnd: (_ms, info) => events.push(info && info.short ? 'end-short' : 'end')
+  });
+  const tone = (ms, amp) => {
+    const n = (16000 * ms) / 1000;
+    const b = Buffer.alloc(n * 2);
+    for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(Math.sin(i / 3) * amp), i * 2);
+    return b;
+  };
+  vad.processChunk(tone(60, 3000));
+  for (let i = 0; i < 30; i++) vad.processChunk(tone(200, 0));
+  assert.deepEqual(events, ['start', 'end-short']);
+});
+
+test('the segmenter drops a blip instead of collecting silence after it', () => {
+  const utterances = [];
+  const states = [];
+  const segmenter = new UtteranceSegmenter({
+    channel: 'you',
+    onUtterance: (_c, pcm) => utterances.push(pcm),
+    onSpeechState: (_c, speaking) => states.push(speaking)
+  });
+  segmenter.push(frame(4000)); // one 30 ms frame: shorter than any word
+  for (let i = 0; i < 60; i++) segmenter.push(frame(0));
+  assert.deepEqual(states, [true, false]);
+  assert.equal(segmenter.collecting, false);
+  assert.equal(utterances.length, 0);
+});

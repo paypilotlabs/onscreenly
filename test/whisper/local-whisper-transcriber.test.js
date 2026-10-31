@@ -101,3 +101,56 @@ test('bounds shutdown drain time before aborting an in-flight inference', async 
   assert.deepEqual(reportedErrors, []);
   assert.deepEqual(stopOptions, [{ force: true }]);
 });
+
+function fakeTranscriber({ transcribe, maxPendingJobs, statuses = [], transcripts = [] }) {
+  return new LocalWhisperTranscriber({
+    sessionOptions: {},
+    maxPendingJobs,
+    sessionFactory: () => ({
+      async start() {},
+      transcribe,
+      abortInferences() {},
+      async stop() {}
+    }),
+    segmenterFactory: (options) => ({
+      push(pcm) {
+        options.onUtterance(options.channel, Buffer.from(pcm));
+      },
+      stop() {}
+    }),
+    onStatus: (s) => statuses.push(s),
+    onTranscript: (channel, text) => transcripts.push(text)
+  });
+}
+
+test('Whisper’s made-up lines over silence are filtered like the cloud paths', async () => {
+  const transcripts = [];
+  const t = fakeTranscriber({ transcribe: async (pcm) => pcm.toString(), transcripts });
+  await t.start();
+  t.push('them', Buffer.from('Thank you.'));
+  t.push('them', Buffer.from('We ship on Tuesday.'));
+  await t.queueTail;
+  assert.deepEqual(transcripts, ['We ship on Tuesday.']);
+  await t.stop();
+});
+
+test('a slow computer cannot queue utterances without limit; skipping is said once', async () => {
+  let release;
+  const gate = new Promise((r) => (release = r));
+  const statuses = [];
+  const t = fakeTranscriber({
+    transcribe: async (pcm) => {
+      await gate;
+      return pcm.toString();
+    },
+    maxPendingJobs: 3,
+    statuses
+  });
+  await t.start();
+  for (let i = 0; i < 10; i++) t.push('you', Buffer.from(`u${i}`));
+  assert.equal(t.pendingJobs, 3);
+  assert.equal(statuses.filter((s) => s.status === 'behind').length, 1);
+  release();
+  await t.queueTail;
+  await t.stop();
+});

@@ -93,3 +93,31 @@ test('Deepgram: an unexpected close while connected still reconnects', async (t)
   assert.equal(sockets.length, 2, 'server-side close should open a replacement socket');
   stt.disconnect();
 });
+
+test('Deepgram: audio spoken while the socket connects is sent once it opens, not dropped', async () => {
+  sockets.length = 0;
+  const stt = new DeepgramStreamingSTT('key', {});
+  await stt.connect();
+  stt.sendAudio(Buffer.from('first words'));
+  stt.sendAudio(Buffer.from('second'));
+  assert.equal(sockets[0].sent.length, 0);
+  sockets[0].open();
+  assert.deepEqual(
+    sockets[0].sent.map((b) => b.toString()),
+    ['first words', 'second']
+  );
+  stt.sendAudio(Buffer.from('live'));
+  assert.equal(sockets[0].sent.at(-1).toString(), 'live');
+  stt.disconnect();
+});
+
+test('Deepgram: the connecting buffer keeps only the newest audio', async () => {
+  sockets.length = 0;
+  const stt = new DeepgramStreamingSTT('key', {});
+  await stt.connect();
+  for (let i = 0; i < 250; i++) stt.sendAudio(Buffer.from(String(i)));
+  sockets[0].open();
+  assert.equal(sockets[0].sent.length, 100);
+  assert.equal(sockets[0].sent[0].toString(), '150');
+  stt.disconnect();
+});
