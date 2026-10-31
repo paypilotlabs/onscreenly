@@ -64,6 +64,50 @@ test('Help opens the guide in the answer panel’s place, dark like the overlay'
   await expect(page.locator('#panel-wrap')).toBeVisible();
 });
 
+// window-behaviour.js keeps the window clickable only over these; everywhere else clicks pass through.
+const UI = '#toolbar, #panel-wrap, #transcript-sidebar, #settings-scrim, #onboard-scrim, #consent-scrim';
+const uiAt = (page, x, y) =>
+  page.evaluate(([px, py, sel]) => !!(document.elementFromPoint(px, py) || document.body).closest(sel), [x, y, UI]);
+
+test('around the guide clicks pass through, the toolbar closes it, and only publik dims what is under it', async ({
+  launch
+}) => {
+  const { page } = await launch();
+  await page.click('#logo-btn');
+  await expect(page.locator('#onboard')).toBeVisible();
+  await page.locator('#onboard').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  const guide = await page.locator('#onboard').boundingBox();
+  expect(await uiAt(page, guide.x + guide.width / 2, guide.y + 40)).toBe(true);
+  expect(await uiAt(page, guide.x - 12, guide.y + 100), 'beside the guide').toBe(false);
+  expect(await uiAt(page, guide.x + guide.width / 2, guide.y + guide.height + 6), 'under the guide').toBe(false);
+
+  // Help again closes the guide instead of starting it over; another toolbar button closes it too.
+  await page.click('#logo-btn');
+  await expect(page.locator('#onboard-scrim')).toBeHidden();
+  await page.click('#logo-btn');
+  await expect(page.locator('#onboard')).toBeVisible();
+  await page.click('#tb-settings-btn');
+  await expect(page.locator('#onboard-scrim')).toBeHidden();
+  await expect(page.locator('#settings')).toBeVisible();
+
+  // The publik disclosure must be answered, and may open over Settings: its scrim dims and blocks.
+  await page.evaluate(() => {
+    document.getElementById('onboard').classList.add('dialog');
+    document.getElementById('onboard-scrim').classList.remove('hidden');
+  });
+  const scrim = page.locator('#onboard-scrim');
+  expect(await scrim.evaluate((el) => getComputedStyle(el).backdropFilter)).not.toBe('none');
+  const settings = await page.locator('#settings').boundingBox();
+  expect(await uiAt(page, settings.x + 20, settings.y + settings.height - 10)).toBe(true);
+  expect(
+    await page.evaluate(
+      ([x, y]) => document.elementFromPoint(x, y).closest('#onboard-scrim') !== null,
+      [settings.x + 20, settings.y + settings.height - 10]
+    ),
+    'Settings under the publik dialog takes no clicks'
+  ).toBe(true);
+});
+
 test('the permissions window shows the light card with Check again and Continue', async ({ launch }) => {
   const { app } = await launch({ env: { ONSCREENLY_E2E_PERMISSIONS_WINDOW: '1' } });
   const perm = await appWindow(app, 'permissions.html');

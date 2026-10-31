@@ -483,6 +483,20 @@ export function init() {
   });
   $('#ob-skip').addEventListener('click', finishOnboard);
   $('#logo-btn').addEventListener('click', showOnboard);
+  // The toolbar stays live while the guide shows: a click on any of its buttons closes the guide
+  // first (as Skip does), and Help closes it rather than starting it over. The publik disclosure and
+  // card must be answered; their scrim covers the toolbar, so this never runs for them.
+  $('#toolbar').addEventListener(
+    'click',
+    (e) => {
+      if (obScrim.classList.contains('hidden') || obDialog || OB_STEPS[obIndex].publikCard) return;
+      if (!e.target.closest('button')) return;
+      const help = e.target.closest('#logo-btn');
+      finishOnboard();
+      if (help) e.stopImmediatePropagation();
+    },
+    true
+  );
   // The permissions step's "Open settings" buttons open the system settings page they name. Coming
   // back to the window checks again, so a permission switched on there shows as allowed here.
   $('#ob-body').addEventListener('click', (e) => {

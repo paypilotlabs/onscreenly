@@ -184,8 +184,10 @@ test('the click-through ids cover every id that CSS gives pointer events', () =>
         }
         const matches = querySelectorAll(index.root, selector, { ignoreClass });
         for (const el of matches) {
+          // Inside a listed id is covered by it (#onboard-scrim > .ws-dialog: the guide in its scrim).
+          if (insideListed(el)) continue;
           if (el.attrs.id) cssIds.add(el.attrs.id);
-          else if (!insideListed(el)) problems.push(`${where} takes the mouse outside the listed ids`);
+          else problems.push(`${where} takes the mouse outside the listed ids`);
         }
         if (!matches.length && !parts.slice(0, -1).some((p) => ids.has(p.compound.id))) {
           problems.push(`${where} matches nothing in index.html, so its click-through cannot be checked`);

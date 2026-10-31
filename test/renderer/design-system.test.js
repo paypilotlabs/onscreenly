@@ -641,7 +641,10 @@ test('backdrop-filter appears only on the three scrims', () => {
   for (const sheet of OTHERS) {
     for (const d of declarations(sheet).filter((x) => /^(?:-webkit-)?backdrop-filter$/.test(x.prop))) {
       seen++;
-      for (const selector of splitSelectorList(d.selector)) assert.ok(SCRIMS.has(selector), where(sheet, d));
+      // A scrim, or a scrim in a state (#onboard-scrim:has(…) blurs only for the publik dialogs).
+      const isScrim = (selector) =>
+        [...SCRIMS].some((s) => selector === s || (/^[:.]/.test(selector.slice(s.length)) && selector.startsWith(s)));
+      for (const selector of splitSelectorList(d.selector)) assert.ok(isScrim(selector), where(sheet, d));
     }
   }
   assert.ok(seen > 0, 'the scrims blur what is behind them');

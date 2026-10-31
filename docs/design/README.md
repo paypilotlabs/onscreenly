@@ -2,7 +2,7 @@
 
 This folder holds the redesign that PR 9 builds into the app: a quiet dark overlay over your screen, and a light workspace for Settings, onboarding, consent and the permissions window. The look follows the Cluely style source (below): Geist everywhere, one Signal Blue accent, hairline Bone borders, no drop shadows on surfaces.
 
-> **Changed in 0.2.5:** the guide (onboarding, and Help in the toolbar) is no longer a light workspace dialog. It is part of the dark overlay: it opens in the answer panel's place under the toolbar, at the panel's width, with nothing dimmed or blurred behind it. The welcome step drops the hero band and the EB Garamond headline, so items 11 and 12 and the serif type below now apply only to this prototype. Settings, consent and the permissions window stay light.
+> **Changed in 0.2.5:** the guide (onboarding, and Help in the toolbar) is no longer a light workspace dialog. It is part of the dark overlay: it opens in the answer panel's place under the toolbar, at the panel's width. Nothing is dimmed or blurred, only the guide takes the mouse, and a toolbar click closes it; the publik disclosure and card, which must be answered, keep a dimming scrim. The welcome step drops the hero band and the EB Garamond headline, so item 11, the EB Garamond line under Type, and the onboarding entries under the light workspace below now apply only to this prototype. Settings, consent and the permissions window stay light.
 
 | File | What it is |
 |---|---|

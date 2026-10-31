@@ -70,22 +70,34 @@
 }
 
 /* The guide (onboarding, Help) is part of the overlay: it opens in the answer panel's place, under the
- * toolbar, at the panel's width and in its dark theme. Nothing is dimmed or blurred behind it; the
- * panel steps aside and the toolbar dims while it shows. */
+ * toolbar, at the panel's width and in its dark theme, and the panel steps aside. Nothing is dimmed
+ * or blurred, and only the guide takes the mouse: the transparent area around it passes clicks
+ * through like any other gap in the overlay, and the toolbar stays live (a toolbar click closes the
+ * guide, onboarding.js). */
 #onboard-scrim {
   place-items: start center;
   padding-top: calc(var(--spacing-14) + var(--toolbar-h) + var(--spacing-10));
   background: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  pointer-events: none;
+}
+
+#onboard-scrim > .ws-dialog {
+  pointer-events: auto;
 }
 
 #app:has(~ #onboard-scrim:not(.hidden)) #panel-wrap {
   visibility: hidden;
 }
 
-#app:has(~ #onboard-scrim:not(.hidden)) #toolbar {
-  filter: var(--scrim-dim);
+/* The publik disclosure and card must be answered, and may open over Settings: for them the scrim
+ * dims, blurs and blocks everything under it, as the other dialogs' scrims do. */
+#onboard-scrim:has(> #onboard:is(.dialog, .card)) {
+  background: var(--scrim);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  backdrop-filter: var(--scrim-blur);
+  pointer-events: auto;
 }
 
 #consent-scrim {
