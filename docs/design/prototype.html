@@ -7658,7 +7658,7 @@ action: { label: 'Open Audio settings' }
 }
 };
 SAMPLES.resumeAnalysis.text = SAMPLES.resumeAnalysis.cards
-.map((c) => '## ' + c.title + '\n' + c.html.replace(/<li>/g, '\n- ').replace(/<[^>]+>/g, ''))
+.map((c) => '## ' + c.title + '\n' + new DOMParser().parseFromString(c.html.replace(/<li>/g, '\n- '), 'text/html').body.textContent)
 .join('\n\n');
 function esc(s) {
 return String(s == null ? '' : s).replace(
@@ -11257,11 +11257,11 @@ surfaces: by((t) => t.group === 'Surfaces')
 const decl = (t) => `<span class="pp-code">${esc(t.name)}: ${esc(t.value)}</span>`;
 const unused = (t) => /neon|cyan-veil/.test(t.name);
 const block = (title, meta, body) =>
-`<div class="pp-block"><div class="pp-block-head"><h3 class="pp-block-title">${esc(title)}</h3><span class="pp-block-meta">${meta}</span></div>${body}</div>`;
+`<div class="pp-block"><div class="pp-block-head"><h3 class="pp-block-title">${esc(title)}</h3><span class="pp-block-meta">${esc(meta)}</span></div>${body}</div>`;
 const colors = `<div class="pp-grid">${G.colors
 .map(
 (t) =>
-`<div class="pp-tok"><div class="pp-sw" style="background:var(${t.name})"></div><span class="pp-tok-name">${esc(t.name.replace('--color-', ''))}</span>${decl(t)}` +
+`<div class="pp-tok"><div class="pp-sw" style="background:var(${esc(t.name)})"></div><span class="pp-tok-name">${esc(t.name.replace('--color-', ''))}</span>${decl(t)}` +
 (unused(t) ? '<span class="pp-tok-tag">decorative, not used</span>' : '') +
 '</div>'
 )
@@ -11269,7 +11269,7 @@ const colors = `<div class="pp-grid">${G.colors
 const scaleRows = ['caption', 'body', 'subheading', 'heading-sm', 'heading', 'heading-lg', 'display']
 .map((k) => {
 const get = (p) => (toks.find((t) => t.name === `--${p}-${k}`) || {}).value || '';
-return `<tr><td class="pp-td-name">${k}</td><td class="pp-num">${esc(get('text'))}</td><td class="pp-num">${esc(get('leading'))}</td><td class="pp-num">${esc(get('tracking'))}</td></tr>`;
+return `<tr><td class="pp-td-name">${esc(k)}</td><td class="pp-num">${esc(get('text'))}</td><td class="pp-num">${esc(get('leading'))}</td><td class="pp-num">${esc(get('tracking'))}</td></tr>`;
 })
 .join('');
 const typo =
@@ -11277,13 +11277,13 @@ const typo =
 G.families
 .map(
 (t) =>
-`<div class="pp-row"><div class="pp-row-main"><span class="pp-family" style="font-family:var(${t.name})">${t.name.includes('mono') ? 'idempotency_key = req.key' : 'Ready when you are'}</span>${decl(t)}</div></div>`
+`<div class="pp-row"><div class="pp-row-main"><span class="pp-family" style="font-family:var(${esc(t.name)})">${t.name.includes('mono') ? 'idempotency_key = req.key' : 'Ready when you are'}</span>${decl(t)}</div></div>`
 )
 .join('') +
 G.weights
 .map(
 (t) =>
-`<div class="pp-row"><div class="pp-row-main"><span class="pp-family" style="font-weight:var(${t.name});font-size:16px">Geist ${esc(t.value)} · ${esc(t.name.replace('--font-weight-', ''))}</span>${decl(t)}</div></div>`
+`<div class="pp-row"><div class="pp-row-main"><span class="pp-family" style="font-weight:var(${esc(t.name)});font-size:16px">Geist ${esc(t.value)} · ${esc(t.name.replace('--font-weight-', ''))}</span>${decl(t)}</div></div>`
 )
 .join('') +
 '</div><div><div class="pp-table-wrap"><table class="pp-table"><thead><tr><th>Scale</th><th>--text-*</th><th>--leading-*</th><th>--tracking-*</th></tr></thead><tbody>' +
@@ -11294,7 +11294,7 @@ const spacing =
 G.spacing
 .map(
 (t) =>
-`<div class="pp-space"><span class="pp-bar" style="width:var(${t.name})"></span><span class="pp-tok-name">${esc(t.name)}</span><span class="pp-code">${esc(t.value)}</span></div>`
+`<div class="pp-space"><span class="pp-bar" style="width:var(${esc(t.name)})"></span><span class="pp-tok-name">${esc(t.name)}</span><span class="pp-code">${esc(t.value)}</span></div>`
 )
 .join('') +
 '</div><p class="pp-sub-title">Layout</p><div class="pp-grid">' +
@@ -11303,7 +11303,7 @@ G.layout.map((t) => `<div class="pp-tok"><span class="pp-tok-name">${esc(t.name)
 const radius = `<div class="pp-grid">${G.radius
 .map(
 (t) =>
-`<div class="pp-tok"><span class="pp-radius-tile" style="border-radius:var(${t.name})"></span><span class="pp-tok-name">${esc(t.name.replace('--radius-', ''))}</span>${decl(t)}` +
+`<div class="pp-tok"><span class="pp-radius-tile" style="border-radius:var(${esc(t.name)})"></span><span class="pp-tok-name">${esc(t.name.replace('--radius-', ''))}</span>${decl(t)}` +
 (t.name === '--radius-full' ? '<span class="pp-tok-tag" title="Quirk 3: pills use --radius-pills">quirk 3 · unused</span>' : '') +
 '</div>'
 )
@@ -11320,13 +11320,13 @@ const shadows = `<div class="pp-grid">${G.shadows
 const [kind, use] = SH[t.name] || ['light', ''];
 const demo =
 kind === 'cta'
-? `<div class="pp-shadow-demo"><span class="pp-shadow-cta" style="box-shadow:var(${t.name})">Continue</span></div>`
-: `<div class="pp-shadow-demo${kind === 'dark' ? ' is-dark' : ''}"><span class="pp-shadow-box" style="box-shadow:var(${t.name})"></span></div>`;
+? `<div class="pp-shadow-demo"><span class="pp-shadow-cta" style="box-shadow:var(${esc(t.name)})">Continue</span></div>`
+: `<div class="pp-shadow-demo${kind === 'dark' ? ' is-dark' : ''}"><span class="pp-shadow-box" style="box-shadow:var(${esc(t.name)})"></span></div>`;
 return `<div class="pp-tok">${demo}<span class="pp-tok-name">${esc(t.name.replace('--shadow-', ''))}</span><span class="pp-help">${esc(use)}</span>${decl(t)}</div>`;
 })
 .join('')}</div>`;
 const surfaces = `<div class="pp-grid">${G.surfaces
-.map((t) => `<div class="pp-tok"><div class="pp-sw" style="background:var(${t.name})"></div><span class="pp-tok-name">${esc(t.name.replace('--surface-', ''))}</span>${decl(t)}</div>`)
+.map((t) => `<div class="pp-tok"><div class="pp-sw" style="background:var(${esc(t.name)})"></div><span class="pp-tok-name">${esc(t.name.replace('--surface-', ''))}</span>${decl(t)}</div>`)
 .join('')}</div>`;
 const steps = typeSteps();
 const specimen = `<div class="pp-specimen">${steps
@@ -11337,7 +11337,7 @@ const meta = m ? `${m[1]} · ${m[2]}/${m[3]} · ${track}` : s.value;
 const serif = /garamond/i.test(s.value);
 return (
 `<div class="pp-spec-row"><div class="pp-spec-meta"><span class="pp-spec-name">--ts-${esc(s.name)}</span><span class="pp-help pp-num">${esc(meta)}${serif ? ' · EB Garamond' : /monospace/.test(s.value) ? ' · mono' : ''}</span></div>` +
-`<span class="pp-spec-sample" style="font:var(--ts-${s.name});letter-spacing:var(--ts-${s.name}-track)">${serif ? 'Welcome to Onscreenly' : 'Ready when you are'}</span></div>`
+`<span class="pp-spec-sample" style="font:var(--ts-${esc(s.name)});letter-spacing:var(--ts-${esc(s.name)}-track)">${serif ? 'Welcome to Onscreenly' : 'Ready when you are'}</span></div>`
 );
 })
 .join('')}</div>`;
