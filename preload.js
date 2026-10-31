@@ -52,6 +52,8 @@ const api = {
   keyStorageStatus: () => ipcRenderer.invoke('data:key-storage'),
   deleteAllData: () => ipcRenderer.invoke('data:delete-all'),
   meetingsInfo: () => ipcRenderer.invoke('meetings:info'),
+  shortcutsGet: () => ipcRenderer.invoke('shortcuts:get'),
+  shortcutsSet: (request) => ipcRenderer.invoke('shortcuts:set', request),
   meetingsSetRetention: (keep) => ipcRenderer.invoke('meetings:set-retention', keep),
   meetingsDeleteHistory: () => ipcRenderer.invoke('meetings:delete-history'),
   meetingsArchiveOversized: () => ipcRenderer.invoke('meetings:archive-oversized'),
@@ -63,6 +65,7 @@ const api = {
   on: (channel, cb) => {
     const allowed = [
       'capture:state',
+      'shortcuts:changed',
       'llm:start',
       'llm:token',
       'llm:done',

@@ -285,6 +285,17 @@ async function setCapturing(active) {
 
   if (active) {
     session.sttDisabled = false; // reset on re-enable
+    // macOS asks for the microphone here, the first time a session needs it, rather than at launch.
+    if (process.platform === 'darwin') {
+      try {
+        const { systemPreferences } = require('electron');
+        if (systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+          await systemPreferences.askForMediaAccess('microphone');
+        }
+      } catch (_) {
+        /* the renderer's getUserMedia still asks */
+      }
+    }
     const settings = store.getSettings();
     if ((settings.sttProvider || 'auto') === 'local') {
       try {

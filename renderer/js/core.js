@@ -10,7 +10,13 @@ const quitButton = $('#quit-btn');
 
 // ---- shortcuts as text ---------------------------------------------------
 // The UI has no icons: keys are text. macOS shows its symbols (⌘ ⇧ ↵), Windows and Linux the words.
-const KEY_NAMES = { mod: ['⌘', 'Ctrl'], shift: ['⇧', 'Shift'], '↵': ['↵', 'Enter'] };
+const KEY_NAMES = {
+  mod: ['⌘', 'Ctrl'],
+  shift: ['⇧', 'Shift'],
+  alt: ['⌥', 'Alt'],
+  ctrl: ['⌃', 'Ctrl'],
+  '↵': ['↵', 'Enter']
+};
 const modKey = isMac ? '⌘' : 'Ctrl';
 
 function keyText(key) {
@@ -38,8 +44,62 @@ function kbd(...keys) {
     .join('');
 }
 
-// Hints ([data-combo]), keycap rows ([data-keys]), aria-keyshortcuts and the titles that name a
-// shortcut. The markup is written for macOS; this repaints it for the platform.
+// The global shortcuts, as main registered them (shortcuts:get / shortcuts:changed). Until main
+// answers, the defaults from src/platform/shortcuts.js.
+const SHORTCUT_DEFAULTS = {
+  say: 'CommandOrControl+Alt+Return',
+  assist: 'CommandOrControl+Shift+Return',
+  leetcode: 'CommandOrControl+Alt+K',
+  hide: 'CommandOrControl+Shift+/',
+  listening: 'CommandOrControl+Shift+L',
+  quit: 'CommandOrControl+Shift+X'
+};
+let shortcutMap = { ...SHORTCUT_DEFAULTS };
+const ACCELERATOR_KEYS = {
+  CommandOrControl: 'mod',
+  CmdOrCtrl: 'mod',
+  Command: 'mod',
+  Cmd: 'mod',
+  Meta: 'mod',
+  Super: 'mod',
+  Control: 'ctrl',
+  Ctrl: 'ctrl',
+  Shift: 'shift',
+  Alt: 'alt',
+  Option: 'alt',
+  Return: '↵',
+  Enter: '↵'
+};
+
+/** An Electron accelerator ('CommandOrControl+Alt+K') as keys for combo()/kbd(): ['mod', 'alt', 'K']. */
+function acceleratorKeys(accelerator) {
+  return String(accelerator || '')
+    .split('+')
+    .filter(Boolean)
+    .map((part) => ACCELERATOR_KEYS[part] || part);
+}
+
+/** The keys of one global shortcut: say, assist, leetcode, hide, listening or quit. */
+function shortcutKeys(action) {
+  return acceleratorKeys(shortcutMap[action]);
+}
+
+function setShortcutMap(map) {
+  shortcutMap = { ...SHORTCUT_DEFAULTS, ...(map || {}) };
+  paintShortcuts();
+}
+
+// aria-keyshortcuts wants DOM key names: Meta on macOS and Control elsewhere for the command key.
+function ariaShortcut(action) {
+  const names = { mod: isMac ? 'Meta' : 'Control', ctrl: 'Control', shift: 'Shift', alt: 'Alt', '↵': 'Enter' };
+  return shortcutKeys(action)
+    .map((k) => names[k] || k)
+    .join('+');
+}
+
+// Hints ([data-combo] for keys inside the window, [data-shortcut] / [data-shortcut-keys] for the
+// global shortcuts), aria-keyshortcuts and the titles that name a shortcut. The markup is written
+// for macOS; this repaints it for the platform and for the user's own shortcuts.
 function paintShortcuts() {
   document.querySelectorAll('[data-combo]').forEach((el) => {
     el.textContent = combo(...el.dataset.combo.split(' '));
@@ -47,16 +107,25 @@ function paintShortcuts() {
   document.querySelectorAll('[data-keys]').forEach((el) => {
     el.innerHTML = kbd(...el.dataset.keys.split(' '));
   });
-  if (!isMac) {
-    document.querySelectorAll('[aria-keyshortcuts]').forEach((el) => {
-      el.setAttribute('aria-keyshortcuts', el.getAttribute('aria-keyshortcuts').replace(/\bMeta\b/g, 'Control'));
-    });
-  }
-  $('.act[data-mode="say"]').title = `Suggests what to say next based on the conversation (${combo('mod', '↵')})`;
+  document.querySelectorAll('[data-shortcut]').forEach((el) => {
+    el.textContent = combo(...shortcutKeys(el.dataset.shortcut));
+  });
+  document.querySelectorAll('[data-shortcut-keys]').forEach((el) => {
+    el.innerHTML = kbd(...shortcutKeys(el.dataset.shortcutKeys));
+  });
+  $('#stop-btn').setAttribute('aria-keyshortcuts', ariaShortcut('listening'));
+  $('#hide-btn').setAttribute('aria-keyshortcuts', ariaShortcut('hide'));
+  $('.act[data-mode="say"]').title =
+    `Suggests what to say next based on the conversation (${combo(...shortcutKeys('say'))})`;
   $('.act[data-mode="assist"]').title =
-    `Scans your screen and conversation to decide what you need (${combo('mod', 'shift', '↵')})`;
-  $('#hide-btn').title = `Hide (${combo('mod', 'shift', '/')})`;
-  quitButton.title = `Quit Onscreenly (${combo('mod', 'shift', 'X')})`;
+    `Scans your screen and conversation to decide what you need (${combo(...shortcutKeys('assist'))})`;
+  const hideBtn = $('#hide-btn');
+  hideBtn.title = `${hideBtn.querySelector('.tb-hide-label').textContent} (${combo(...shortcutKeys('hide'))})`;
+  quitButton.title = `Quit Onscreenly (${combo(...shortcutKeys('quit'))})`;
+  const stop = $('#stop-btn');
+  if (!stop.classList.contains('is-pending')) {
+    stop.title = `${stop.querySelector('.tb-stop-label').textContent} (${combo(...shortcutKeys('listening'))})`;
+  }
 }
 
 // ---- buttons -------------------------------------------------------------
@@ -78,7 +147,7 @@ function setSessionButton(active, pending = false) {
   if (pending) btn.setAttribute('aria-busy', 'true');
   else btn.removeAttribute('aria-busy');
   btn.querySelector('.tb-stop-label').textContent = text;
-  btn.title = pending ? text : `${text} (${combo('mod', 'shift', 'L')})`;
+  btn.title = pending ? text : `${text} (${combo(...shortcutKeys('listening'))})`;
   btn.setAttribute('aria-label', text);
   // The empty state follows the session: "Ready when you are", or "Listening" once one runs. A
   // session that nothing can transcribe is 'no-stt' (set with the speech status, transcript.js).
@@ -93,4 +162,18 @@ export function init() {
   setSessionButton(false);
 }
 
-export { $, combo, isMac, isWindows, kbd, keyText, modKey, onscreenly, setButtonKind, setSessionButton };
+export {
+  $,
+  acceleratorKeys,
+  combo,
+  isMac,
+  isWindows,
+  kbd,
+  keyText,
+  modKey,
+  onscreenly,
+  setButtonKind,
+  setSessionButton,
+  setShortcutMap,
+  shortcutKeys
+};

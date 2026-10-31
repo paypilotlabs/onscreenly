@@ -11,12 +11,12 @@
     <!-- Toolbar: a 36px pill of text buttons. Press anywhere that isn't a control to drag the window. -->
     <div id="toolbar" role="group" aria-label="Onscreenly" title="Drag to move">
       <button type="button" class="tb-btn tb-stop" id="stop-btn" title="Start session (⌘⇧L)" aria-label="Start session" aria-keyshortcuts="Meta+Shift+L">
-        <span class="tb-stop-row"><span class="tb-lead"><span id="live-dot" class="off"></span></span><span class="tb-stop-label">Start session</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift L">⌘⇧L</span></span>
+        <span class="tb-stop-row"><span class="tb-lead"><span id="live-dot" class="off"></span></span><span class="tb-stop-label">Start session</span><span class="tb-hint" aria-hidden="true" data-shortcut="listening">⌘⇧L</span></span>
         <!-- Sizer: the widest state, "● End session" and its hint, kept invisible so every state has one width. -->
-        <span class="tb-stop-row tb-stop-sizer" aria-hidden="true"><span class="tb-sizer-dot"></span><span>End session</span><span class="tb-hint" data-combo="mod shift L">⌘⇧L</span></span>
+        <span class="tb-stop-row tb-stop-sizer" aria-hidden="true"><span class="tb-sizer-dot"></span><span>End session</span><span class="tb-hint" data-shortcut="listening">⌘⇧L</span></span>
       </button>
       <button type="button" class="tb-btn tb-hide" id="hide-btn" title="Hide (⌘⇧/)" aria-label="Hide" aria-keyshortcuts="Meta+Shift+/" aria-expanded="true" aria-controls="panel-wrap">
-        <span class="tb-hide-label">Hide</span><span class="tb-hint" aria-hidden="true" data-combo="mod shift /">⌘⇧/</span><span class="tb-unread" aria-hidden="true"></span>
+        <span class="tb-hide-label">Hide</span><span class="tb-hint" aria-hidden="true" data-shortcut="hide">⌘⇧/</span><span class="tb-unread" aria-hidden="true"></span>
       </button>
       <div class="tb-divider" aria-hidden="true"></div>
       <div class="tb-opacity-wrap">
@@ -60,11 +60,11 @@
                   <p class="es-body">Start a session to listen, or ask anything below.</p>
                 </div>
                 <dl class="es-keys">
-                  <div class="es-key"><dt data-keys="mod shift L"></dt><dd>Start or end a session</dd></div>
-                  <div class="es-key"><dt data-keys="mod ↵"></dt><dd>What should I say?</dd></div>
-                  <div class="es-key"><dt data-keys="mod shift ↵"></dt><dd class="es-assist-label">Assist</dd></div>
-                  <div class="es-key"><dt data-keys="mod H"></dt><dd>Solve the coding problem on screen</dd></div>
-                  <div class="es-key"><dt data-keys="mod shift /"></dt><dd>Hide or show</dd></div>
+                  <div class="es-key"><dt data-shortcut-keys="listening"></dt><dd>Start or end a session</dd></div>
+                  <div class="es-key"><dt data-shortcut-keys="say"></dt><dd>What should I say?</dd></div>
+                  <div class="es-key"><dt data-shortcut-keys="assist"></dt><dd class="es-assist-label">Assist</dd></div>
+                  <div class="es-key"><dt data-shortcut-keys="leetcode"></dt><dd>Solve the coding problem on screen</dd></div>
+                  <div class="es-key"><dt data-shortcut-keys="hide"></dt><dd>Hide or show</dd></div>
                 </dl>
               </div>
               <div class="es-variant es-listening">
@@ -82,11 +82,11 @@
             </div>
 
             <div id="action-row">
-              <button type="button" class="act act-primary" data-mode="say" title="Suggests what to say next based on the conversation (⌘↵)">
-                <span class="act-label">What should I say?</span><span class="shortcut-hint" id="say-shortcut-hint" aria-hidden="true" data-combo="mod ↵">⌘↵</span>
+              <button type="button" class="act act-primary" data-mode="say" title="Suggests what to say next based on the conversation (⌘⌥↵)">
+                <span class="act-label">What should I say?</span><span class="shortcut-hint" id="say-shortcut-hint" aria-hidden="true" data-shortcut="say">⌘⌥↵</span>
               </button>
               <button type="button" class="act act-secondary" data-mode="assist" title="Scans your screen and conversation to decide what you need (⌘⇧↵)">
-                <span class="act-label">Assist</span><span class="shortcut-hint" id="assist-shortcut-hint" aria-hidden="true" data-combo="mod shift ↵">⌘⇧↵</span>
+                <span class="act-label">Assist</span><span class="shortcut-hint" id="assist-shortcut-hint" aria-hidden="true" data-shortcut="assist">⌘⇧↵</span>
               </button>
               <button type="button" class="act" data-mode="recap" title="Sums up the conversation so far">
                 <span class="act-label">Recap</span>
@@ -450,6 +450,15 @@
             <span id="s-opacity-value" class="num">100%</span>
           </div>
           <p class="s-help">Applies to the toolbar, the answer panel and these dialogs. Shortcuts keep working at any opacity.</p>
+        </section>
+
+        <section class="s-group" id="shortcut-settings">
+          <div class="s-group-head"><h3 class="s-eyebrow">Keyboard shortcuts</h3><span class="s-hint">Work in every app while Onscreenly runs</span></div>
+          <div id="shortcut-rows"></div>
+          <p class="s-help" id="shortcut-note" aria-live="polite">Click a shortcut, then press the new keys. Esc cancels.</p>
+          <div class="whisper-actions s-actions">
+            <button type="button" id="shortcut-reset" class="s-action btn btn-secondary compact">Reset to defaults</button>
+          </div>
         </section>
       </div>
 

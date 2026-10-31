@@ -86,8 +86,9 @@ async function requestPermissions() {
 
 /**
  * What launch does about missing OS permissions. Pure, so each platform's branch is unit-tested.
- *  - 'gate': macOS. The permissions window is the first screen, and the overlay starts only after
- *    Continue, once both permissions are allowed.
+ *  - 'gate': no platform today. macOS used to hold the whole app until both Microphone and Screen
+ *    Recording were allowed, which blocked text-only use (typing a question, résumé prep); now each
+ *    permission is asked for when the feature that needs it is first used.
  *  - 'beside': Windows, for a returning user whose microphone is off. The overlay starts at once and
  *    the window shows above it; Continue closes it with or without the microphone.
  *  - 'none': everything is allowed; Linux, which asks for nothing; or a first run on Windows, where
@@ -95,7 +96,6 @@ async function requestPermissions() {
  */
 function permissionGatePlan({ platform, onboarded, allGranted }) {
   if (allGranted) return 'none';
-  if (platform === 'darwin') return 'gate';
   if (platform === 'win32' && onboarded) return 'beside';
   return 'none';
 }
