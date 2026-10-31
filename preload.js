@@ -12,6 +12,7 @@ const api = {
   whisperModelImport: (modelId) => ipcRenderer.invoke('whisper:model-import', modelId),
   platformInfo: () => ipcRenderer.invoke('platform:info'),
   ask: (payload) => ipcRenderer.send('ask', payload),
+  cancelAnswer: () => ipcRenderer.send('llm:cancel'),
   captureToggle: () =>
     ipcRenderer.invoke('capture:toggle').catch((err) => {
       console.error('[onscreenly] captureToggle error', err);

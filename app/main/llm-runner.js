@@ -13,13 +13,48 @@ const publikController = require('./publik-controller');
 const { retrieveNotes } = require('./knowledge');
 
 const STREAM_INACTIVITY_MS = 25000; // abort a stalled LLM stream so state.busy can't wedge forever
+// The steps before the stream (screenshot, note search) get their own limits: a hung step there
+// used to leave state.busy set for good, so every later question was silently dropped.
+const SCREENSHOT_TIMEOUT_MS = 10000;
+const NOTES_TIMEOUT_MS = 5000;
+
+// The answer being produced, so Stop (llm:cancel) can cancel the request itself.
+let current = null;
+
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_res, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), ms);
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
+/** Stops the answer in progress: cancels the provider request and settles the answer as stopped. */
+function cancelCurrent() {
+  if (current) current.cancel();
+}
 
 async function runFeature(mode, userText) {
   const { state, transcript } = session;
-  if (state.busy) return;
+  if (state.busy) {
+    send('status', { message: 'Still answering the previous question. Stop it (Esc) or wait for it to finish.' });
+    return;
+  }
   const def = MODES[mode];
   if (!def) return;
   state.busy = true;
+  const controller = new AbortController();
+  let cancelled = false;
+  let cancelStream = () => {};
+  current = {
+    cancel() {
+      cancelled = true;
+      controller.abort();
+      cancelStream();
+    }
+  };
   let streamSettled = false; // drop stray tokens from a stream we've already abandoned
   let streamStarted = false;
   let receivedTokens = false;
@@ -82,9 +117,10 @@ async function runFeature(mode, userText) {
     let imageDataUrl = null;
     if (def.needsScreen) {
       try {
-        imageDataUrl = await captureScreenshot();
+        imageDataUrl = await withTimeout(captureScreenshot(), SCREENSHOT_TIMEOUT_MS, 'Screen capture timed out.');
         if (!imageDataUrl) throw new Error('No screen source was available.');
       } catch (e) {
+        imageDataUrl = null;
         recordEvent({
           level: 'error',
           event: 'screen_capture_failed',
@@ -98,9 +134,15 @@ async function runFeature(mode, userText) {
             : process.platform === 'win32'
               ? 'Screen capture failed. Make sure Onscreenly is not blocked by Windows privacy or security software, then try again.'
               : 'Screen capture failed. Check your desktop capture permissions, then try again.';
+        // LeetCode reads the problem from the screen; without it there is nothing to solve.
+        if (def.requiresScreen) {
+          send('llm:error', { message, code: 'needs-screen' });
+          return;
+        }
         send('status', { message });
       }
     }
+    if (cancelled) return;
 
     // Follow-up / Recap have nothing to work with before anything was heard —
     // sent to the model anyway, it fabricates plausible generic output that
@@ -134,14 +176,20 @@ async function runFeature(mode, userText) {
       mode !== 'leetcode' && !def.ownContext && session.meetingMemory ? session.meetingMemory.memoryBlock() : null;
     if (memoryBlock) contextBlock = contextBlock ? contextBlock + '\n\n' + memoryBlock : memoryBlock;
     // Matching notes from the user's Obsidian vault, when Knowledge is on.
-    const notes = await retrieveNotes(mode, ctx).catch((e) => {
+    const notes = await withTimeout(retrieveNotes(mode, ctx), NOTES_TIMEOUT_MS, 'note search timed out').catch((e) => {
       console.warn('[knowledge] note search failed:', e && e.message);
       return { block: '', sources: [] };
     });
+    if (cancelled) return;
     if (notes.block) contextBlock = contextBlock ? contextBlock + '\n\n' + notes.block : notes.block;
     console.log(`[llm] notes=${notes.sources.length}`);
     const system = def.buildSystem ? def.buildSystem(contextBlock, settingsForPrompt.aiRules || '') : def.system || '';
-    const built = def.build(ctx);
+    let built = def.build(ctx);
+    // A mode that looks at the screen, run without a screenshot: say so, so the answer does not
+    // describe a screenshot it never saw.
+    if (def.needsScreen && !imageDataUrl) {
+      built += '\n\n(No screenshot is attached: screen capture was unavailable. Do not refer to a screenshot.)';
+    }
 
     // Watchdog: a provider that stalls mid-stream would otherwise hang the await forever,
     // leaving state.busy = true and wedging every later question until an app restart.
@@ -150,28 +198,42 @@ async function runFeature(mode, userText) {
     const stalled = new Promise((_res, reject) => {
       rearm = () => {
         clearTimeout(watchdog);
-        watchdog = setTimeout(
-          () => reject(new Error('the model stopped responding (timed out). Please try again.')),
-          STREAM_INACTIVITY_MS
-        );
+        watchdog = setTimeout(() => {
+          // Cancel the request itself, not only the wait for it: an abandoned stream would keep
+          // generating (and billing) after the user is told it timed out.
+          controller.abort();
+          reject(new Error('the model stopped responding (timed out). Please try again.'));
+        }, STREAM_INACTIVITY_MS);
       };
       rearm();
+      cancelStream = () => reject(Object.assign(new Error('Stopped.'), { stopped: true }));
     });
     // A failure from here on is the provider's, and worth a retry. Once part of the answer has
     // arrived, the answer was interrupted rather than refused.
     streamStarted = true;
+    let truncated = false;
+    let answer = '';
     try {
       await Promise.race([
         llm.stream({
           system,
           turns: [{ role: 'user', text: built }],
           imageDataUrl,
+          signal: controller.signal,
           ...(def.maxTokens ? { maxTokens: def.maxTokens } : {}),
           onToken: (t) => {
             if (streamSettled) return;
             rearm();
             receivedTokens = true;
+            answer += t;
             send('llm:token', { text: t });
+          },
+          // A reasoning model thinks before it writes: that is progress, not a stall.
+          onActivity: () => {
+            if (!streamSettled) rearm();
+          },
+          onFinish: (info) => {
+            truncated = !!(info && info.truncated);
           },
           onResponse:
             settings.provider === publik.PUBLIK_PROVIDER
@@ -184,11 +246,19 @@ async function runFeature(mode, userText) {
       streamSettled = true;
       clearTimeout(watchdog);
     }
-    send('llm:done', { sources: notes.sources });
+    if (!answer.trim()) {
+      throw new Error('The model returned an empty answer. Try again, or pick another model in Settings.');
+    }
+    send('llm:done', { sources: notes.sources, truncated });
     // Streams settle after their headers, so the charge is reconciled from
     // GET /wallet shortly after the answer — one request per answer, debounced.
     if (settings.provider === publik.PUBLIK_PROVIDER) publikController.publikScheduleWalletRefresh();
   } catch (e) {
+    // Stop: keep what arrived, marked as stopped. Never an error.
+    if (cancelled) {
+      send('llm:done', { stopped: true });
+      return;
+    }
     recordEvent({
       level: 'error',
       event: 'llm_failed',
@@ -197,13 +267,17 @@ async function runFeature(mode, userText) {
       context: { mode, provider: store.getSettings().provider }
     });
     const action = e && e.action ? e.action : null;
-    const code = action || !streamStarted ? undefined : receivedTokens ? 'interrupted' : 'provider-failed';
+    const code =
+      action || !streamStarted ? undefined : e && e.code ? e.code : receivedTokens ? 'interrupted' : 'provider-failed';
     send('llm:error', { message: e && e.message ? e.message : String(e), action, code });
     if (action) publikController.publikHandleErrorAction(action);
   } finally {
     streamSettled = true;
     state.busy = false;
+    current = null;
+    // A Stop that came before the stream started: the renderer is still waiting for an end.
+    if (cancelled && !streamStarted) send('llm:done', { stopped: true });
   }
 }
 
-module.exports = { runFeature, STREAM_INACTIVITY_MS };
+module.exports = { runFeature, cancelCurrent, STREAM_INACTIVITY_MS };

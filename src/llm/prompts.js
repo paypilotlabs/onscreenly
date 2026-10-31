@@ -253,6 +253,7 @@ const MODES = {
   // ── LeetCode: pure coding solver — no personal context, no AI rules ─────
   leetcode: {
     needsScreen: true,
+    requiresScreen: true, // the problem is only on the screen: no screenshot, no answer
     userBubble: "Solve what's on screen",
     small: false,
     resumeMode: 'leetcode',

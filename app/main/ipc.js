@@ -10,7 +10,7 @@ const { appLinkConsentState, revokeAppLinkCaller, revokeAllAppLinkCallers } = re
 const { WIN_BUILD, WIN_SUPPORTS_CONTENT_PROTECTION } = require('./platform');
 const { session, send } = require('./session');
 const { getWin } = require('./window');
-const { runFeature } = require('./llm-runner');
+const { runFeature, cancelCurrent } = require('./llm-runner');
 const { MODES } = require('../../src/llm/prompts');
 const {
   isAllowedPaneUrl,
@@ -119,6 +119,8 @@ function registerAppIpc() {
     send('slides:update', { count: 0, last: null });
     return { ok: true };
   });
+  // Stop: cancels the answer in progress (Send while busy, or Escape).
+  on('llm:cancel', () => cancelCurrent());
   on('ask', (_e, payload) => {
     if (!isValidAskPayload(payload, MODES)) {
       // A well-formed question that is only too long gets an answer the user

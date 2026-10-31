@@ -22,7 +22,8 @@ function stub(rel, exports) {
 }
 
 stub('src/storage/store.js', { getSettings: () => settings });
-stub('src/capture/screen.js', { captureScreenshot: async () => 'data:image/png;base64,AA==' });
+let screenshot;
+stub('src/capture/screen.js', { captureScreenshot: () => screenshot() });
 stub('src/llm/llm.js', { createLLM: () => llm });
 stub('src/integrations/applink.js', { recordEvent: () => {} });
 stub('app/main/publik-controller.js', {
@@ -33,7 +34,7 @@ stub('app/main/publik-controller.js', {
 stub('app/main/knowledge.js', { retrieveNotes: async () => ({ block: '', sources: [] }) });
 
 const { session, setSender } = require('../../app/main/session');
-const { runFeature } = require('../../app/main/llm-runner');
+const { runFeature, cancelCurrent } = require('../../app/main/llm-runner');
 
 function baseSettings(overrides = {}) {
   return {
@@ -62,6 +63,7 @@ async function run(t, mode, text = '') {
 }
 
 test.beforeEach(() => {
+  screenshot = async () => 'data:image/png;base64,AA==';
   settings = baseSettings();
   llm = readyLLM(async ({ onToken }) => onToken('Use a sliding window.'));
   session.state.capturing = false;
@@ -145,4 +147,130 @@ test('a stream error that carries an action gets no code', async (t) => {
   assert.equal(errors.length, 1);
   assert.deepEqual(errors[0].action, { kind: 'claim', label: 'Pick a plan' });
   assert.equal(errors[0].code, undefined);
+});
+
+// Lets pending promise callbacks run between mocked timer ticks.
+const settle = () => new Promise((r) => setImmediate(r));
+
+function runAsync(t, mode, text = '') {
+  t.mock.method(console, 'log', () => {});
+  t.mock.method(console, 'warn', () => {});
+  const sent = [];
+  setSender((channel, data) => sent.push({ channel, data }));
+  const finished = runFeature(mode, text);
+  const of = (channel) => sent.filter((m) => m.channel === channel).map((m) => m.data);
+  return { finished, of };
+}
+
+test('a screenshot that never returns times out instead of wedging every later question', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  screenshot = () => new Promise(() => {});
+  const { finished, of } = runAsync(t, 'ask', 'What is a mutex?');
+  await settle();
+  t.mock.timers.tick(10000);
+  await settle();
+  await finished;
+  assert.equal(of('llm:done').length, 1, 'the question is still answered, without a screenshot');
+  assert.equal(session.state.busy, false);
+});
+
+test('Ask without a screenshot tells the model there is none; LeetCode stops with needs-screen', async (t) => {
+  screenshot = async () => null;
+  let prompt = '';
+  llm = readyLLM(async ({ turns, onToken }) => {
+    prompt = turns[0].text;
+    onToken('ok');
+  });
+  await run(t, 'ask', 'What is a mutex?');
+  assert.match(prompt, /No screenshot is attached/);
+  const leet = await run(t, 'leetcode');
+  assert.equal(leet.errors.length, 1);
+  assert.equal(leet.errors[0].code, 'needs-screen');
+});
+
+test('Stop cancels the provider request and ends the answer as stopped, not as an error', async (t) => {
+  let signal;
+  llm = readyLLM(({ onToken, signal: s }) => {
+    signal = s;
+    onToken('Partial');
+    return new Promise(() => {}); // a provider that would keep going
+  });
+  const { finished, of } = runAsync(t, 'ask', 'q');
+  await settle();
+  cancelCurrent();
+  await finished;
+  assert.equal(signal.aborted, true, 'the request itself is cancelled');
+  assert.deepEqual(of('llm:done'), [{ stopped: true }]);
+  assert.deepEqual(of('llm:error'), []);
+  assert.equal(session.state.busy, false);
+});
+
+test('the stall watchdog cancels the request it gives up on', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let signal;
+  llm = readyLLM(({ signal: s }) => {
+    signal = s;
+    return new Promise(() => {});
+  });
+  const { finished, of } = runAsync(t, 'say');
+  await settle();
+  t.mock.timers.tick(25000);
+  await finished;
+  assert.equal(signal.aborted, true);
+  assert.match(of('llm:error')[0].message, /timed out/);
+});
+
+test('a reasoning model that is thinking is not mistaken for a stall', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let hooks;
+  let finish;
+  llm = readyLLM((params) => {
+    hooks = params;
+    return new Promise((r) => (finish = r));
+  });
+  const { finished, of } = runAsync(t, 'say');
+  await settle();
+  for (let i = 0; i < 4; i++) {
+    t.mock.timers.tick(20000);
+    hooks.onActivity();
+  }
+  hooks.onToken('Here is the answer.');
+  finish('Here is the answer.');
+  await finished;
+  assert.deepEqual(of('llm:error'), []);
+  assert.equal(of('llm:done').length, 1);
+});
+
+test('an answer cut off at the length limit is marked truncated; an empty one is an error', async (t) => {
+  llm = readyLLM(async ({ onToken, onFinish }) => {
+    onToken('Step one, then');
+    onFinish({ truncated: true });
+  });
+  const cut = await run(t, 'say');
+  assert.equal(cut.done[0].truncated, true);
+
+  llm = readyLLM(async ({ onFinish }) => onFinish({ truncated: false }));
+  const empty = await run(t, 'say');
+  assert.equal(empty.done.length, 0);
+  assert.equal(empty.errors[0].code, 'provider-failed');
+  assert.match(empty.errors[0].message, /empty answer/);
+});
+
+test('a provider error with its own code (a rejected key) keeps it', async (t) => {
+  llm = readyLLM(async () => {
+    throw Object.assign(new Error('OpenAI rejected the API key (401).'), { code: 'no-provider' });
+  });
+  const { errors } = await run(t, 'say');
+  assert.equal(errors[0].code, 'no-provider');
+});
+
+test('a question while another is being answered is not silently dropped', async (t) => {
+  session.state.busy = true;
+  t.mock.method(console, 'log', () => {});
+  const sent = [];
+  setSender((channel, data) => sent.push({ channel, data }));
+  await runFeature('say', '');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].channel, 'status');
+  assert.match(sent[0].data.message, /Still answering/);
 });
