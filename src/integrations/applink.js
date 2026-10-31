@@ -204,6 +204,11 @@ function revokeAppLinkCaller(callerId) {
   return link ? link.consent.revoke(callerId) : false;
 }
 
+// Forgets every program the user has let see or control Onscreenly ("Delete all my data").
+function revokeAllAppLinkCallers() {
+  return link ? link.consent.revokeAll() : false;
+}
+
 async function stopAppLink() {
   if (!link) return;
   const current = link;
@@ -217,6 +222,7 @@ module.exports = {
   recordEvent,
   appLinkConsentState,
   revokeAppLinkCaller,
+  revokeAllAppLinkCallers,
   describeState,
   requestConsent
 };

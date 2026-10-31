@@ -20,8 +20,10 @@ const NOTES_SYSTEM =
 const DEFAULTS = {
   resumeWindowMs: 30 * 60 * 1000, // an open meeting whose last turn is older than this is treated as over
   minTurnsForNotes: 4, // fewer than this is a false start, not a meeting worth notes
-  maxMeetings: 50, // kept on disk; oldest are pruned
-  memoryCount: 3 // summaries offered to prompts
+  maxMeetings: 50, // kept on disk; oldest are pruned (getKeep() from settings wins when given)
+  memoryCount: 3, // summaries offered to prompts
+  maxTranscriptChars: 200_000, // about 3.5 hours of speech; then the meeting continues as a new record
+  maxNotesAttempts: 2 // a meeting whose notes keep failing is not re-sent to the provider at every launch
 };
 
 function createMeetingMemory(opts) {
@@ -32,6 +34,13 @@ function createMeetingMemory(opts) {
   let current = null; // the meeting the live transcript is being written to
   let notesTurnCount = 0; // transcript length when notes were last written for `current`
   let notesInFlight = null;
+  let disposed = false;
+  // How many meetings to keep on disk; 0 means meeting history is not saved at all.
+  const keep = () => {
+    const n = typeof opts.getKeep === 'function' ? opts.getKeep() : cfg.maxMeetings;
+    return Number.isFinite(n) && n >= 0 ? n : cfg.maxMeetings;
+  };
+  const transcriptChars = (m) => m.transcript.reduce((n, t) => n + (t.text ? t.text.length : 0), 0);
 
   function lastTurnTs(m) {
     return m.transcript.length ? m.transcript[m.transcript.length - 1].ts : m.startedAt;
@@ -46,17 +55,27 @@ function createMeetingMemory(opts) {
   // Write notes for a meeting with the LLM. Resolves to the parsed notes, or
   // null when there is nothing to do (too short, no usable provider, failure).
   async function writeNotes(m) {
-    if (!m || m.transcript.length < cfg.minTurnsForNotes) return null;
+    if (disposed || !m || m.transcript.length < cfg.minTurnsForNotes) return null;
     const llm = llmFactory();
     if (!llm || !llm.ready) return null;
+    // A meeting deleted (or the whole history cleared) while the notes were being written must not
+    // come back when they arrive.
+    const stillThere = () => !disposed && store.get(m.id) === m;
+    const failedOnce = () => {
+      if (stillThere()) store.update(m.id, { notesAttempts: (m.notesAttempts || 0) + 1 });
+    };
     try {
       const text = await llm.stream({
         system: NOTES_SYSTEM,
         turns: [{ role: 'user', text: buildNotesPrompt(m.transcript) }],
         onToken: () => {}
       });
+      if (!stillThere()) return null;
       const notes = parseNotes(text);
-      if (!notes.summary) return null;
+      if (!notes.summary) {
+        failedOnce();
+        return null;
+      }
       store.update(m.id, {
         ...notes,
         title: titleFor(notes.summary, m.startedAt),
@@ -67,6 +86,7 @@ function createMeetingMemory(opts) {
       return notes;
     } catch (e) {
       log(`notes failed for meeting ${m.id}: ${e && e.message}`);
+      failedOnce();
       return null;
     }
   }
@@ -96,12 +116,21 @@ function createMeetingMemory(opts) {
     // Every live transcript turn lands here. A meeting opens on the first
     // turn; a long silence since the previous turn means the last one is over.
     onTurn(turn) {
+      if (disposed || keep() === 0) return; // meeting history is off, or being deleted
       if (current && now() - lastTurnTs(current) > cfg.resumeWindowMs) this.end();
+      // A very long conversation continues as a new record, so no single meeting (and no notes
+      // prompt) grows without bound. Nothing is dropped.
+      let continuedFrom = null;
+      if (current && transcriptChars(current) >= cfg.maxTranscriptChars) {
+        continuedFrom = current.id;
+        this.end();
+      }
       if (!current) {
         current = store.add();
+        if (continuedFrom) store.update(current.id, { continuedFrom });
         notesTurnCount = 0;
-        store.prune(cfg.maxMeetings);
-        log(`meeting ${current.id} started`);
+        store.prune(keep());
+        log(`meeting ${current.id} started${continuedFrom ? ` (continues ${continuedFrom})` : ''}`);
       }
       store.addTurn(current.id, turn);
     },
@@ -139,9 +168,18 @@ function createMeetingMemory(opts) {
 
     // Launch-time catch-up: meetings that ended without notes (quit, crash).
     async catchUp() {
-      const pending = store.all().filter((m) => m.endedAt && !m.summary && m.transcript.length >= cfg.minTurnsForNotes);
+      const pending = store
+        .all()
+        .filter(
+          (m) =>
+            m.endedAt &&
+            !m.summary &&
+            m.transcript.length >= cfg.minTurnsForNotes &&
+            (m.notesAttempts || 0) < cfg.maxNotesAttempts
+        );
       let written = 0;
       for (const m of pending) {
+        if (disposed) break;
         if (await writeNotes(m)) written++;
       } // sequential: one provider call at a time
       return written;
@@ -150,6 +188,7 @@ function createMeetingMemory(opts) {
     // "Previous meetings" context for prompts — summaries only, never full
     // transcripts, and never the meeting that is happening right now.
     memoryBlock() {
+      if (keep() === 0) return null;
       const items = store
         .recentSummaries(cfg.memoryCount + 1)
         .filter((m) => !current || m.id !== current.id)
@@ -160,7 +199,23 @@ function createMeetingMemory(opts) {
     },
 
     flush() {
-      store.flush();
+      return store.flush();
+    },
+
+    // Stops recording and any write still on its way (notes included): used before the history is
+    // deleted, so nothing that is already in memory can bring it back.
+    dispose() {
+      disposed = true;
+      current = null;
+      notesTurnCount = 0;
+      store.close();
+    },
+
+    // Deletes every meeting but keeps recording new ones.
+    clearHistory() {
+      current = null;
+      notesTurnCount = 0;
+      store.clearAll();
     }
   };
 }

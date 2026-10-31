@@ -90,11 +90,53 @@ test('a corrupt live file is recovered from the backup generation', (t) => {
   assert.equal(result.data.apiKeys.anthropic, undefined, 'recovers the PREVIOUS generation, not the latest');
 });
 
-test('a corrupt file with no usable backup returns null rather than throwing', (t) => {
+test('a corrupt file with no usable backup is reported, not thrown, and left in place', (t) => {
   const dir = tempDir(t);
   fs.writeFileSync(path.join(dir, 'onscreenly-data.json'), 'not json at all');
   const fileStore = createFileStore(() => dir, 'onscreenly-data.json');
-  assert.equal(fileStore.load(), null);
+  assert.deepEqual(fileStore.load(), { data: null, recoveredFromBackup: false, mainCorrupt: true });
+  assert.equal(fs.readFileSync(path.join(dir, 'onscreenly-data.json'), 'utf8'), 'not json at all');
+});
+
+test('quarantineMain sets the damaged file aside byte for byte, so a save cannot overwrite it', (t) => {
+  const dir = tempDir(t);
+  fs.writeFileSync(path.join(dir, 'm.json'), '[{"id":"a"');
+  fs.writeFileSync(path.join(dir, 'm.json.bak'), '[{"id":"b"}]');
+  const fileStore = createFileStore(() => dir, 'm.json', { validate: Array.isArray });
+  const loaded = fileStore.load();
+  assert.deepEqual(loaded, { data: [{ id: 'b' }], recoveredFromBackup: true, mainCorrupt: true });
+  const aside = fileStore.quarantineMain();
+  assert.equal(fs.readFileSync(aside, 'utf8'), '[{"id":"a"');
+  fileStore.persist(loaded.data);
+  assert.equal(fs.readFileSync(aside, 'utf8'), '[{"id":"a"', 'the set-aside copy is untouched');
+  assert.equal(fs.readFileSync(path.join(dir, 'm.json.bak'), 'utf8'), '[{"id":"b"}]', 'the good backup survives');
+});
+
+test('validate treats parseable but wrong-shaped JSON as corrupt', (t) => {
+  const dir = tempDir(t);
+  fs.writeFileSync(path.join(dir, 'm.json'), '{"not":"a list"}');
+  const fileStore = createFileStore(() => dir, 'm.json', { validate: Array.isArray });
+  assert.equal(fileStore.load().mainCorrupt, true);
+});
+
+test('a file over maxBytes is reported without being read', (t) => {
+  const dir = tempDir(t);
+  fs.writeFileSync(path.join(dir, 'm.json'), '[' + '1,'.repeat(600) + '1]');
+  const fileStore = createFileStore(() => dir, 'm.json', { maxBytes: 1000 });
+  const loaded = fileStore.load();
+  assert.equal(loaded.tooLarge, true);
+  assert.ok(loaded.size > 1000);
+});
+
+test('persistAsync writes atomically with a backup and owner-only permissions', async (t) => {
+  const dir = tempDir(t);
+  const fileStore = createFileStore(() => dir, 'm.json', { compact: true });
+  await fileStore.persistAsync([1]);
+  await fileStore.persistAsync([1, 2]);
+  assert.equal(fs.readFileSync(path.join(dir, 'm.json'), 'utf8'), '[1,2]');
+  assert.equal(fs.readFileSync(path.join(dir, 'm.json.bak'), 'utf8'), '[1]');
+  assert.equal(fs.existsSync(path.join(dir, 'm.json.tmp')), false);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, 'm.json')).mode & 0o777, 0o600);
 });
 
 test('persist() throws rather than swallowing a failure, so a caller can surface it', (t) => {

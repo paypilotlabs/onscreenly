@@ -104,6 +104,9 @@ const DEFAULTS = {
   // captions too. Keyed by app-link caller id; value is 'granted' or 'denied'.
   applinkSlidesConsent: {}, // Legacy Cue decisions, retained but not honored by the new app identity.
   applinkSlidesConsentByApp: {},
+  // How many meetings to keep (0 = don't save meeting history). Changed through the
+  // meetings:set-retention IPC, which confirms before deleting anything.
+  meetingHistory: { keep: 50 },
   // Window position
   windowX: null,
   windowY: null,
@@ -146,7 +149,14 @@ function clampOpacity(value) {
   return Math.min(MAX_OPACITY, Math.max(MIN_OPACITY, Math.round(n * 100) / 100));
 }
 
-const RENDERER_READ_ONLY = ['publik', 'applinkSlidesConsent', 'applinkSlidesConsentByApp', 'windowX', 'windowY'];
+const RENDERER_READ_ONLY = [
+  'publik',
+  'applinkSlidesConsent',
+  'applinkSlidesConsentByApp',
+  'windowX',
+  'windowY',
+  'meetingHistory'
+];
 // Settings the renderer may write that have no default of their own (absent until first set).
 const RENDERER_EXTRA_FIELDS = { onboarded: false, sttModel: '', resumeContext: '' };
 
@@ -188,6 +198,7 @@ let keyMode = 'pending';
 let secretsFile = null;
 let secretsWrite = Promise.resolve();
 let lastWrittenKeys = null; // JSON of the key map secrets.bin holds
+let secretsError = null; // the last failed encrypted-key write, until one succeeds
 
 // The Ollama "key" field holds a local URL, not a secret, so Settings shows it as is.
 const UNMASKED_KEYS = new Set(['ollama']);
@@ -225,14 +236,15 @@ function queueSecretsWrite() {
     .then(async () => {
       await file.write(JSON.parse(snapshot));
       lastWrittenKeys = snapshot;
+      secretsError = null;
       if (keyMode === 'unreadable') keyMode = 'encrypted';
     })
     .catch((e) => {
-      // Never lose a key: if it cannot be written encrypted, keep it in the
-      // settings file the way it was stored before encryption existed.
+      // A key store that fails once (locked, busy) is not a reason to write the key to disk in
+      // plain text for the rest of the session. The key stays in memory, the next save retries,
+      // and settings:set reports the failure instead of "Saved".
       console.error('[onscreenly] could not write encrypted API keys:', e && e.message);
-      keyMode = 'unavailable';
-      save();
+      secretsError = e;
     });
 }
 
@@ -317,6 +329,11 @@ function flushSecrets() {
   return secretsWrite.catch(() => {});
 }
 
+/** Null when the API keys on disk match the ones in memory; the Error of the last failed write otherwise. */
+function secretsSaveError() {
+  return secretsError;
+}
+
 /** Removes the settings file, its backup and the encrypted keys. */
 async function deleteLocalSettings() {
   await flushSecrets();
@@ -330,6 +347,7 @@ async function deleteLocalSettings() {
   if (secretsFile) secretsFile.remove();
   data = null;
   lastWrittenKeys = null;
+  secretsError = null;
 }
 
 function deepMerge(base, over) {
@@ -337,6 +355,10 @@ function deepMerge(base, over) {
   for (const k of Object.keys(over || {})) {
     if (over[k] && typeof over[k] === 'object' && !Array.isArray(over[k]) && typeof base[k] === 'object') {
       out[k] = deepMerge(base[k], over[k]);
+    } else if (isPlainObject(base[k]) && !isPlainObject(over[k])) {
+      // A block of settings replaced by null, a string or a list (a hand-edited or damaged file)
+      // keeps its defaults; "publik": null used to stop the app from launching.
+      continue;
     } else {
       if (k === 'aiRules' && typeof over[k] === 'string') {
         out[k] = over[k].slice(0, MAX_AI_RULES_CHARS);
@@ -351,7 +373,9 @@ function deepMerge(base, over) {
 function load() {
   if (data) return data;
   const loaded = fileStore.load();
-  data = deepMerge(DEFAULTS, loaded ? loaded.data : {});
+  data = deepMerge(DEFAULTS, loaded && loaded.data ? loaded.data : {});
+  // Keep a damaged file for inspection instead of letting the next save copy it over the backup.
+  if (loaded && loaded.mainCorrupt) fileStore.quarantineMain();
   if (loaded && loaded.recoveredFromBackup) save(); // best-effort heal so the corruption doesn't linger
   return data;
 }
@@ -444,6 +468,7 @@ module.exports = {
   initSecureStorage,
   keyStorageStatus,
   flushSecrets,
+  secretsSaveError,
   deleteLocalSettings,
   getSettings() {
     return load();

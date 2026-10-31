@@ -127,7 +127,11 @@ for (const corruptPrimary of [false, true]) {
     if (corruptPrimary) write('cue-data.json', '{broken');
     write('cue-data.json.bak', '{"onboarded":true}');
     const store = createFileStore(() => root, resolveSettingsFilename);
-    assert.deepEqual(store.load(), { data: { onboarded: true }, recoveredFromBackup: true });
+    assert.deepEqual(store.load(), {
+      data: { onboarded: true },
+      recoveredFromBackup: true,
+      ...(corruptPrimary ? { mainCorrupt: true } : {})
+    });
     store.persist({ onboarded: true, opacity: 0.8 });
     assert.equal(fs.existsSync(path.join(root, 'onscreenly-data.json')), false);
     const reopened = createFileStore(() => root, resolveSettingsFilename);

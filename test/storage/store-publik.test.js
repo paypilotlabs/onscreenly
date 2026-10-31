@@ -286,3 +286,13 @@ test('a Settings save leaves the window position the main process saved', () => 
   assert.equal(store.getSettings().windowX, 350);
   assert.equal(store.getSettings().windowY, 150);
 });
+
+test('a settings block replaced by null or a string keeps its defaults and the app still starts', () => {
+  const { store } = loadStore({ provider: 'openai', publik: null, models: 'abc', slides: [1], localWhisper: 'x' });
+  const s = store.getSettings();
+  assert.equal(typeof s.publik, 'object');
+  assert.equal(s.publik.defaultApplied, false);
+  assert.equal(typeof s.models.openai.fast, 'string');
+  assert.equal(s.slides.intervalMs, 3000);
+  assert.doesNotThrow(() => store.applyPublikDefault(AVAILABLE));
+});

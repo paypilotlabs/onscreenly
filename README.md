@@ -73,7 +73,7 @@ On first launch, grant the microphone and screen permissions, then open Settings
 ## Privacy
 
 - API keys are encrypted with your operating system's key store.
-- Meeting history, notes and your profile stay on your computer. **Settings → API Keys → Delete all my data** removes them.
+- Meeting history, notes and your profile stay on your computer. **Settings → API Keys → Your data** sets how many meetings are kept (or none) and deletes the history; **Delete all my data** removes everything.
 - Screenshots, conversation context and (if you turn it on) matching Obsidian excerpts go only to the AI provider you choose.
 - Screen-share hiding is **best effort**, not a guarantee. Check what others actually see in your meeting app.
 

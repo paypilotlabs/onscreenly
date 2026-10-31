@@ -1,12 +1,12 @@
 // IPC channels that do not belong to a single feature module: settings,
 // transcript, asking, profile documents, app-link consent and app plumbing.
-const { app, clipboard, dialog, shell } = require('electron');
+const { app, clipboard, dialog, shell, session: electronSession } = require('electron');
 const { handle, on } = require('./ipc-guard');
 const fs = require('fs');
 const path = require('path');
 const store = require('../../src/storage/store');
 const { DOCUMENT_EXTENSIONS, parseDocumentFile } = require('../../src/context/resume');
-const { appLinkConsentState, revokeAppLinkCaller } = require('../../src/integrations/applink');
+const { appLinkConsentState, revokeAppLinkCaller, revokeAllAppLinkCallers } = require('../../src/integrations/applink');
 const { WIN_BUILD, WIN_SUPPORTS_CONTENT_PROTECTION } = require('./platform');
 const { session, send } = require('./session');
 const { getWin } = require('./window');
@@ -52,16 +52,25 @@ async function deleteAllData() {
     cancelId: 0,
     message: 'Delete all your Onscreenly data?',
     detail:
-      'This removes your settings, saved API keys, résumé and profile text, and meeting history from this computer, then restarts Onscreenly. Downloaded Whisper models are kept. This cannot be undone.'
+      'This removes your settings, saved API keys, résumé and profile text, meeting history, and the list of programs allowed to use Onscreenly from this computer, then restarts Onscreenly. Downloaded Whisper models are kept. This cannot be undone.'
   });
   if (response !== 1) return { deleted: false };
   if (session.state.capturing) await setCapturing(false).catch(() => {});
   stopKnowledge();
   session.transcript.splice(0, session.transcript.length);
-  const userData = app.getPath('userData');
-  for (const name of ['meetings.json', 'meetings.json.tmp', 'meetings.json.bak']) {
-    fs.rmSync(path.join(userData, name), { force: true });
+  // Stop every writer first: a debounced save or meeting notes still on their way must not write
+  // the history back after it is deleted.
+  if (session.meetingMemory) session.meetingMemory.dispose();
+  if (session.meetingStore) session.meetingStore.clearAll();
+  else {
+    const userData = app.getPath('userData');
+    for (const name of ['meetings.json', 'meetings.json.tmp', 'meetings.json.bak']) {
+      fs.rmSync(path.join(userData, name), { force: true });
+    }
   }
+  // Programs the user let see or control Onscreenly, and anything the windows stored.
+  revokeAllAppLinkCallers();
+  await electronSession.defaultSession.clearStorageData().catch(() => {});
   await store.deleteLocalSettings();
   // exit() skips will-quit, so nothing writes settings or meetings back.
   app.relaunch();
@@ -79,8 +88,18 @@ function registerAppIpc() {
     const next = store.setSettings(store.stripRendererPatch(patch));
     // Restart slide polling with the new interval when capturing (keeps slides).
     if (session.state.capturing) slides.startSlideLoop();
-    // A changed key is on disk (encrypted) before Save reports success.
+    // A changed key is on disk (encrypted) before Save reports success, and a failed write is
+    // reported as one rather than as "Saved".
     await store.flushSecrets();
+    const saveError = store.lastSaveError();
+    // The renderer shows these as "Couldn’t save: <reason>."
+    if (saveError)
+      throw new Error(`the settings file could not be written (${saveError.message}); check free disk space`);
+    if (store.secretsSaveError()) {
+      throw new Error(
+        'your API key could not be stored in the system key store; it works until you quit, so try Save again'
+      );
+    }
     // Knowledge on/off or excluded folders changed: re-index in the background.
     configureKnowledge().catch((e) => console.warn('[knowledge] configure failed:', e && e.message));
     return store.redactForRenderer(next);

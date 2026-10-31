@@ -29,7 +29,16 @@ const path = require('path');
 
 const FILE_MODE = 0o600;
 
-function createFileStore(resolveUserDataDir, label) {
+/**
+ * @param {() => string} resolveUserDataDir
+ * @param {string | ((dir: string) => string)} label
+ * @param {{ maxBytes?: number, validate?: (data: unknown) => boolean, compact?: boolean }} [options]
+ *   maxBytes: a larger file is reported (tooLarge) without being read or parsed.
+ *   validate: parsed JSON that fails it counts as corrupt, like unparseable JSON.
+ *   compact: write without indentation (large files).
+ */
+function createFileStore(resolveUserDataDir, label, options = {}) {
+  const { maxBytes = 0, validate = null, compact = false } = options;
   // Resolved lazily so merely requiring this module never touches Electron.
   let filePath = null;
   function mainPath() {
@@ -44,7 +53,17 @@ function createFileStore(resolveUserDataDir, label) {
   const bakPath = () => mainPath() + '.bak';
 
   function readJson(candidate) {
-    return JSON.parse(fs.readFileSync(candidate, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+    if (validate && !validate(data)) throw new Error('unexpected contents');
+    return data;
+  }
+
+  function sizeOf(candidate) {
+    try {
+      return fs.statSync(candidate).size;
+    } catch (_) {
+      return -1;
+    }
   }
 
   function chmodQuiet(target) {
@@ -56,13 +75,17 @@ function createFileStore(resolveUserDataDir, label) {
   }
 
   /**
-   * @returns {{ data: object, recoveredFromBackup: boolean } | null}
-   *   null means neither the file nor its backup are usable — the caller
-   *   should start from defaults. A missing main file on first run is
-   *   expected and stays quiet; anything else unreadable is logged.
+   * @returns {{ data: any, recoveredFromBackup: boolean, mainCorrupt?: boolean, tooLarge?: boolean, size?: number } | null}
+   *   null means there is nothing on disk yet — the caller starts from
+   *   defaults. data is null (with mainCorrupt) when the main file exists but
+   *   neither it nor its backup is usable; it is left in place, so the caller
+   *   can quarantineMain() it before the next save would copy it over the
+   *   backup. tooLarge means the main file is over maxBytes and was not read.
    */
   function load() {
     let mainMissing = false;
+    const size = sizeOf(mainPath());
+    if (maxBytes && size > maxBytes) return { data: null, recoveredFromBackup: false, tooLarge: true, size };
     try {
       return { data: readJson(mainPath()), recoveredFromBackup: false };
     } catch (e) {
@@ -73,24 +96,42 @@ function createFileStore(resolveUserDataDir, label) {
     // The main file is gone or unusable. A stale .bak from the previous good
     // save is strictly better than blanking every key the user has stored.
     try {
+      if (maxBytes && sizeOf(bakPath()) > maxBytes) throw new Error('backup is too large to load');
       const data = readJson(bakPath());
-      console.error('[onscreenly] ' + label + ' was lost or corrupt — recovered settings from backup');
-      return { data, recoveredFromBackup: true };
+      console.error('[onscreenly] ' + label + ' was lost or corrupt — recovered it from backup');
+      return mainMissing ? { data, recoveredFromBackup: true } : { data, recoveredFromBackup: true, mainCorrupt: true };
     } catch (bakErr) {
       if (!(bakErr && bakErr.code === 'ENOENT')) {
         console.error('[onscreenly] cannot read backup ' + bakPath() + ':', bakErr && bakErr.message);
       }
     }
 
-    if (!mainMissing) console.error('[onscreenly] no usable backup for ' + label + '; starting from defaults');
-    return null;
+    if (mainMissing) return null;
+    console.error('[onscreenly] no usable backup for ' + label + '; starting from defaults');
+    return { data: null, recoveredFromBackup: false, mainCorrupt: true };
   }
+
+  // Moves an unreadable main file aside (FILE.corrupt-<time>) so nothing overwrites it: the next
+  // save would otherwise copy it over a good .bak, then replace it. Returns the new path, or null.
+  function quarantineMain() {
+    const target = `${mainPath()}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    try {
+      fs.renameSync(mainPath(), target);
+      chmodQuiet(target);
+      return target;
+    } catch (e) {
+      console.error('[onscreenly] could not set aside ' + mainPath() + ':', e && e.message);
+      return null;
+    }
+  }
+
+  const serialize = (data) => (compact ? JSON.stringify(data) : JSON.stringify(data, null, 2));
 
   // Serialize → snapshot the previous good state → atomic replace. Throws on
   // failure rather than swallowing it, so the caller can surface a save error
   // instead of silently pretending the write succeeded.
   function persist(data) {
-    const json = JSON.stringify(data, null, 2);
+    const json = serialize(data);
     fs.writeFileSync(tmpPath(), json, { mode: FILE_MODE });
     try {
       if (fs.existsSync(mainPath())) fs.copyFileSync(mainPath(), bakPath());
@@ -115,7 +156,27 @@ function createFileStore(resolveUserDataDir, label) {
     chmodQuiet(mainPath());
   }
 
-  return { load, persist, mainPath, tmpPath, bakPath };
+  // persist() without blocking the main process on the file system: the same
+  // temp → backup → rename steps, on fs.promises. Rejects on failure.
+  async function persistAsync(data) {
+    const json = serialize(data);
+    await fs.promises.writeFile(tmpPath(), json, { mode: FILE_MODE });
+    try {
+      await fs.promises.copyFile(mainPath(), bakPath());
+      chmodQuiet(bakPath());
+    } catch (_) {
+      /* no previous file yet, or backup failed: never block the save */
+    }
+    try {
+      await fs.promises.rename(tmpPath(), mainPath());
+    } catch (_) {
+      await fs.promises.writeFile(mainPath(), json, { mode: FILE_MODE });
+      await fs.promises.unlink(tmpPath()).catch(() => {});
+    }
+    chmodQuiet(mainPath());
+  }
+
+  return { load, persist, persistAsync, quarantineMain, mainPath, tmpPath, bakPath };
 }
 
 module.exports = { createFileStore };

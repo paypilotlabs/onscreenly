@@ -19,7 +19,8 @@ const { startAppLink, stopAppLink, recordEvent } = require('../../src/integratio
 const { createMeetingStore } = require('../../src/meetings/meetings');
 const { createMeetingMemory } = require('../../src/meetings/meeting-memory');
 const { isMac, isWindows } = require('./platform');
-const { session, MAX_TRANSCRIPT_TURNS } = require('./session');
+const { meetingHistoryKeep, registerMeetingHistoryIpc } = require('./meeting-history');
+const { session, send, MAX_TRANSCRIPT_TURNS } = require('./session');
 const { getWin, createWindow, registerWindowIpc } = require('./window');
 const { initWhisper, shutdownWhisper, registerWhisperIpc } = require('./whisper');
 const { stopSlideLoop, listSlides, registerSlidesIpc } = require('./slides');
@@ -69,6 +70,7 @@ app.on('web-contents-created', (_event, contents) => {
 
 registerAppIpc();
 registerKnowledgeIpc();
+registerMeetingHistoryIpc();
 registerPublikIpc();
 registerCaptureIpc();
 registerWhisperIpc();
@@ -103,11 +105,23 @@ function launchApp() {
 
   initWhisper(app.getPath('userData'));
 
+  const meetingStore = createMeetingStore({
+    file: path.join(app.getPath('userData'), 'meetings.json'),
+    debounceMs: 1500,
+    // Once per failure streak: the transcript stays in memory and the next save retries.
+    onError: (e) =>
+      send('status', {
+        message: `Couldn’t save meeting history (${(e && e.code) || (e && e.message) || 'write failed'}). The transcript is kept while Onscreenly runs; free some disk space or check the folder’s permissions.`,
+        code: 'meetings'
+      })
+  });
   const meetingMemory = createMeetingMemory({
-    store: createMeetingStore({ file: path.join(app.getPath('userData'), 'meetings.json'), debounceMs: 1500 }),
+    store: meetingStore,
     llmFactory: () => createLLM(store.getSettings()),
+    getKeep: () => meetingHistoryKeep(store.getSettings()),
     log: (msg) => console.log('[meetings]', msg)
   });
+  session.meetingStore = meetingStore;
   session.meetingMemory = meetingMemory;
   session.restoredTurns = meetingMemory.resumeOpen();
   if (session.restoredTurns.length) session.transcript.push(...session.restoredTurns.slice(-MAX_TRANSCRIPT_TURNS));
@@ -141,9 +155,27 @@ function launchApp() {
   });
 
   createWindow();
+  reportMeetingHistoryStatus(meetingStore.status());
   registerShortcuts();
   // Index the Obsidian vault in the background when Knowledge is on.
   configureKnowledge().catch((e) => console.warn('[knowledge] could not index the vault:', e && e.message));
+}
+
+// How loading the meeting history went, said once when the overlay has loaded.
+function reportMeetingHistoryStatus(status) {
+  const name = (file) => (file ? path.basename(file) : '');
+  const message =
+    status.state === 'recovered'
+      ? `Part of your meeting history could not be read and was restored from the last good copy. The damaged file was kept as ${name(status.aside)}.`
+      : status.state === 'corrupt'
+        ? `Your meeting history could not be read, so new meetings start a fresh history. The old file was kept as ${name(status.aside)}.`
+        : status.state === 'too-large'
+          ? 'Your meeting history is too large to load, so new meetings aren’t saved. Archive it in Settings › API keys › Your data to start a new one; nothing is deleted.'
+          : '';
+  if (!message) return;
+  const win = getWin();
+  if (!win) return;
+  win.webContents.once('did-finish-load', () => send('status', { message, code: 'meetings' }));
 }
 
 // -------- lifecycle --------
@@ -195,7 +227,11 @@ app.on('will-quit', () => {
   // Quitting mid-meeting is a pause, not an end: the meeting stays open on disk
   // so a relaunch within the resume window picks it back up (a stale one is
   // closed and its notes written at the next launch). Just get the bytes down.
-  if (session.meetingMemory) session.meetingMemory.flush();
+  if (session.meetingMemory) {
+    const flushed = session.meetingMemory.flush();
+    if (flushed && !flushed.ok)
+      console.error('[meetings] history not saved on quit:', flushed.error && flushed.error.message);
+  }
   // Best effort, deliberately not blocking the quit: the library also removes
   // the instance file from a `process.on('exit')` handler, and a file left
   // behind is harmless anyway because readers check whether the PID is alive.
