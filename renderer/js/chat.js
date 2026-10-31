@@ -378,9 +378,20 @@ function armBusyFailsafe() {
 function isBusy() {
   return busy;
 }
+let sendTitle = '';
 function setBusy(v) {
+  const sendBtn = $('#send-btn');
+  // While an answer is on its way, Send stops it (composer.js); its own title comes back after.
+  if (v && !busy) {
+    sendTitle = sendBtn.title;
+    sendBtn.title = 'Stop the answer (Esc)';
+    sendBtn.setAttribute('aria-label', 'Stop the answer');
+  } else if (!v && busy) {
+    sendBtn.title = sendTitle;
+    sendBtn.removeAttribute('aria-label');
+  }
   busy = v;
-  $('#send-btn').classList.toggle('busy', v);
+  sendBtn.classList.toggle('busy', v);
   messages.setAttribute('aria-busy', String(v));
   // The mode buttons step back while an answer is on its way (runMode ignores them meanwhile).
   document.querySelectorAll('.act').forEach((btn) => {
@@ -396,6 +407,14 @@ function setBusy(v) {
 // résumé analysis can run past 40 s) is never marked idle while it streams.
 function noteStreamActivity() {
   if (busy) armBusyFailsafe();
+}
+
+// One quiet line under an answer that did not finish normally: stopped, or cut off at the length limit.
+function addAnswerNote(answer, text) {
+  const note = createEl('p', 'ai-note', text);
+  note.setAttribute('role', 'status');
+  answer.after(note);
+  followNewest();
 }
 
 // ---- transcript helpers ------------------------------------------------
@@ -470,6 +489,7 @@ export function init() {
 export {
   MAX_RESPONSES,
   addAnswerExtras,
+  addAnswerNote,
   appendToken,
   clearTranscriptInterim,
   esc,

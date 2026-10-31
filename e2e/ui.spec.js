@@ -202,3 +202,39 @@ test('arrow keys move between Settings tabs without saving', async ({ launch }) 
   expect(fs.statSync(file).mtimeMs).toBe(before);
   await closeSettings(page);
 });
+
+test('Send stops an answer that is on its way, and so does Escape', async ({ launch }) => {
+  let release = () => {};
+  const mock = await startMockProvider(() => new Promise((resolve) => (release = () => resolve('Too late'))));
+  try {
+    const { page } = await launch({ settings: mock.settings });
+    await ask(page, 'First question?');
+    await expect(page.locator('#send-btn')).toHaveAttribute('aria-label', 'Stop the answer');
+    await page.click('#send-btn');
+    await expect(page.locator('.ai-note').last()).toHaveText('Stopped.');
+    await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.locator('#send-btn')).not.toHaveAttribute('aria-label', /.*/);
+    release();
+
+    await ask(page, 'Second question?');
+    await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'true');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.ai-note')).toHaveCount(2);
+    await expect(page.locator('#messages')).toHaveAttribute('aria-busy', 'false');
+    release();
+  } finally {
+    await mock.close();
+  }
+});
+
+test('a rejected API key offers Open settings, not Try again', async ({ launch }) => {
+  const mock = await startMockProvider(() => 'never', { status: 401 });
+  try {
+    const { page } = await launch({ settings: mock.settings });
+    await ask(page, 'Hello?');
+    await expect(page.locator('.ai-error-msg').last()).toContainText('rejected the API key (401)');
+    await expect(page.locator('.ai-fix').last()).toHaveText('Open settings');
+  } finally {
+    await mock.close();
+  }
+});

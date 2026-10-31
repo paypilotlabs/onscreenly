@@ -7,6 +7,8 @@ let capturedClientOptions = null;
 let capturedCompletionRequest = null;
 let fakeResponseHeaders = null; // when set, create() returns an APIPromise-like with withResponse()
 let fakeCreateError = null; // when set, create() rejects with it (the SDK's APIError shape)
+let fakeChunks = null; // when set, the stream yields these parts instead of a single "ok"
+let capturedRequestOptions = null;
 const originalModuleLoad = Module._load;
 
 Module._load = function loadWithOpenAIStub(request, parent, isMain) {
@@ -16,9 +18,10 @@ Module._load = function loadWithOpenAIStub(request, parent, isMain) {
         capturedClientOptions = clientOptions;
         this.chat = {
           completions: {
-            create: (completionRequest) => {
+            create: (completionRequest, requestOptions) => {
               capturedCompletionRequest = completionRequest;
-              const data = [{ choices: [{ delta: { content: 'ok' } }] }];
+              capturedRequestOptions = requestOptions;
+              const data = fakeChunks || [{ choices: [{ delta: { content: 'ok' } }] }];
               if (fakeCreateError) return Promise.reject(fakeCreateError);
               if (!fakeResponseHeaders) return Promise.resolve(data);
               const headers = fakeResponseHeaders;
@@ -714,4 +717,99 @@ test('geminiGenerationConfig: smart tier keeps the model default reasoning with 
   const cfg = geminiGenerationConfig({ system: 'sys', maxTokens: 1400, thinking: true });
   assert.equal(cfg.thinkingConfig, undefined);
   assert.ok(cfg.maxOutputTokens >= 1400 + 4096);
+});
+
+const openaiSettings = () => ({
+  provider: 'openai',
+  smart: false,
+  apiKeys: { openai: 'sk-test' },
+  models: { openai: { fast: 'gpt-4o-mini', smart: 'gpt-4o' } }
+});
+
+test('the abort signal reaches the provider request, and length/reasoning are reported', async () => {
+  fakeChunks = [
+    { choices: [{ delta: { reasoning_content: 'thinking…' } }] },
+    { choices: [{ delta: { content: 'Half an ans' }, finish_reason: 'length' }] }
+  ];
+  const controller = new AbortController();
+  let activity = 0;
+  let finish = null;
+  const text = await createLLM(openaiSettings()).stream({
+    system: 's',
+    turns: [{ role: 'user', text: 'q' }],
+    signal: controller.signal,
+    onToken: () => {},
+    onActivity: () => activity++,
+    onFinish: (info) => (finish = info)
+  });
+  fakeChunks = null;
+  assert.equal(capturedRequestOptions.signal, controller.signal);
+  assert.equal(text, 'Half an ans');
+  assert.equal(activity, 1);
+  assert.deepEqual(finish, { truncated: true });
+});
+
+test('a rejected key (401/403) says so and opens Settings, instead of a raw error and Try again', async () => {
+  fakeCreateError = Object.assign(new Error('401 Incorrect API key provided: sk-te***'), { status: 401 });
+  await assert.rejects(
+    createLLM(openaiSettings()).stream({ system: 's', turns: [{ role: 'user', text: 'q' }], onToken: () => {} }),
+    (e) => e.code === 'no-provider' && /rejected the API key \(401\)/.test(e.message)
+  );
+  fakeCreateError = null;
+});
+
+test('an HTML error page becomes one short readable line', () => {
+  const page =
+    '<html><head><style>body{color:red}</style></head><body><h1>502 Bad Gateway</h1>' +
+    'x'.repeat(5000) +
+    '</body></html>';
+  const message = formatProviderErrorMessage(new Error(page), 'openai');
+  assert.ok(message.length <= 300, `length ${message.length}`);
+  assert.doesNotMatch(message, /<|color:red/);
+  assert.match(message, /^502 Bad Gateway/);
+});
+
+test('Ollama: maxTokens is sent, and an error in the middle of the stream fails the answer', async (t) => {
+  let body;
+  const lines = ['{"message":{"content":"Partial "}}', '{"error":"model ran out of memory"}'];
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    body = JSON.parse(init.body);
+    const enc = new TextEncoder();
+    return {
+      ok: true,
+      body: (async function* () {
+        for (const l of lines) yield enc.encode(l + '\n');
+      })()
+    };
+  });
+  const llm = createLLM({
+    provider: 'ollama',
+    smart: false,
+    apiKeys: { ollama: '' },
+    models: { ollama: { fast: 'llama3.2' } }
+  });
+  await assert.rejects(
+    llm.stream({ system: 's', turns: [{ role: 'user', text: 'q' }], onToken: () => {} }),
+    /ran out of memory/
+  );
+  assert.equal(body.options.num_predict, 700);
+});
+
+test('Ollama: a failed request reports the reason from its body', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => ({
+    ok: false,
+    status: 500,
+    statusText: 'Internal Server Error',
+    text: async () => '{"error":"model requires more system memory than is available"}'
+  }));
+  const llm = createLLM({
+    provider: 'ollama',
+    smart: false,
+    apiKeys: { ollama: '' },
+    models: { ollama: { fast: 'llama3.3' } }
+  });
+  await assert.rejects(
+    llm.stream({ system: 's', turns: [{ role: 'user', text: 'q' }], onToken: () => {} }),
+    /500 Internal Server Error — model requires more system memory/
+  );
 });

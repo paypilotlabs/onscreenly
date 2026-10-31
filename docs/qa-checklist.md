@@ -80,6 +80,8 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 
 - [ ] **Meeting history** under Your data shows the meeting count and size. Choosing a lower Keep asks before deleting the oldest; Cancel changes nothing. **Don’t save** stops recording new meetings.
 - [ ] **Delete meeting history…** asks first, removes every meeting, and new meetings are saved again afterwards.
+- [ ] While an answer is on its way, **Send** (or Esc) stops it: the answer ends with “Stopped.” and the next question works at once.
+- [ ] A wrong API key shows “rejected the API key” with **Open settings**; a long answer cut off at the limit says so under it.
 - [ ] Opening the app a second time while it runs shows the running copy instead of a second overlay.
 - [ ] **Delete all my data** asks first; Cancel changes nothing.
 - [ ] Confirming removes settings, keys, résumé and meeting history and restarts Onscreenly as new.

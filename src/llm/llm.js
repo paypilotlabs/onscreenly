@@ -231,12 +231,49 @@ function formatProviderErrorMessage(error, provider, model) {
     return `${label} is rate-limiting requests right now (429 Too Many Requests).${waitHint} and try again — this is a temporary per-minute/request limit, not your account running out of credit.`;
   }
 
+  const status = errorStatus(error);
+  if (status === 401 || status === 403) {
+    return withCode(
+      `${label} rejected the API key (${status}). Check the key for ${label} in Settings › API keys, or pick another provider.`,
+      'no-provider'
+    );
+  }
+
+  if (provider === 'ollama' && isConnectionError(error)) {
+    return `Couldn’t reach Ollama. Is it running? ${clip(rawMessage, 200)}`;
+  }
+
   if (isNotFoundError(error)) {
     const modelHint = model ? ` "${model}"` : '';
     return `${label} model${modelHint} is unavailable (404) — it may have been renamed, retired by the provider, or misspelled. Open Settings and pick a current model for ${label} (or clear the field to use onscreenly's default), then try again.`;
   }
 
-  return rawMessage || 'Unknown LLM error.';
+  if (isConnectionError(error)) {
+    return `Couldn’t reach ${label}: ${clip(rawMessage, 200)}. Check your connection and try again.`;
+  }
+
+  return clip(rawMessage, 300) || 'Unknown LLM error.';
+}
+
+function errorStatus(error) {
+  return (error && (error.status || error.statusCode || (error.response && error.response.status))) || 0;
+}
+
+// An Error whose `code` picks the button under the answer (renderer events.js fixFor).
+function withCode(message, code) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
+}
+
+// Provider errors can carry a whole HTML error page or a JSON body: show one readable line.
+function clip(text, max) {
+  const plain = String(text || '')
+    .replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return plain.length > max ? plain.slice(0, max - 1).trimEnd() + '…' : plain;
 }
 
 function sanitizeTurns(turns) {
@@ -256,7 +293,25 @@ function stripDataUrl(dataUrl) {
   return m ? { mime: m[1], b64: m[2] } : null;
 }
 
-async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUrl, maxTokens, onToken, onResponse }) {
+// Every stream takes the same optional hooks besides onToken:
+//   signal      an AbortSignal that cancels the request itself (Stop, the stall watchdog);
+//   onActivity  called for output the user does not see (a reasoning model thinking), so a
+//               watchdog does not mistake a model that is thinking for one that has stalled;
+//   onFinish    called once with { truncated } when the provider says the answer hit maxTokens.
+async function streamOpenAI({
+  apiKey,
+  baseURL,
+  model,
+  system,
+  turns,
+  imageDataUrl,
+  maxTokens,
+  onToken,
+  onResponse,
+  signal,
+  onActivity = () => {},
+  onFinish = () => {}
+}) {
   const OpenAI = require('openai');
   const client = new OpenAI(baseURL ? { apiKey, baseURL } : { apiKey });
   const messages = [{ role: 'system', content: system }];
@@ -274,7 +329,7 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
       messages.push({ role: t.role, content: t.text });
     }
   });
-  const pending = client.chat.completions.create({ model, messages, stream: true, max_tokens: maxTokens });
+  const pending = client.chat.completions.create({ model, messages, stream: true, max_tokens: maxTokens }, { signal });
   let stream;
   if (typeof onResponse === 'function' && pending && typeof pending.withResponse === 'function') {
     // The gateway stamps x-publik-* headers at admission; hand the raw
@@ -289,14 +344,25 @@ async function streamOpenAI({ apiKey, baseURL, model, system, turns, imageDataUr
   } else {
     stream = await pending;
   }
+  return readOpenAIStream(stream, { onToken, onActivity, onFinish });
+}
+
+async function readOpenAIStream(stream, { onToken, onActivity, onFinish }) {
   let full = '';
+  let truncated = false;
   for await (const part of stream) {
-    const d = part.choices && part.choices[0] && part.choices[0].delta && part.choices[0].delta.content;
+    const choice = part.choices && part.choices[0];
+    const delta = choice && choice.delta;
+    const d = delta && delta.content;
     if (d) {
       full += d;
       onToken(d);
+    } else if (delta && (delta.reasoning_content || delta.reasoning)) {
+      onActivity();
     }
+    if (choice && choice.finish_reason === 'length') truncated = true;
   }
+  onFinish({ truncated });
   return full;
 }
 
@@ -314,7 +380,19 @@ function normalizeAzureBaseURL(raw) {
   return u;
 }
 
-async function streamAzure({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken, endpoint }) {
+async function streamAzure({
+  apiKey,
+  model,
+  system,
+  turns,
+  imageDataUrl,
+  maxTokens,
+  onToken,
+  endpoint,
+  signal,
+  onActivity = () => {},
+  onFinish = () => {}
+}) {
   const url = normalizeAzureBaseURL(endpoint);
   if (!url) throw new Error('Missing Azure endpoint. Add your Azure AI Foundry or Azure OpenAI endpoint in Settings.');
   const messages = [{ role: 'system', content: system }];
@@ -347,24 +425,30 @@ async function streamAzure({ apiKey, model, system, turns, imageDataUrl, maxToke
     };
     client = new OpenAI({ baseURL: url, apiKey, fetch: azureFetch });
   }
-  const stream = await client.chat.completions.create({
-    model,
-    messages,
-    stream: true,
-    max_completion_tokens: maxTokens
-  });
-  let full = '';
-  for await (const part of stream) {
-    const d = part.choices && part.choices[0] && part.choices[0].delta && part.choices[0].delta.content;
-    if (d) {
-      full += d;
-      onToken(d);
-    }
-  }
-  return full;
+  const stream = await client.chat.completions.create(
+    {
+      model,
+      messages,
+      stream: true,
+      max_completion_tokens: maxTokens
+    },
+    { signal }
+  );
+  return readOpenAIStream(stream, { onToken, onActivity, onFinish });
 }
 
-async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
+async function streamAnthropic({
+  apiKey,
+  model,
+  system,
+  turns,
+  imageDataUrl,
+  maxTokens,
+  onToken,
+  signal,
+  onActivity = () => {},
+  onFinish = () => {}
+}) {
   const Anthropic = require('@anthropic-ai/sdk');
   const client = new Anthropic({ apiKey });
   const messages = turns.map((t, i) => {
@@ -378,14 +462,23 @@ async function streamAnthropic({ apiKey, model, system, turns, imageDataUrl, max
     }
     return { role: t.role, content: t.text };
   });
-  const stream = await client.messages.create({ model, max_tokens: maxTokens, system, messages, stream: true });
+  const stream = await client.messages.create(
+    { model, max_tokens: maxTokens, system, messages, stream: true },
+    { signal }
+  );
   let full = '';
+  let truncated = false;
   for await (const ev of stream) {
     if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') {
       full += ev.delta.text;
       onToken(ev.delta.text);
+    } else if (ev.type === 'content_block_delta') {
+      onActivity(); // thinking
+    } else if (ev.type === 'message_delta' && ev.delta && ev.delta.stop_reason === 'max_tokens') {
+      truncated = true;
     }
   }
+  onFinish({ truncated });
   return full;
 }
 
@@ -408,7 +501,18 @@ function geminiGenerationConfig({ system, maxTokens, thinking }) {
   return config;
 }
 
-async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTokens, thinking, onToken }) {
+async function streamGemini({
+  apiKey,
+  model,
+  system,
+  turns,
+  imageDataUrl,
+  maxTokens,
+  thinking,
+  onToken,
+  signal,
+  onFinish = () => {}
+}) {
   const { GoogleGenAI } = require('@google/genai');
   const ai = new GoogleGenAI({ apiKey });
   const contents = turns.map((t, i) => {
@@ -421,6 +525,7 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     return { role: t.role === 'assistant' ? 'model' : 'user', parts };
   });
   const config = geminiGenerationConfig({ system, maxTokens, thinking });
+  if (signal) config.abortSignal = signal;
   let stream;
   try {
     stream = await ai.models.generateContentStream({ model, contents, config });
@@ -432,17 +537,31 @@ async function streamGemini({ apiKey, model, system, turns, imageDataUrl, maxTok
     stream = await ai.models.generateContentStream({ model, contents, config });
   }
   let full = '';
+  let truncated = false;
   for await (const chunk of stream) {
     const t = chunk && chunk.text;
     if (t) {
       full += t;
       onToken(t);
     }
+    const candidate = chunk && chunk.candidates && chunk.candidates[0];
+    if (candidate && candidate.finishReason === 'MAX_TOKENS') truncated = true;
   }
+  onFinish({ truncated });
   return full;
 }
 
-async function streamOllama({ apiKey, model, system, turns, imageDataUrl, maxTokens, onToken }) {
+async function streamOllama({
+  apiKey,
+  model,
+  system,
+  turns,
+  imageDataUrl,
+  maxTokens,
+  onToken,
+  signal,
+  onFinish = () => {}
+}) {
   const baseUrl = apiKey || 'http://localhost:11434';
   const url = `${baseUrl.replace(/\/$/, '')}/api/chat`;
 
@@ -466,45 +585,56 @@ async function streamOllama({ apiKey, model, system, turns, imageDataUrl, maxTok
     response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: true })
+      // num_predict is Ollama's maxTokens; without it a local model could run on for minutes.
+      body: JSON.stringify({ model, messages, stream: true, options: { num_predict: maxTokens } }),
+      signal
     });
   } catch (err) {
+    if (signal && signal.aborted) throw err;
     throw new Error(`Ollama fetch failed: ${err.message}. Is Ollama running at ${baseUrl}?`);
   }
 
   if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+    // Ollama explains the problem in the body ({"error":"model 'x' not found"}).
+    let detail = '';
+    try {
+      const body = await response.text();
+      detail = (JSON.parse(body).error || body || '').toString();
+    } catch (_) {}
+    const e = new Error(`Ollama API error: ${response.status} ${response.statusText}${detail ? ` — ${detail}` : ''}`);
+    e.status = response.status;
+    throw e;
   }
 
   const decoder = new TextDecoder();
   let full = '';
   let buffer = '';
+  let truncated = false;
+  // One NDJSON line. An error reported mid-stream ({"error": ...}) fails the answer instead of
+  // passing off what arrived so far as complete.
+  const readLine = (line) => {
+    if (!line.trim()) return;
+    let data;
+    try {
+      data = JSON.parse(line);
+    } catch (_) {
+      return; // a partial or garbled line
+    }
+    if (data.error) throw new Error(`Ollama: ${data.error}`);
+    if (data.message && data.message.content) {
+      full += data.message.content;
+      onToken(data.message.content);
+    }
+    if (data.done && data.done_reason === 'length') truncated = true;
+  };
   for await (const chunk of response.body) {
     buffer += decoder.decode(chunk, { stream: true });
     const lines = buffer.split('\n');
     buffer = lines.pop(); // keep incomplete line
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const data = JSON.parse(line);
-        if (data.message && data.message.content) {
-          full += data.message.content;
-          onToken(data.message.content);
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
+    for (const line of lines) readLine(line);
   }
-  if (buffer.trim()) {
-    try {
-      const data = JSON.parse(buffer);
-      if (data.message && data.message.content) {
-        full += data.message.content;
-        onToken(data.message.content);
-      }
-    } catch (e) {}
-  }
+  readLine(buffer);
+  onFinish({ truncated });
   return full;
 }
 

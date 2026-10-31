@@ -1,9 +1,10 @@
 // Events pushed from the main process: capture, transcription, answers and status messages.
 import { state } from './state.js';
-import { $, onscreenly, setSessionButton } from './core.js';
+import { $, isMac, onscreenly, setSessionButton } from './core.js';
 import {
   MAX_RESPONSES,
   addAnswerExtras,
+  addAnswerNote,
   appendToken,
   clearTranscriptInterim,
   failAi,
@@ -104,6 +105,16 @@ function fixFor(code, run) {
       };
     case 'needs-speech':
       return noSpeechToText() ? { label: 'Open Audio settings', run: () => openSettings('transcription') } : null;
+    case 'needs-screen':
+      return isMac
+        ? {
+            label: 'Open Privacy settings',
+            run: () =>
+              onscreenly.openPane('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture')
+          }
+        : run
+          ? { label: 'Try again', run: () => runMode(run.mode, run.text) }
+          : null;
     case 'provider-failed':
     case 'interrupted':
       return run ? { label: 'Try again', run: () => runMode(run.mode, run.text) } : null;
@@ -208,9 +219,18 @@ export function init() {
     noteStreamActivity();
     appendToken(text);
   });
-  onscreenly.on('llm:done', ({ sources } = {}) => {
-    const el = finalizeAi();
-    if (el) addAnswerExtras(el, sources);
+  onscreenly.on('llm:done', ({ sources, truncated, stopped } = {}) => {
+    const el = finalizeAi(stopped ? 'stopped' : 'done');
+    if (el) {
+      if (!stopped) addAnswerExtras(el, sources);
+      if (stopped) addAnswerNote(el, 'Stopped.');
+      else if (truncated) {
+        addAnswerNote(
+          el,
+          'This answer reached the length limit and was cut off. Ask for the rest, or turn on Smart for longer answers.'
+        );
+      }
+    }
     setBusy(false);
   });
   onscreenly.on('llm:error', ({ message, action, code }) => {

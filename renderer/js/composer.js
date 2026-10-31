@@ -379,7 +379,10 @@ export function init() {
     syncPlaceholder();
   });
   $('#input-area').addEventListener('click', () => input.focus());
-  $('#send-btn').addEventListener('click', send);
+  $('#send-btn').addEventListener('click', () => {
+    if (isBusy()) onscreenly.cancelAnswer();
+    else send();
+  });
   input.addEventListener('keydown', (e) => {
     // Ctrl+Z / Cmd+Z: restore last question if input is empty
     if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !input.value.trim()) {

@@ -1,5 +1,6 @@
 // Window behaviour: global keys, scroll lock, click-through and dragging.
 import { $, onscreenly } from './core.js';
+import { isBusy } from './chat.js';
 import { closeSettings, openSettings, scrim } from './settings-panel.js';
 import { safeFocus, topDialog } from './a11y.js';
 import { toggleOpacityPopover } from './toolbar.js';
@@ -23,7 +24,9 @@ const toolbar = $('#toolbar');
 // below, and the composer clears its text with preventDefault. After those, Escape closes the
 // opacity popover, then the transcript sidebar, and gives focus back to the button that opened it.
 function closeTopLayer() {
-  if (!$('#opacity-popover').classList.contains('hidden')) {
+  if (isBusy()) {
+    onscreenly.cancelAnswer(); // Escape stops an answer that is on its way
+  } else if (!$('#opacity-popover').classList.contains('hidden')) {
     toggleOpacityPopover(false);
     safeFocus($('#opacity-btn'));
   } else if (sidebarOpen) {

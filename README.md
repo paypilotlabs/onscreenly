@@ -36,6 +36,7 @@ Keyboard shortcuts:
 | Action | macOS | Windows / Linux |
 |---|---|---|
 | Start or end a session | ⌘ ⇧ L | Ctrl Shift L |
+| Stop an answer that is on its way (or click Send) | Esc | Esc |
 | What should I say? | ⌘ Enter | Ctrl Enter |
 | Assist | ⌘ ⇧ Enter | Ctrl Shift Enter |
 | Solve the coding problem on screen | ⌘ H | Ctrl H |
