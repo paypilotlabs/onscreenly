@@ -760,13 +760,18 @@ test('a rejected key (401/403) says so and opens Settings, instead of a raw erro
 
 test('an HTML error page becomes one short readable line', () => {
   const page =
-    '<html><head><style>body{color:red}</style></head><body><h1>502 Bad Gateway</h1>' +
+    '<!DOCTYPE html><html><head><title>502 Bad Gateway</title><style>body{color:red}</style></head><body><h1>502</h1>' +
     'x'.repeat(5000) +
     '</body></html>';
   const message = formatProviderErrorMessage(new Error(page), 'openai');
-  assert.ok(message.length <= 300, `length ${message.length}`);
-  assert.doesNotMatch(message, /<|color:red/);
-  assert.match(message, /^502 Bad Gateway/);
+  assert.equal(message, '502 Bad Gateway (an HTML error page)');
+  const untitled = formatProviderErrorMessage(
+    new Error('<html><body>' + 'y'.repeat(9000) + '</body></html>'),
+    'openai'
+  );
+  assert.equal(untitled, 'the provider answered with an HTML error page');
+  const long = formatProviderErrorMessage(new Error('z'.repeat(1000)), 'openai');
+  assert.ok(long.length <= 300);
 });
 
 test('Ollama: maxTokens is sent, and an error in the middle of the stream fails the answer', async (t) => {

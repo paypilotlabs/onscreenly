@@ -266,13 +266,18 @@ function withCode(message, code) {
   return e;
 }
 
-// Provider errors can carry a whole HTML error page or a JSON body: show one readable line.
+// Provider errors can carry a whole HTML error page or a JSON body: show one readable line. An HTML
+// page is summed up by its <title> rather than stripped of tags (tag-stripping regexes are easy to
+// get wrong); the result is only ever shown as plain text.
 function clip(text, max) {
-  const plain = String(text || '')
-    .replace(/<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let plain = String(text || '');
+  if (/<(?:!doctype|html|head|body)\b/i.test(plain)) {
+    const start = plain.search(/<title[^>]*>/i);
+    const end = plain.search(/<\/title\s*>/i);
+    const title = start >= 0 && end > start ? plain.slice(plain.indexOf('>', start) + 1, end).trim() : '';
+    plain = title ? `${title} (an HTML error page)` : 'the provider answered with an HTML error page';
+  }
+  plain = plain.replace(/\s+/g, ' ').trim();
   return plain.length > max ? plain.slice(0, max - 1).trimEnd() + '…' : plain;
 }
 
