@@ -206,7 +206,7 @@ function moduleLoadLookups(src) {
     const name = decl ? decl[1] : null;
     let guarded = false;
     if (name) {
-      const n = name.replace(/\$/g, '\\$');
+      const n = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
       guarded = new RegExp(String.raw`\bif\s*\(\s*!?\s*${n}\s*\)|\b${n}\?\.|\b${n}\s*&&`).test(src);
     }
     found.push({
