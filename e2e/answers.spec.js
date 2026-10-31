@@ -61,6 +61,7 @@ test('a question is answered by the provider and uses the matching notes from th
 
   const prompt = systemPrompt(provider.requests.at(-1));
   expect(prompt).toContain("Reference notes from the user's Obsidian vault");
+  expect(prompt).toContain('If a note answers the question, answer from it');
   expect(prompt).toContain('Cut p99 checkout latency from 900 ms to 180 ms.');
   expect(prompt).not.toContain('template');
 });
