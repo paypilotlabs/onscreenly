@@ -4,6 +4,14 @@ const { app, BrowserWindow, globalShortcut } = require('electron');
 const { bootstrapIdentity } = require('../../src/platform/app-identity');
 bootstrapIdentity(app);
 
+// One copy per profile. A second launch would open its own overlay and keep its
+// own copy of the settings, keys and meeting history, and whichever copy saved
+// last would overwrite the other. It hands over to the running copy instead.
+if (!app.requestSingleInstanceLock()) {
+  app.exit(0);
+  return;
+}
+
 const path = require('path');
 const store = require('../../src/storage/store');
 const { createLLM } = require('../../src/llm/llm');
@@ -139,6 +147,12 @@ function launchApp() {
 }
 
 // -------- lifecycle --------
+app.on('second-instance', () => {
+  const win = getWin();
+  if (win && !win.isDestroyed()) win.showInactive();
+  else if (hasPermissionsWindow()) createPermissionsWindow(); // shows the existing one
+});
+
 app.whenReady().then(async () => {
   if (isWindows) {
     process.title = 'Onscreenly';

@@ -146,7 +146,34 @@ function clampOpacity(value) {
   return Math.min(MAX_OPACITY, Math.max(MIN_OPACITY, Math.round(n * 100) / 100));
 }
 
-const RENDERER_READ_ONLY = ['publik', 'applinkSlidesConsent', 'applinkSlidesConsentByApp'];
+const RENDERER_READ_ONLY = ['publik', 'applinkSlidesConsent', 'applinkSlidesConsentByApp', 'windowX', 'windowY'];
+// Settings the renderer may write that have no default of their own (absent until first set).
+const RENDERER_EXTRA_FIELDS = { onboarded: false, sttModel: '', resumeContext: '' };
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+// Keeps only what has the same shape as the default it would replace: strings for strings,
+// finite numbers for numbers, objects (checked field by field) for objects. Anything else is
+// dropped, so one wrong-typed or unknown field can neither erase a block of settings (apiKeys:null
+// wiped every saved key) nor be written to disk. Returns undefined when nothing usable is left.
+function sanitizeLike(shape, value) {
+  if (isPlainObject(shape)) {
+    if (!isPlainObject(value)) return undefined;
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (!Object.prototype.hasOwnProperty.call(shape, k)) continue;
+      const clean = sanitizeLike(shape[k], v);
+      if (clean !== undefined) out[k] = clean;
+    }
+    return out;
+  }
+  if (Array.isArray(shape)) return Array.isArray(value) ? value : undefined;
+  if (typeof shape === 'number') return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  if (typeof shape === 'string' || typeof shape === 'boolean') return typeof value === typeof shape ? value : undefined;
+  return undefined;
+}
 
 let data = null;
 let lastError = null;
@@ -368,7 +395,7 @@ function applyPublikDefault(build) {
 }
 
 function stripRendererPatch(patch) {
-  const out = { ...(patch || {}) };
+  const out = sanitizeLike({ ...DEFAULTS, ...RENDERER_EXTRA_FIELDS }, patch) || {};
   for (const k of RENDERER_READ_ONLY) delete out[k];
   // The vault folder and the on/off switch have their own IPC channels
   // (knowledge:pick-vault, knowledge:set-enabled), so a Save made while a

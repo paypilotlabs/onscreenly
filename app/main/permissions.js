@@ -6,7 +6,7 @@ const { PRELOAD_PATH, rendererPage } = require('./platform');
 let permWin = null;
 
 function hasPermissionsWindow() {
-  return !!permWin;
+  return !!permWin && !permWin.isDestroyed();
 }
 
 function closePermissionsWindow() {
@@ -132,6 +132,11 @@ function createPermissionsWindow({ above = null } = {}) {
     }
   });
   const win = permWin;
+  // Closed by the user (Cmd+W, Alt+F4) rather than through closePermissionsWindow: forget it, or
+  // window-all-closed keeps waiting for it and the app never quits.
+  win.once('closed', () => {
+    if (permWin === win) permWin = null;
+  });
   if (above) {
     win.setAlwaysOnTop(true, 'screen-saver', 2);
     const raise = () => {

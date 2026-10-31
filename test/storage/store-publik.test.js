@@ -242,3 +242,47 @@ test('a failed save is reported via lastSaveError instead of being silently swal
   assert.ok(store.lastSaveError());
   assert.match(String(store.lastSaveError().message), /ENOENT/);
 });
+
+test('a wrong-typed apiKeys field cannot erase the saved keys', () => {
+  const { store } = loadStore();
+  store.setPublik({ apiKey: 'pk_live_real' });
+  store.setSettings({ apiKeys: { openai: 'sk-synthetic-1234' } });
+  for (const apiKeys of [null, 'abc', 42, ['sk-x']]) {
+    store.setSettings(store.stripRendererPatch({ apiKeys }));
+    assert.equal(store.getSettings().apiKeys.openai, 'sk-synthetic-1234', `apiKeys: ${JSON.stringify(apiKeys)}`);
+    assert.equal(store.getSettings().apiKeys.publik, 'pk_live_real');
+  }
+  store.setSettings(store.stripRendererPatch({ apiKeys: { openai: null, anthropic: 7 } }));
+  assert.equal(store.getSettings().apiKeys.openai, 'sk-synthetic-1234', 'a non-string key value is ignored');
+});
+
+test('renderer patches keep only known fields with the right types', () => {
+  const { store } = loadStore();
+  const out = store.stripRendererPatch({
+    provider: 'ollama',
+    models: 'abc',
+    opacity: 'x',
+    smart: true,
+    onboarded: true,
+    windowX: 400,
+    windowY: 'zz',
+    totallyUnknown: 'x'.repeat(1000),
+    localWhisper: { threads: Number.NaN, language: 'en', extra: 1 },
+    knowledge: { exclude: ['a'], maxChars: 4000 }
+  });
+  assert.deepEqual(out, {
+    provider: 'ollama',
+    smart: true,
+    onboarded: true,
+    localWhisper: { language: 'en' },
+    knowledge: { exclude: ['a'], maxChars: 4000 }
+  });
+});
+
+test('a Settings save leaves the window position the main process saved', () => {
+  const { store } = loadStore();
+  store.setSettings({ windowX: 350, windowY: 150 });
+  store.setSettings(store.stripRendererPatch({ ...store.getSettings(), windowX: 400, windowY: 20 }));
+  assert.equal(store.getSettings().windowX, 350);
+  assert.equal(store.getSettings().windowY, 150);
+});
