@@ -8,6 +8,8 @@ const DEFAULTS = {
   say: 'CommandOrControl+Alt+Return',
   assist: 'CommandOrControl+Shift+Return',
   leetcode: 'CommandOrControl+Alt+K',
+  // Keeps the visible part of a coding problem too long for one screen; the solve sends every part.
+  leetcodeAdd: 'CommandOrControl+Alt+A',
   hide: 'CommandOrControl+Shift+/',
   listening: 'CommandOrControl+Shift+L',
   quit: 'CommandOrControl+Shift+X'

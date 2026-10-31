@@ -31,6 +31,46 @@ function withTimeout(promise, ms, message) {
   ]).finally(() => clearTimeout(timer));
 }
 
+function captureFailedMessage() {
+  return process.platform === 'darwin'
+    ? 'Screen capture needs permission — grant Screen Recording to Onscreenly in System Settings.'
+    : process.platform === 'win32'
+      ? 'Screen capture failed. Make sure Onscreenly is not blocked by Windows privacy or security software, then try again.'
+      : 'Screen capture failed. Check your desktop capture permissions, then try again.';
+}
+
+let adding = false;
+/**
+ * Add screen: keeps the visible part of a coding problem that is longer than the screen. The user
+ * scrolls and adds the next part; the next LeetCode solve sends every part with what is visible then.
+ */
+async function addProblemScreen() {
+  const screens = session.problemScreens;
+  if (adding) return;
+  if (screens.count() >= screens.max) {
+    send('problem:screens', { count: screens.count(), max: screens.max, full: true });
+    return;
+  }
+  adding = true;
+  try {
+    const dataUrl = await withTimeout(captureScreenshot(), SCREENSHOT_TIMEOUT_MS, 'Screen capture timed out.');
+    if (!dataUrl) throw new Error('No screen source was available.');
+    const { count } = screens.add(dataUrl);
+    send('problem:screens', { count, max: screens.max });
+  } catch (e) {
+    recordEvent({
+      level: 'error',
+      event: 'screen_capture_failed',
+      msg: e && e.message ? e.message : String(e),
+      frame: 'addProblemScreen',
+      context: { mode: 'leetcode' }
+    });
+    send('status', { message: captureFailedMessage() });
+  } finally {
+    adding = false;
+  }
+}
+
 /** Stops the answer in progress: cancels the provider request and settles the answer as stopped. */
 function cancelCurrent() {
   if (current) current.cancel();
@@ -61,8 +101,11 @@ async function runFeature(mode, userText) {
   try {
     const settings = store.getSettings();
     const llm = createLLM(settings);
-    const userBubble =
-      def.userBubble !== null
+    // LeetCode: the parts of a long problem added before (Add screen), oldest first.
+    const parts = mode === 'leetcode' ? session.problemScreens.list() : [];
+    const userBubble = parts.length
+      ? `Solve what's on screen (${parts.length + 1} screens)`
+      : def.userBubble !== null
         ? def.userBubble
         : mode === 'ask'
           ? userText
@@ -128,14 +171,9 @@ async function runFeature(mode, userText) {
           frame: 'captureScreenshot',
           context: { mode }
         });
-        const message =
-          process.platform === 'darwin'
-            ? 'Screen capture needs permission — grant Screen Recording to Onscreenly in System Settings.'
-            : process.platform === 'win32'
-              ? 'Screen capture failed. Make sure Onscreenly is not blocked by Windows privacy or security software, then try again.'
-              : 'Screen capture failed. Check your desktop capture permissions, then try again.';
-        // LeetCode reads the problem from the screen; without it there is nothing to solve.
-        if (def.requiresScreen) {
+        const message = captureFailedMessage();
+        // LeetCode reads the problem from the screen; without it (and no parts added) there is nothing to solve.
+        if (def.requiresScreen && !parts.length) {
           send('llm:error', { message, code: 'needs-screen' });
           return;
         }
@@ -143,6 +181,7 @@ async function runFeature(mode, userText) {
       }
     }
     if (cancelled) return;
+    const images = [...parts, ...(imageDataUrl ? [imageDataUrl] : [])];
 
     // Follow-up / Recap have nothing to work with before anything was heard —
     // sent to the model anyway, it fabricates plausible generic output that
@@ -166,7 +205,7 @@ async function runFeature(mode, userText) {
     }
 
     const settingsForPrompt = store.getSettings();
-    const ctx = { transcript, userText: userText || '', settings: settingsForPrompt };
+    const ctx = { transcript, userText: userText || '', settings: settingsForPrompt, screenCount: images.length };
     // Modes with their own context (résumé analysis) put the full documents in
     // the user turn and skip the clipped interview excerpts and meeting memory.
     let contextBlock = def.ownContext ? null : buildInterviewContext(settingsForPrompt, mode, transcript);
@@ -187,7 +226,7 @@ async function runFeature(mode, userText) {
     let built = def.build(ctx);
     // A mode that looks at the screen, run without a screenshot: say so, so the answer does not
     // describe a screenshot it never saw.
-    if (def.needsScreen && !imageDataUrl) {
+    if (def.needsScreen && !images.length) {
       built += '\n\n(No screenshot is attached: screen capture was unavailable. Do not refer to a screenshot.)';
     }
 
@@ -218,7 +257,7 @@ async function runFeature(mode, userText) {
         llm.stream({
           system,
           turns: [{ role: 'user', text: built }],
-          imageDataUrl,
+          imageDataUrls: images,
           signal: controller.signal,
           ...(def.maxTokens ? { maxTokens: def.maxTokens } : {}),
           onToken: (t) => {
@@ -250,6 +289,8 @@ async function runFeature(mode, userText) {
       throw new Error('The model returned an empty answer. Try again, or pick another model in Settings.');
     }
     send('llm:done', { sources: notes.sources, truncated });
+    // The problem is solved: its parts are done with. A failed or stopped solve keeps them for Try again.
+    if (parts.length) session.problemScreens.clear();
     // Streams settle after their headers, so the charge is reconciled from
     // GET /wallet shortly after the answer — one request per answer, debounced.
     if (settings.provider === publik.PUBLIK_PROVIDER) publikController.publikScheduleWalletRefresh();
@@ -280,4 +321,4 @@ async function runFeature(mode, userText) {
   }
 }
 
-module.exports = { runFeature, cancelCurrent, STREAM_INACTIVITY_MS };
+module.exports = { runFeature, cancelCurrent, addProblemScreen, STREAM_INACTIVITY_MS };

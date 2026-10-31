@@ -60,6 +60,8 @@ test('defaults cover the core actions without taking keys other apps rely on', (
     assert.ok(!Object.values(DEFAULTS).includes(taken), taken);
   }
   assert.strictEqual(DEFAULTS.listening, 'CommandOrControl+Shift+L');
+  // ⌘⌥J, ⌘⌥I, ⌘⌥U and ⌘⌥C open Chrome's developer tools, where LeetCode runs.
+  assert.strictEqual(DEFAULTS.leetcodeAdd, 'CommandOrControl+Alt+A');
   assert.ok(DEFAULTS.leetcode);
   assert.ok(DEFAULTS.quit);
 });

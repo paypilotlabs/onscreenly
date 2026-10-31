@@ -2,17 +2,29 @@
 // rolling transcript, meeting memory and the renderer channel. Other modules
 // read and write these fields directly; keeping them on one object means a
 // reassignment in one module is seen by all of them.
+const { createProblemScreens } = require('../../src/capture/problem-screens');
+
 const session = {
   state: { capturing: false, busy: false, transcribing: { you: false, them: false } },
   sttDisabled: false, // set when the key can't reach any speech model (stops retry spam)
   transcript: [], // { channel, text, ts } — capped at MAX_TRANSCRIPT_TURNS
   meetingMemory: null, // persists the transcript per meeting + notes; see src/meetings/meeting-memory.js
+  // Parts of a coding problem longer than the screen (Add screen), sent together by the next solve.
+  problemScreens: createProblemScreens(),
   restoredTurns: [], // turns of an interrupted meeting resumed at launch, replayed to the renderer once
   // Which global shortcuts Onscreenly actually holds. `globalShortcut.register` returns
   // false when another application already owns the combination, and nothing used
   // to look at that — so the only symptom was a key that did nothing. Iris reads
   // this and can say which key is taken instead of guessing from a screenshot.
-  shortcutState: { assist: false, say: false, leetcode: false, hide: false, listening: false, quit: false }
+  shortcutState: {
+    assist: false,
+    say: false,
+    leetcode: false,
+    leetcodeAdd: false,
+    hide: false,
+    listening: false,
+    quit: false
+  }
 };
 
 const MAX_TRANSCRIPT_TURNS = 200; // ~30–40 minutes of conversation at normal pace

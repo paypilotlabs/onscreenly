@@ -7,6 +7,7 @@ All notable changes to Onscreenly. Versions follow [Semantic Versioning](https:/
 ## [0.2.5] - 2026-10-31
 
 ### Added
+- Coding problems longer than the screen: press ⌘⌥A / Ctrl+Alt+A to keep each part as you scroll (up to 4), then solve; every part is sent together. A problem that is still cut off is named as such instead of half-solved.
 - Settings › API keys › Your data › Meeting history: keep the last 10, 25, 50 or 100 meetings, or none, and delete the history.
 - Stop an answer that is on its way (Send or Esc); answers cut off at the length limit say so.
 - Settings › Appearance › Keyboard shortcuts: change any global shortcut.

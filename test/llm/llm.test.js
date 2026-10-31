@@ -818,3 +818,45 @@ test('Ollama: a failed request reports the reason from its body', async (t) => {
     /500 Internal Server Error — model requires more system memory/
   );
 });
+
+test('several screenshots go with the question in order, for every request format', async (t) => {
+  const { imagesOf } = require('../../src/llm/llm');
+  assert.deepEqual(imagesOf({ imageDataUrl: 'data:image/png;base64,AA==' }), ['data:image/png;base64,AA==']);
+  assert.deepEqual(imagesOf({ imageDataUrls: ['a', '', null, 'b'], imageDataUrl: 'x' }), ['a', 'b']);
+  assert.deepEqual(imagesOf({}), []);
+
+  const shots = ['data:image/png;base64,QQ==', 'data:image/jpeg;base64,Qg=='];
+  // OpenAI-compatible: one text part, then one image part per screenshot.
+  const openai = createLLM(createCustomSettings());
+  await openai.stream({ system: 's', turns: [{ role: 'user', text: 'q' }], imageDataUrls: shots, onToken: () => {} });
+  const content = capturedCompletionRequest.messages.at(-1).content;
+  assert.deepEqual(
+    content.map((p) => p.type),
+    ['text', 'image_url', 'image_url']
+  );
+  assert.deepEqual(
+    content.slice(1).map((p) => p.image_url.url),
+    shots
+  );
+
+  // Ollama: every screenshot's base64 in `images`, in order.
+  let body;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    body = JSON.parse(init.body);
+    const enc = new TextEncoder();
+    return {
+      ok: true,
+      body: (async function* () {
+        yield enc.encode('{"message":{"content":"ok"},"done":true}\n');
+      })()
+    };
+  });
+  const ollama = createLLM({
+    provider: 'ollama',
+    smart: false,
+    apiKeys: { ollama: '' },
+    models: { ollama: { fast: 'llava' } }
+  });
+  await ollama.stream({ system: 's', turns: [{ role: 'user', text: 'q' }], imageDataUrls: shots, onToken: () => {} });
+  assert.deepEqual(body.messages.at(-1).images, ['QQ==', 'Qg==']);
+});

@@ -50,6 +50,7 @@ const SHORTCUT_DEFAULTS = {
   say: 'CommandOrControl+Alt+Return',
   assist: 'CommandOrControl+Shift+Return',
   leetcode: 'CommandOrControl+Alt+K',
+  leetcodeAdd: 'CommandOrControl+Alt+A',
   hide: 'CommandOrControl+Shift+/',
   listening: 'CommandOrControl+Shift+L',
   quit: 'CommandOrControl+Shift+X'
@@ -79,7 +80,7 @@ function acceleratorKeys(accelerator) {
     .map((part) => ACCELERATOR_KEYS[part] || part);
 }
 
-/** The keys of one global shortcut: say, assist, leetcode, hide, listening or quit. */
+/** The keys of one global shortcut: say, assist, leetcode, leetcodeAdd, hide, listening or quit. */
 function shortcutKeys(action) {
   return acceleratorKeys(shortcutMap[action]);
 }

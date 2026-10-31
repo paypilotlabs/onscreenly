@@ -7,12 +7,13 @@ const { recordEvent } = require('../../src/integrations/applink');
 const { DEFAULTS, resolveShortcuts, findConflicts, isValid } = require('../../src/platform/shortcuts');
 const { handle } = require('./ipc-guard');
 const { session, send } = require('./session');
-const { runFeature } = require('./llm-runner');
+const { runFeature, addProblemScreen } = require('./llm-runner');
 
 const ACTIONS = {
   say: () => runFeature('say', ''),
   assist: () => runFeature('assist', ''),
   leetcode: () => runFeature('leetcode', ''),
+  leetcodeAdd: () => addProblemScreen(),
   hide: () => send('hide:toggle', {}),
   // Start or end a session: the renderer runs the same toggle as the session button.
   listening: () => send('session:toggle', {}),
