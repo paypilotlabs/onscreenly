@@ -274,3 +274,124 @@ test('a question while another is being answered is not silently dropped', async
   assert.equal(sent[0].channel, 'status');
   assert.match(sent[0].data.message, /Still answering/);
 });
+
+test('Add screen keeps parts of a long problem; the solve sends them all, oldest first, then lets them go', async (t) => {
+  const { addProblemScreen } = require('../../app/main/llm-runner');
+  session.problemScreens.clear();
+  const sent = [];
+  setSender((channel, data) => sent.push({ channel, data }));
+  screenshot = async () => 'data:image/png;base64,top';
+  await addProblemScreen();
+  screenshot = async () => 'data:image/png;base64,middle';
+  await addProblemScreen();
+  assert.deepEqual(
+    sent.filter((m) => m.channel === 'problem:screens').map((m) => m.data),
+    [
+      { count: 1, max: session.problemScreens.max },
+      { count: 2, max: session.problemScreens.max }
+    ]
+  );
+
+  let request;
+  llm = readyLLM(async (params) => {
+    request = params;
+    params.onToken('def solve(): ...');
+  });
+  screenshot = async () => 'data:image/png;base64,bottom';
+  const { start, errors, done } = await run(t, 'leetcode');
+  assert.deepEqual(errors, []);
+  assert.equal(done.length, 1);
+  assert.equal(start.userBubble, "Solve what's on screen (3 screens)");
+  assert.deepEqual(request.imageDataUrls, [
+    'data:image/png;base64,top',
+    'data:image/png;base64,middle',
+    'data:image/png;base64,bottom'
+  ]);
+  assert.match(request.turns[0].text, /across these 3 screenshots/);
+  // The prompt names the keys that add a part, as the user reads them.
+  assert.match(request.turns[0].text, /Ctrl\+Alt\+Shift\+K|⌘⌥⇧K/);
+  assert.equal(session.problemScreens.count(), 0, 'a solved problem lets its parts go');
+});
+
+test('a solve that says part of the problem is missing, or is cut off, keeps the parts for the next solve', async (t) => {
+  for (const [label, reply, info] of [
+    [
+      'missing',
+      'Missing: the constraints are cut off.\nScroll down and press Ctrl+Alt+Shift+K, then solve again.',
+      null
+    ],
+    ['truncated', 'def solve(): ...', { truncated: true }]
+  ]) {
+    session.problemScreens.clear();
+    session.problemScreens.add('data:image/png;base64,top');
+    llm = readyLLM(async (params) => {
+      params.onToken(reply);
+      if (info) params.onFinish(info);
+    });
+    const { errors } = await run(t, 'leetcode');
+    assert.deepEqual(errors, [], label);
+    assert.deepEqual(session.problemScreens.list(), ['data:image/png;base64,top'], label);
+  }
+  session.problemScreens.clear();
+});
+
+test('a part added while a solve is answering stays for the next solve', async (t) => {
+  const { addProblemScreen } = require('../../app/main/llm-runner');
+  session.problemScreens.clear();
+  session.problemScreens.add('data:image/png;base64,top');
+  llm = readyLLM(async (params) => {
+    screenshot = async () => 'data:image/png;base64,added-meanwhile';
+    await addProblemScreen();
+    params.onToken('def solve(): ...');
+  });
+  await run(t, 'leetcode');
+  assert.deepEqual(session.problemScreens.list(), ['data:image/png;base64,added-meanwhile']);
+  session.problemScreens.clear();
+});
+
+test('a failed solve keeps the added parts for Try again, and they stand in when the screen cannot be read', async (t) => {
+  session.problemScreens.clear();
+  session.problemScreens.add('data:image/png;base64,top');
+  llm = readyLLM(async () => {
+    throw new Error('the provider is down');
+  });
+  const failed = await run(t, 'leetcode');
+  assert.equal(failed.errors.length, 1);
+  assert.equal(session.problemScreens.count(), 1, 'kept for Try again');
+
+  let request;
+  llm = readyLLM(async (params) => {
+    request = params;
+    params.onToken('ok');
+  });
+  screenshot = async () => {
+    throw new Error('denied');
+  };
+  const retried = await run(t, 'leetcode');
+  assert.deepEqual(retried.errors, []);
+  assert.deepEqual(request.imageDataUrls, ['data:image/png;base64,top']);
+  session.problemScreens.clear();
+});
+
+test('Add screen says when it already holds the most parts, and other modes never use them', async (t) => {
+  const { addProblemScreen } = require('../../app/main/llm-runner');
+  session.problemScreens.clear();
+  for (let i = 0; i < session.problemScreens.max; i++) session.problemScreens.add(`data:image/png;base64,${i}`);
+  const sent = [];
+  setSender((channel, data) => sent.push({ channel, data }));
+  await addProblemScreen();
+  assert.deepEqual(sent.at(-1), {
+    channel: 'problem:screens',
+    data: { count: session.problemScreens.max, max: session.problemScreens.max, full: true }
+  });
+
+  let request;
+  llm = readyLLM(async (params) => {
+    request = params;
+    params.onToken('ok');
+  });
+  await run(t, 'assist');
+  assert.deepEqual(request.imageDataUrls, ['data:image/png;base64,AA==']);
+  assert.equal(session.problemScreens.count(), session.problemScreens.max, 'assist leaves them alone');
+  session.problemScreens.clear();
+});

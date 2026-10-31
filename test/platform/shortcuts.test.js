@@ -8,7 +8,7 @@ const ROOT = path.join(__dirname, '..', '..');
 
 // Loads app/main/shortcuts.js with Electron's globalShortcut replaced by a recorder, and returns
 // what it registered (accelerator and handler, in order) plus the session it reports to.
-function registeredShortcuts({ taken = [] } = {}) {
+function registeredShortcuts({ taken = [], saved = {} } = {}) {
   const stub = (id, exports) => {
     const file = require.resolve(id, { paths: [ROOT] });
     const mod = new Module(file);
@@ -18,7 +18,7 @@ function registeredShortcuts({ taken = [] } = {}) {
     require.cache[file] = mod;
   };
   let registered = [];
-  let settings = { shortcuts: {} };
+  let settings = { shortcuts: { ...saved } };
   const handlers = {};
   stub('electron', {
     app: { quit: () => {} },
@@ -60,6 +60,11 @@ test('defaults cover the core actions without taking keys other apps rely on', (
     assert.ok(!Object.values(DEFAULTS).includes(taken), taken);
   }
   assert.strictEqual(DEFAULTS.listening, 'CommandOrControl+Shift+L');
+  // Solve's keys plus Shift; never Ctrl+Alt+<letter> alone, which is AltGr+<letter> on Windows.
+  assert.strictEqual(DEFAULTS.leetcodeAdd, 'CommandOrControl+Alt+Shift+K');
+  for (const accel of Object.values(DEFAULTS)) {
+    assert.ok(!/^CommandOrControl\+Alt\+[A-Z]$/.test(accel) || accel === DEFAULTS.leetcode, accel);
+  }
   assert.ok(DEFAULTS.leetcode);
   assert.ok(DEFAULTS.quit);
 });
@@ -133,4 +138,20 @@ test('a shortcut that is invalid, already used, or held by another app is refuse
     'the previous keys still work'
   );
   assert.throws(() => set({ action: 'format-disk', accelerator: 'CommandOrControl+Alt+F' }), /unknown shortcut/);
+});
+
+test('a key the user already gave to an action wins over a default added in a later version', () => {
+  // Saved before Add screen existed: quit was moved onto what is now Add screen's default.
+  const { registered, session } = registeredShortcuts({ saved: { quit: DEFAULTS.leetcodeAdd } });
+  const quit = registered().find((r) => r.accelerator === DEFAULTS.leetcodeAdd);
+  assert.ok(quit, 'the user keeps their keys');
+  assert.strictEqual(registered().filter((r) => r.accelerator === DEFAULTS.leetcodeAdd).length, 1);
+  assert.strictEqual(session.shortcutState.quit, true);
+  assert.strictEqual(session.shortcutState.leetcodeAdd, false);
+});
+
+test('a refused shortcut names the action in words', () => {
+  const { set } = registeredShortcuts();
+  const dup = set({ action: 'say', accelerator: DEFAULTS.leetcodeAdd });
+  assert.match(dup.error, /Already used for Add screen\./);
 });

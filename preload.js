@@ -80,6 +80,7 @@ const api = {
       'applink:consent-request',
       'hide:toggle',
       'session:toggle',
+      'problem:screens',
       'whisper:download-progress',
       'whisper:models-changed',
       'publik:state',

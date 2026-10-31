@@ -1,5 +1,6 @@
 // LLM factory — OpenAI, Anthropic, Gemini, and OpenAI-compatible APIs behind one streaming interface.
-// stream({ system, turns:[{role,text}], imageDataUrl, maxTokens, onToken }) -> Promise<fullText>
+// stream({ system, turns:[{role,text}], imageDataUrl | imageDataUrls, maxTokens, onToken }) -> Promise<fullText>
+// Images go with the last user turn, in order (a long problem captured in parts, top to bottom).
 
 const { createCompatibleClientOptions } = require('./openai-compatible');
 const publik = require('../integrations/publik');
@@ -293,6 +294,12 @@ const MINIMAX_BASE_URLS = {
   cn_zh: 'https://api.minimaxi.com/v1'
 };
 
+/** The screenshots for a request, in order: `imageDataUrls`, or the single `imageDataUrl`. */
+function imagesOf({ imageDataUrls, imageDataUrl } = {}) {
+  const list = Array.isArray(imageDataUrls) ? imageDataUrls : imageDataUrl ? [imageDataUrl] : [];
+  return list.filter((u) => typeof u === 'string' && u);
+}
+
 function stripDataUrl(dataUrl) {
   const m = /^data:(.+?);base64,(.*)$/s.exec(dataUrl || '');
   return m ? { mime: m[1], b64: m[2] } : null;
@@ -309,7 +316,7 @@ async function streamOpenAI({
   model,
   system,
   turns,
-  imageDataUrl,
+  images = [],
   maxTokens,
   onToken,
   onResponse,
@@ -322,13 +329,10 @@ async function streamOpenAI({
   const messages = [{ role: 'system', content: system }];
   turns.forEach((t, i) => {
     const last = i === turns.length - 1;
-    if (last && imageDataUrl && t.role === 'user') {
+    if (last && images.length && t.role === 'user') {
       messages.push({
         role: 'user',
-        content: [
-          { type: 'text', text: t.text },
-          { type: 'image_url', image_url: { url: imageDataUrl } }
-        ]
+        content: [{ type: 'text', text: t.text }, ...images.map((url) => ({ type: 'image_url', image_url: { url } }))]
       });
     } else {
       messages.push({ role: t.role, content: t.text });
@@ -390,7 +394,7 @@ async function streamAzure({
   model,
   system,
   turns,
-  imageDataUrl,
+  images = [],
   maxTokens,
   onToken,
   endpoint,
@@ -403,13 +407,10 @@ async function streamAzure({
   const messages = [{ role: 'system', content: system }];
   turns.forEach((t, i) => {
     const last = i === turns.length - 1;
-    if (last && imageDataUrl && t.role === 'user') {
+    if (last && images.length && t.role === 'user') {
       messages.push({
         role: 'user',
-        content: [
-          { type: 'text', text: t.text },
-          { type: 'image_url', image_url: { url: imageDataUrl } }
-        ]
+        content: [{ type: 'text', text: t.text }, ...images.map((url) => ({ type: 'image_url', image_url: { url } }))]
       });
     } else {
       messages.push({ role: t.role, content: t.text });
@@ -447,7 +448,7 @@ async function streamAnthropic({
   model,
   system,
   turns,
-  imageDataUrl,
+  images = [],
   maxTokens,
   onToken,
   signal,
@@ -458,10 +459,11 @@ async function streamAnthropic({
   const client = new Anthropic({ apiKey });
   const messages = turns.map((t, i) => {
     const last = i === turns.length - 1;
-    if (last && imageDataUrl && t.role === 'user') {
-      const img = stripDataUrl(imageDataUrl);
+    if (last && images.length && t.role === 'user') {
       const content = [];
-      if (img) content.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.b64 } });
+      for (const img of images.map(stripDataUrl)) {
+        if (img) content.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.b64 } });
+      }
       content.push({ type: 'text', text: t.text });
       return { role: 'user', content };
     }
@@ -511,7 +513,7 @@ async function streamGemini({
   model,
   system,
   turns,
-  imageDataUrl,
+  images = [],
   maxTokens,
   thinking,
   onToken,
@@ -523,9 +525,10 @@ async function streamGemini({
   const contents = turns.map((t, i) => {
     const last = i === turns.length - 1;
     const parts = [{ text: t.text }];
-    if (last && imageDataUrl && t.role === 'user') {
-      const img = stripDataUrl(imageDataUrl);
-      if (img) parts.push({ inlineData: { mimeType: img.mime, data: img.b64 } });
+    if (last && images.length && t.role === 'user') {
+      for (const img of images.map(stripDataUrl)) {
+        if (img) parts.push({ inlineData: { mimeType: img.mime, data: img.b64 } });
+      }
     }
     return { role: t.role === 'assistant' ? 'model' : 'user', parts };
   });
@@ -561,7 +564,7 @@ async function streamOllama({
   model,
   system,
   turns,
-  imageDataUrl,
+  images = [],
   maxTokens,
   onToken,
   signal,
@@ -573,10 +576,13 @@ async function streamOllama({
   const messages = [{ role: 'system', content: system }];
   turns.forEach((t, i) => {
     const last = i === turns.length - 1;
-    if (last && imageDataUrl && t.role === 'user') {
-      const img = stripDataUrl(imageDataUrl);
-      if (img) {
-        messages.push({ role: 'user', content: t.text, images: [img.b64] });
+    if (last && images.length && t.role === 'user') {
+      const b64 = images
+        .map(stripDataUrl)
+        .filter(Boolean)
+        .map((img) => img.b64);
+      if (b64.length) {
+        messages.push({ role: 'user', content: t.text, images: b64 });
       } else {
         messages.push({ role: 'user', content: t.text });
       }
@@ -718,8 +724,11 @@ function createLLM(settings) {
         maxTokens,
         thinking: !!settings.smart,
         ...params,
+        images: imagesOf(params),
         turns: sanitizeTurns(params.turns)
       };
+      delete args.imageDataUrl;
+      delete args.imageDataUrls;
       try {
         if (provider === 'openai') return await streamOpenAI(args);
         if (provider === CUSTOM_PROVIDER) return await streamOpenAI(args);
@@ -749,6 +758,7 @@ function createLLM(settings) {
 
 module.exports = {
   createLLM,
+  imagesOf,
   formatProviderErrorMessage,
   isQuotaError,
   isNotFoundError,

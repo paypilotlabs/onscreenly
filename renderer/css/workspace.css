@@ -1,4 +1,5 @@
-/* Workspace: the light Cluely dialogs (Settings, onboarding, consent) and the permissions card.
+/* Workspace: the light Cluely dialogs (Settings, consent) and the permissions card; also the guide
+ * (onboarding, Help), which takes the overlay theme and opens in the answer panel's place.
  * Text only: no icons. Headings, eyebrows and tags carry the structure; status is an ok dot or a ring.
  *
  * Every surface is Chalk with a 1px Bone edge and no shadow (--frame is none in this theme).
@@ -66,6 +67,37 @@
 
 #onboard-scrim {
   z-index: var(--z-onboard);
+}
+
+/* The guide (onboarding, Help) is part of the overlay: it opens in the answer panel's place, under the
+ * toolbar, at the panel's width and in its dark theme, and the panel steps aside. Nothing is dimmed
+ * or blurred, and only the guide takes the mouse: the transparent area around it passes clicks
+ * through like any other gap in the overlay, and the toolbar stays live (a toolbar click closes the
+ * guide, onboarding.js). */
+#onboard-scrim {
+  place-items: start center;
+  padding-top: calc(var(--spacing-14) + var(--toolbar-h) + var(--spacing-10));
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+#onboard-scrim > .ws-dialog {
+  pointer-events: auto;
+}
+
+#app:has(~ #onboard-scrim:not(.hidden)) #panel-wrap {
+  visibility: hidden;
+}
+
+/* The publik disclosure and card must be answered, and may open over Settings: for them the scrim
+ * dims, blurs and blocks everything under it, as the other dialogs' scrims do. */
+#onboard-scrim:has(> #onboard:is(.dialog, .card)) {
+  background: var(--scrim);
+  -webkit-backdrop-filter: var(--scrim-blur);
+  backdrop-filter: var(--scrim-blur);
+  pointer-events: auto;
 }
 
 #consent-scrim {
@@ -854,17 +886,19 @@
  * Head (eyebrow, title, lede), body, body buttons, then a footer with Skip, the step count with
  * decorative dots, Back and Next. One blue button per view. #ob-icon stays in the DOM, hidden. */
 #onboard {
-  width: 520px;
-  max-height: calc(var(--win-h) - 32px);
+  width: var(--panel-w);
+  max-height: calc(var(--win-h) - var(--spacing-14) * 2 - var(--toolbar-h) - var(--spacing-10));
+  border-color: var(--line);
+  animation: ui-rise-in var(--dur-slow) var(--ease-out);
 }
 
 /* The four steps share one height, so the footer (and Next under the pointer) stays put from step to
- * step. The height is the tallest step (the publik disclosure, when it replaces step 3) plus the 28px
+ * step: all the room under the toolbar, which holds the tallest step (the shortcut list) plus the 28px
  * minimum spacer. Spare room collects above the footer: the ::after spacer sits between the body
  * buttons and the footer, and #ob-body scrolls if a step ever needs more. The publik dialog and card
  * keep their own height. */
 #onboard:not(.dialog, .card) {
-  height: min(504px, calc(var(--win-h) - 32px));
+  height: calc(var(--win-h) - var(--spacing-14) * 2 - var(--toolbar-h) - var(--spacing-10));
 }
 
 #onboard::after {
@@ -1031,8 +1065,8 @@
 
 .ob-key-row {
   justify-content: space-between;
-  min-height: 44px;
-  padding-block: var(--spacing-10);
+  min-height: 36px;
+  padding-block: var(--spacing-6);
 }
 
 .ob-key-label {
@@ -1054,39 +1088,6 @@
   padding-top: 2px; /* the sans line box sits the symbols about 1px high in the 22px cap */
   font: var(--type-meta);
   letter-spacing: var(--type-meta-track);
-}
-
-/* Welcome: the hero band. The serif and the gradient appear here and nowhere else.
- * The Bone hairline would ring the dark band with a light halo, so the hero drops it: the Chalk part
- * below stands out against the dark scrim on its own (the border stays as space, so the size holds). */
-#onboard.is-hero {
-  border-color: transparent;
-  background-clip: padding-box;
-}
-
-#onboard.is-hero .ob-head {
-  align-items: center;
-  padding: var(--spacing-32) var(--spacing-28) var(--spacing-28);
-  background: var(--gradient-hero);
-  text-align: center;
-}
-
-#onboard.is-hero .ob-eyebrow {
-  display: none;
-}
-
-#onboard.is-hero #ob-title {
-  margin-top: 0;
-  font: var(--type-display);
-  letter-spacing: var(--type-display-track);
-  color: var(--on-accent);
-}
-
-#onboard.is-hero .ob-lede {
-  margin-top: var(--spacing-10);
-  font: var(--type-lede);
-  letter-spacing: var(--type-lede-track);
-  color: var(--bg-tint); /* Frost on the band: 8.18:1 on the light stop */
 }
 
 /* The Welcome Frost feature card: the only 24px card. A short definition list: an eyebrow names each

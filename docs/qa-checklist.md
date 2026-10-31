@@ -32,6 +32,7 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 - [ ] Type a question and press Enter: an answer streams in.
 - [ ] **Assist** (Command/Ctrl+Shift+Enter) answers about what is on screen.
 - [ ] **Solve the coding problem on screen** (⌘⌥K / Ctrl+Alt+K) on a LeetCode page returns a solution.
+- [ ] A LeetCode problem longer than the screen: at the top press ⌘⌥⇧K / Ctrl+Alt+Shift+K ("Screen 1 kept"), scroll, press it again, scroll to the end and solve. The question reads "(3 screens)" and the solution uses every constraint and the full signature. Solving a cut-off problem without adding screens starts with "Missing:" and names those keys; adding the rest and solving again keeps the parts already added.
 - [ ] ⌘↵ in Slack or Teams and ⌘H on macOS still do what those apps expect while Onscreenly runs.
 - [ ] Settings › Appearance › Keyboard shortcuts: a new combination works at once in other apps, and the hints update; one already used is refused.
 - [ ] macOS, fresh install: the overlay opens without asking for any permission; starting a session asks for the microphone, and the first screen answer asks for Screen Recording.
@@ -92,7 +93,8 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 ## 11. Design and accessibility
 
 - [ ] Opacity at 100%, 60% and 20% over a video call, a white document and a dark code editor: answers stay readable and the toolbar stays findable.
-- [ ] The light dialogs (Settings, onboarding, consent, permissions) over a dark desktop and over a bright one.
+- [ ] The light dialogs (Settings, consent, permissions) over a dark desktop and over a bright one.
+- [ ] Help opens the guide dark, in the answer panel's place under the toolbar; the area around it clicks through to the app below, and a toolbar button (or Help again) closes it.
 - [ ] Text and borders look sharp on a Retina display, on a 1x display, and on Windows at 150% scaling.
 - [ ] Keyboard only: Tab reaches every control with a visible focus ring, dialogs keep focus inside, and Escape closes one layer per press (the composer text, then Opacity, then the transcript).
 - [ ] VoiceOver (macOS) and NVDA (Windows) read the toolbar buttons, answers as they finish, and the status lines.

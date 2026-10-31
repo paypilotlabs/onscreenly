@@ -132,12 +132,13 @@ const SHORTCUTS = [
   ['What should I say?', 'say'],
   ['Assist', 'assist'],
   ['Solve the coding problem on screen', 'leetcode'],
+  ['Add screen of a long problem, then solve', 'leetcodeAdd'],
   ['Hide or show', 'hide']
 ];
 
 const OB_STEPS = [
   {
-    hero: true,
+    eyebrow: 'Getting started',
     title: 'Welcome to Onscreenly',
     lede: 'A quiet AI copilot that floats over your screen.',
     body: () =>
@@ -361,7 +362,6 @@ function renderOnboard() {
   const step = OB_STEPS[obIndex];
   const last = obIndex === OB_STEPS.length - 1;
   const ob = $('#onboard');
-  ob.classList.toggle('is-hero', !!step.hero);
   // The publik card has its own two buttons and no Next/Skip: leaving it any
   // other way would spend the starter without the card being acknowledged.
   ob.classList.toggle('card', !!step.publikCard);
@@ -483,6 +483,20 @@ export function init() {
   });
   $('#ob-skip').addEventListener('click', finishOnboard);
   $('#logo-btn').addEventListener('click', showOnboard);
+  // The toolbar stays live while the guide shows: a click on any of its buttons closes the guide
+  // first (as Skip does), and Help closes it rather than starting it over. The publik disclosure and
+  // card must be answered; their scrim covers the toolbar, so this never runs for them.
+  $('#toolbar').addEventListener(
+    'click',
+    (e) => {
+      if (obScrim.classList.contains('hidden') || obDialog || OB_STEPS[obIndex].publikCard) return;
+      if (!e.target.closest('button')) return;
+      const help = e.target.closest('#logo-btn');
+      finishOnboard();
+      if (help) e.stopImmediatePropagation();
+    },
+    true
+  );
   // The permissions step's "Open settings" buttons open the system settings page they name. Coming
   // back to the window checks again, so a permission switched on there shows as allowed here.
   $('#ob-body').addEventListener('click', (e) => {

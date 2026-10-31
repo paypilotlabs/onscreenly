@@ -330,7 +330,7 @@
 }
 
 /* 8. Themes. Both declare the same property set (a parity test checks this).
- *    .theme-overlay sits on #app; .theme-workspace on #settings, #onboard, #consent and .perm-card.
+ *    .theme-overlay sits on #app and #onboard (the guide); .theme-workspace on #settings, #consent and .perm-card.
  *    --text-3 is the caption role (captions, placeholders, eyebrows, timestamps). */
 .theme-overlay {
   color-scheme: dark;

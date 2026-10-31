@@ -8,6 +8,7 @@ const LABELS = [
   ['say', 'What should I say?'],
   ['assist', 'Assist'],
   ['leetcode', 'Solve the coding problem on screen'],
+  ['leetcodeAdd', 'Add screen: keep this part of a long coding problem'],
   ['hide', 'Hide or show'],
   ['quit', 'Quit']
 ];

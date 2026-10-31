@@ -261,13 +261,29 @@ const MODES = {
       // Context block AND aiRules intentionally ignored — code answers must
       // stay strict regardless of personal style or context.
       return (
-        'You are an expert competitive programmer. The screenshot contains a coding problem. ' +
+        'You are an expert competitive programmer. The screenshots contain a coding problem; when there are several, ' +
+        'they are parts of one long page in order, top to bottom, and may overlap. ' +
         'Respond with: (1) a one-line restatement, (2) a short approach, (3) a clean, correct, idiomatic solution in a fenced code block ' +
-        '(use the language shown on screen, else Python), (4) time and space complexity. Keep prose tight.'
+        '(use the language shown on screen, else Python, and keep the exact function signature shown), (4) time and space complexity. Keep prose tight. ' +
+        'Before solving, check that the whole problem is visible: the statement, every constraint, the examples and the function signature. ' +
+        'If any of it is cut off at an edge, make your first line start with "Missing:" and say exactly what is missing, then on the next ' +
+        'line tell the user how to add it, with the Add screen keys given in the request. Then solve only if what is visible is enough ' +
+        'to be correct; never guess missing rules or constraints.'
       );
     },
-    build() {
-      return 'Solve the coding problem shown in the screenshot.';
+    build(ctx) {
+      const n = (ctx && ctx.screenCount) || 0;
+      const keys = (ctx && ctx.addScreenKeys) || 'the Add screen shortcut';
+      const ask =
+        n > 1
+          ? `Solve the coding problem shown across these ${n} screenshots (top of the page first).`
+          : 'Solve the coding problem shown in the screenshot.';
+      // How a cut-off problem is completed: the parts already sent stay kept, so only the rest is added.
+      const how =
+        n > 1
+          ? `If something is missing, the user scrolls to it, presses ${keys} for each missing part, then solves again; the parts above stay kept.`
+          : `If something is missing, the user scrolls to the top of the problem, presses ${keys} there and for each further part as they scroll, then solves again.`;
+      return ask + '\n' + how;
     }
   }
 };

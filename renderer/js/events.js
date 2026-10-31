@@ -1,6 +1,6 @@
 // Events pushed from the main process: capture, transcription, answers and status messages.
 import { state } from './state.js';
-import { $, isMac, onscreenly, setSessionButton } from './core.js';
+import { $, combo, isMac, onscreenly, setSessionButton, shortcutKeys } from './core.js';
 import {
   MAX_RESPONSES,
   addAnswerExtras,
@@ -269,6 +269,17 @@ export function init() {
       if (!t || !t.text || t.text.trim().length < 2) continue;
       appendTranscriptHistoryTurn(t.channel, t.text, false);
     }
+  });
+  // Add screen kept one part of a long coding problem: say how many, and how to solve with them.
+  onscreenly.on('problem:screens', ({ count, max, full }) => {
+    const solve = combo(...shortcutKeys('leetcode'));
+    const add = combo(...shortcutKeys('leetcodeAdd'));
+    if (full) {
+      showToast(`${max} screens kept, the most there can be. Solve now with ${solve}.`, 4000);
+      return;
+    }
+    const message = `Screen ${count} of the problem kept. Scroll and press ${add} for the next part, or solve with ${solve}.`;
+    showToast(message, 4000, 'ok', `Screen ${count} kept · solve with ${solve}`);
   });
   onscreenly.on('status', ({ message, code }) => {
     onscreenly.log('[status] ' + message);

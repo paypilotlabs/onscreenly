@@ -40,6 +40,7 @@ Keyboard shortcuts:
 | What should I say? | ⌘ ⌥ Enter | Ctrl Alt Enter |
 | Assist | ⌘ ⇧ Enter | Ctrl Shift Enter |
 | Solve the coding problem on screen | ⌘ ⌥ K | Ctrl Alt K |
+| Add screen: keep this part of a long coding problem (scroll, add the next, then solve) | ⌘ ⌥ ⇧ K | Ctrl Alt Shift K |
 | Collapse / expand the answer panel | ⌘ ⇧ / | Ctrl Shift / |
 | Quit | ⌘ ⇧ X | Ctrl Shift X |
 

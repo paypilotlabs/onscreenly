@@ -7,12 +7,14 @@ All notable changes to Onscreenly. Versions follow [Semantic Versioning](https:/
 ## [0.2.5] - 2026-10-31
 
 ### Added
+- Coding problems longer than the screen: press ⌘⌥⇧K / Ctrl+Alt+Shift+K (Add screen) to keep each part as you scroll (up to 4), then solve; every part is sent together. A problem that is still cut off is named as such instead of half-solved, and the parts already added are kept for the next solve.
 - Settings › API keys › Your data › Meeting history: keep the last 10, 25, 50 or 100 meetings, or none, and delete the history.
 - Stop an answer that is on its way (Send or Esc); answers cut off at the length limit say so.
 - Settings › Appearance › Keyboard shortcuts: change any global shortcut.
 - Answers come from your Obsidian notes first, in your own wording.
 
 ### Changed
+- The guide (first run and Help) is part of the overlay: it opens in the answer panel's place under the toolbar, in the same dark theme, instead of a light card over a grey box. It also lists the Add screen shortcut.
 - Global shortcuts no longer take keys other apps rely on: "What should I say?" is ⌘⌥↵ / Ctrl+Alt+Enter and LeetCode ⌘⌥K / Ctrl+Alt+K.
 - macOS opens without asking for permissions; the microphone and Screen Recording are asked for when first needed.
 - Answers never invent experience, employers or numbers; missing details are marked [X].

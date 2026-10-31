@@ -184,8 +184,10 @@ test('the click-through ids cover every id that CSS gives pointer events', () =>
         }
         const matches = querySelectorAll(index.root, selector, { ignoreClass });
         for (const el of matches) {
+          // Inside a listed id is covered by it (#onboard-scrim > .ws-dialog: the guide in its scrim).
+          if (insideListed(el)) continue;
           if (el.attrs.id) cssIds.add(el.attrs.id);
-          else if (!insideListed(el)) problems.push(`${where} takes the mouse outside the listed ids`);
+          else problems.push(`${where} takes the mouse outside the listed ids`);
         }
         if (!matches.length && !parts.slice(0, -1).some((p) => ids.has(p.compound.id))) {
           problems.push(`${where} matches nothing in index.html, so its click-through cannot be checked`);
@@ -278,10 +280,10 @@ test('the closed transcript sidebar is click-through, winning over layout.css by
   }
 });
 
-test('#app carries the overlay theme, and no theme class sits on html, body or a scrim', () => {
+test('#app and the guide carry the overlay theme, and no theme class sits on html, body or a scrim', () => {
   assert.deepEqual(
     querySelectorAll(index.root, '.theme-overlay').map((el) => el.attrs.id),
-    ['app']
+    ['app', 'onboard']
   );
   for (const selector of ['html', 'body', '#settings-scrim', '#onboard-scrim', '#consent-scrim']) {
     for (const el of querySelectorAll(index.root, selector)) {
@@ -292,19 +294,23 @@ test('#app carries the overlay theme, and no theme class sits on html, body or a
 
 const themesOf = (el) => classesOf(el).filter((k) => k.startsWith('theme-'));
 
-test('Settings, onboarding and consent are light workspace dialogs, and themes never nest', () => {
-  for (const id of ['settings', 'onboard', 'consent']) {
+test('Settings and consent are light workspace dialogs, the guide is part of the dark overlay, and themes never nest', () => {
+  for (const [id, theme] of [
+    ['settings', 'theme-workspace'],
+    ['onboard', 'theme-overlay'],
+    ['consent', 'theme-workspace']
+  ]) {
     const found = querySelectorAll(index.root, `#${id}`);
     assert.equal(found.length, 1, `#${id}`);
     assert.ok(classesOf(found[0]).includes('ws-dialog'), `#${id} is a .ws-dialog`);
-    assert.deepEqual(themesOf(found[0]), ['theme-workspace'], `#${id} carries the workspace theme`);
+    assert.deepEqual(themesOf(found[0]), [theme], `#${id} carries ${theme}`);
     assert.equal(found[0].parent.attrs.id, `${id}-scrim`, `#${id} sits directly in its scrim`);
   }
   assert.deepEqual(
     querySelectorAll(index.root, '.theme-workspace')
       .map((el) => el.attrs.id)
       .sort(),
-    ['consent', 'onboard', 'settings']
+    ['consent', 'settings']
   );
   for (const page of [index, permissions]) {
     for (const el of elements(page.root)) {
