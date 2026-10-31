@@ -8,8 +8,10 @@ const DEFAULTS = {
   say: 'CommandOrControl+Alt+Return',
   assist: 'CommandOrControl+Shift+Return',
   leetcode: 'CommandOrControl+Alt+K',
-  // Keeps the visible part of a coding problem too long for one screen; the solve sends every part.
-  leetcodeAdd: 'CommandOrControl+Alt+A',
+  // Add screen: keeps the visible part of a coding problem too long for one screen; the solve sends
+  // every part. Solve's keys plus Shift. Not Ctrl+Alt+<letter> alone: on Windows that is AltGr+<letter>,
+  // which types characters such as ą on many layouts.
+  leetcodeAdd: 'CommandOrControl+Alt+Shift+K',
   hide: 'CommandOrControl+Shift+/',
   listening: 'CommandOrControl+Shift+L',
   quit: 'CommandOrControl+Shift+X'
@@ -63,4 +65,37 @@ function isValid(accel) {
   return keys.length >= 1;
 }
 
-module.exports = { DEFAULTS, resolveShortcuts, findConflicts, isValid };
+// An accelerator as the user reads it: '⌘⌥⇧K' on macOS, 'Ctrl+Alt+Shift+K' elsewhere.
+function displayAccelerator(accel, platform = process.platform) {
+  if (!accel || typeof accel !== 'string') return '';
+  const mac = platform === 'darwin';
+  const names = mac
+    ? {
+        CommandOrControl: '⌘',
+        CmdOrCtrl: '⌘',
+        Command: '⌘',
+        Cmd: '⌘',
+        Control: '⌃',
+        Ctrl: '⌃',
+        Alt: '⌥',
+        Option: '⌥',
+        Shift: '⇧',
+        Return: '↵',
+        Enter: '↵'
+      }
+    : {
+        CommandOrControl: 'Ctrl',
+        CmdOrCtrl: 'Ctrl',
+        Control: 'Ctrl',
+        Command: 'Ctrl',
+        Cmd: 'Ctrl',
+        Option: 'Alt',
+        Return: 'Enter'
+      };
+  return accel
+    .split('+')
+    .map((p) => names[p] || p)
+    .join(mac ? '' : '+');
+}
+
+module.exports = { DEFAULTS, resolveShortcuts, findConflicts, isValid, displayAccelerator };

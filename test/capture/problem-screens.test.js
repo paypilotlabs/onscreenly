@@ -16,14 +16,29 @@ test('keeps the parts of a long problem in order, up to the limit', () => {
   assert.equal(screens.count(), 0);
 });
 
-test('parts older than the age limit are dropped, so an old problem never joins a new solve', () => {
+test('the parts expire together, never the top of a problem alone', () => {
   let now = 1000;
   const screens = createProblemScreens({ now: () => now });
-  screens.add('data:image/png;base64,old');
+  screens.add('data:image/png;base64,top');
   now += MAX_AGE_MS - 1;
-  screens.add('data:image/png;base64,new');
+  screens.add('data:image/png;base64,bottom');
   now += 2;
-  assert.deepEqual(screens.list(), ['data:image/png;base64,new']);
+  assert.deepEqual(screens.list(), ['data:image/png;base64,top', 'data:image/png;base64,bottom']);
+  now += MAX_AGE_MS + 1;
+  assert.deepEqual(screens.list(), []);
+});
+
+test('touch keeps the parts fresh; release lets go of only the parts a solve sent', () => {
+  let now = 0;
+  const screens = createProblemScreens({ now: () => now });
+  screens.add('a');
+  now += MAX_AGE_MS - 1;
+  screens.touch();
+  now += MAX_AGE_MS - 1;
+  assert.deepEqual(screens.list(), ['a']);
+  screens.add('b'); // added while the solve that sent 'a' was answering
+  screens.release(1);
+  assert.deepEqual(screens.list(), ['b']);
 });
 
 test('an empty capture is not kept', () => {

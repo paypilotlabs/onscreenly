@@ -20,6 +20,9 @@ const ACTIONS = {
   quit: () => app.quit()
 };
 
+// How "Already used for …" names an action whose id is not a word.
+const NAMES = { leetcodeAdd: 'Add screen', leetcode: 'coding solves' };
+
 let registered = {}; // action -> accelerator Onscreenly holds right now
 
 function currentMap() {
@@ -31,13 +34,23 @@ function registerShortcuts() {
   for (const accelerator of Object.values(registered)) globalShortcut.unregister(accelerator);
   registered = {};
   const map = currentMap();
-  for (const [action, run] of Object.entries(ACTIONS)) {
+  // Keys the user chose register first: a default added in a later version never takes a
+  // combination the user already gave to another action (that default is left unavailable).
+  const overrides = store.getSettings().shortcuts || {};
+  const order = Object.keys(ACTIONS).sort((a, b) => Number(!(a in overrides)) - Number(!(b in overrides)));
+  const held = new Set();
+  for (const action of order) {
+    const run = ACTIONS[action];
+    const key = String(map[action] || '').toLowerCase();
     let ok = false;
-    try {
-      ok = globalShortcut.register(map[action], run);
-    } catch (_) {
-      ok = false; // an accelerator Electron cannot parse
+    if (!held.has(key)) {
+      try {
+        ok = globalShortcut.register(map[action], run);
+      } catch (_) {
+        ok = false; // an accelerator Electron cannot parse
+      }
     }
+    if (ok) held.add(key);
     shortcutState[action] = ok;
     if (ok) registered[action] = map[action];
     else {
@@ -89,7 +102,7 @@ function registerShortcutsIpc() {
     const clash = findConflicts(next).find(([a, b]) => a === action || b === action);
     if (clash) {
       const other = clash[0] === action ? clash[1] : clash[0];
-      return { ok: false, error: `Already used for ${other}.`, ...shortcutsInfo() };
+      return { ok: false, error: `Already used for ${NAMES[other] || other}.`, ...shortcutsInfo() };
     }
     const info = save(next);
     // Another app holds it: keep the old keys rather than leave the action without any.

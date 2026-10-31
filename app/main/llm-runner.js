@@ -9,6 +9,7 @@ const { buildInterviewContext, detectCategory } = require('../../src/context/int
 const publik = require('../../src/integrations/publik');
 const { recordEvent } = require('../../src/integrations/applink');
 const { session, send } = require('./session');
+const { DEFAULTS: SHORTCUT_DEFAULTS, resolveShortcuts, displayAccelerator } = require('../../src/platform/shortcuts');
 const publikController = require('./publik-controller');
 const { retrieveNotes } = require('./knowledge');
 
@@ -205,7 +206,19 @@ async function runFeature(mode, userText) {
     }
 
     const settingsForPrompt = store.getSettings();
-    const ctx = { transcript, userText: userText || '', settings: settingsForPrompt, screenCount: images.length };
+    const ctx = {
+      transcript,
+      userText: userText || '',
+      settings: settingsForPrompt,
+      screenCount: images.length,
+      // The user's Add screen keys as they read them, so a cut-off solve can say which keys to press.
+      addScreenKeys:
+        mode === 'leetcode'
+          ? displayAccelerator(
+              resolveShortcuts(settingsForPrompt.shortcuts || {}).leetcodeAdd || SHORTCUT_DEFAULTS.leetcodeAdd
+            )
+          : ''
+    };
     // Modes with their own context (résumé analysis) put the full documents in
     // the user turn and skip the clipped interview excerpts and meeting memory.
     let contextBlock = def.ownContext ? null : buildInterviewContext(settingsForPrompt, mode, transcript);
@@ -289,8 +302,15 @@ async function runFeature(mode, userText) {
       throw new Error('The model returned an empty answer. Try again, or pick another model in Settings.');
     }
     send('llm:done', { sources: notes.sources, truncated });
-    // The problem is solved: its parts are done with. A failed or stopped solve keeps them for Try again.
-    if (parts.length) session.problemScreens.clear();
+    // A whole solve lets go of the parts it sent; a part added while it was answering stays. One that
+    // was cut off at the length limit, or that says part of the problem is missing, keeps them (and
+    // keeps them fresh), so the user can add the rest and solve again. Failed or stopped solves keep
+    // them for Try again.
+    if (parts.length) {
+      const missing = /^\s*\**Missing:/im.test(answer);
+      if (truncated || missing) session.problemScreens.touch();
+      else session.problemScreens.release(parts.length);
+    }
     // Streams settle after their headers, so the charge is reconciled from
     // GET /wallet shortly after the answer — one request per answer, debounced.
     if (settings.provider === publik.PUBLIK_PROVIDER) publikController.publikScheduleWalletRefresh();

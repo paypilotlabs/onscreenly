@@ -50,7 +50,7 @@ const SHORTCUT_DEFAULTS = {
   say: 'CommandOrControl+Alt+Return',
   assist: 'CommandOrControl+Shift+Return',
   leetcode: 'CommandOrControl+Alt+K',
-  leetcodeAdd: 'CommandOrControl+Alt+A',
+  leetcodeAdd: 'CommandOrControl+Alt+Shift+K',
   hide: 'CommandOrControl+Shift+/',
   listening: 'CommandOrControl+Shift+L',
   quit: 'CommandOrControl+Shift+X'
