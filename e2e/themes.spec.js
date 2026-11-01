@@ -36,12 +36,15 @@ test('Settings is a flat white sheet with a blue tab underline and one primary a
 
 test('Help opens the guide in the answer panel’s place, dark like the overlay', async ({ launch }) => {
   const { page } = await launch();
+  // Both are measured once they have risen into place (ui-rise-in), or a slow runner reads mid-way.
+  const settled = (sel) =>
+    page.locator(sel).evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+  await settled('#panel');
   const panel = await page.locator('#panel').boundingBox();
   const panelColor = await page.locator('#panel').evaluate((el) => getComputedStyle(el).backgroundColor);
   await page.click('#logo-btn');
   await expect(page.locator('#onboard')).toBeVisible();
-  // Measured once it has risen into place.
-  await page.locator('#onboard').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  await settled('#onboard');
   const guide = await page.locator('#onboard').boundingBox();
   expect(Math.round(guide.x)).toBe(Math.round(panel.x));
   expect(Math.round(guide.y)).toBe(Math.round(panel.y));
