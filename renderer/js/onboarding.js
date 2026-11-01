@@ -151,7 +151,14 @@ const OB_STEPS = [
       }</dd></div>` +
       '<div class="ob-feature"><dt class="ob-feature-key">Answers</dt><dd>Suggests what to say next</dd></div>' +
       '</dl>' +
-      '<p class="ob-caveat">It tries to stay out of screen shares, but that is best effort, so check before you rely on it.</p>'
+      '<p class="ob-caveat">It tries to stay out of screen shares, but that is best effort, so check before you rely on it.</p>',
+    // Opened from Help (after the first run): a way to tell us what went wrong. It opens a new GitHub
+    // issue with the version and system filled in, in the browser, where the user sees it all first.
+    get buttons() {
+      return state.settings && state.settings.onboarded
+        ? [{ label: 'Report a problem', kind: 'secondary', action: () => onscreenly.reportProblem() }]
+        : [];
+    }
   },
   {
     eyebrow: 'Permissions',

@@ -270,6 +270,16 @@ export function init() {
       appendTranscriptHistoryTurn(t.channel, t.text, false);
     }
   });
+  // A newer release is out (main checks once per launch, if Settings allows): say so until dismissed.
+  onscreenly.on('update:available', ({ version }) => {
+    const button = document.createElement('button');
+    button.textContent = 'Download';
+    button.addEventListener('click', () => {
+      hideStatus();
+      onscreenly.openReleases();
+    });
+    showStatus(`Onscreenly ${version} is available.`, button, 'notice');
+  });
   // Add screen kept one part of a long coding problem: say how many, and how to solve with them.
   onscreenly.on('problem:screens', ({ count, max, full }) => {
     const solve = combo(...shortcutKeys('leetcode'));

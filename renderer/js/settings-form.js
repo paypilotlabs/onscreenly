@@ -55,6 +55,8 @@ function fillSettings() {
   $('#whisper-threads').value = Number(localWhisper.threads) || 0;
   // Slides tab (inside Transcription pane)
   const slidesCfg = state.settings.slides || { enabled: false, intervalMs: 3000 };
+  const checkUpdates = $('#check-updates');
+  if (checkUpdates) checkUpdates.checked = state.settings.checkForUpdates !== false;
   const slidesEnabled = $('#slides-enabled');
   if (slidesEnabled) slidesEnabled.checked = !!slidesCfg.enabled;
   const slidesInterval = $('#slides-interval');

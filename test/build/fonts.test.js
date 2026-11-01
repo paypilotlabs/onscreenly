@@ -12,8 +12,7 @@ const { drift, vendorPlan, FONTS, FONT_DIR } = require('../../scripts/vendor-fon
 const MAX_FONT_BYTES = 200 * 1024;
 // family → the vendored files it may use (each declared exactly once).
 const FACES = {
-  Geist: ['geist-latin-wght-normal.woff2', 'geist-latin-ext-wght-normal.woff2'],
-  'EB Garamond': ['eb-garamond-latin-wght-normal.woff2']
+  Geist: ['geist-latin-wght-normal.woff2', 'geist-latin-ext-wght-normal.woff2']
 };
 
 const woff2Files = () => fs.readdirSync(FONT_DIR).filter((f) => f.endsWith('.woff2'));
@@ -124,12 +123,11 @@ test('only the declared faces exist, each from its vendored file with the packag
   assert.deepEqual(used.sort(), Object.values(FACES).flat().sort(), 'each vendored file is declared exactly once');
 });
 
-test('the font licences ship beside the fonts and NOTICE names both families', () => {
+test('the font licence ships beside the font, NOTICE names it, and no unused font ships', () => {
   const notice = fs.readFileSync(path.join(ROOT, 'NOTICE'), 'utf8');
-  for (const [family, licence] of [
-    ['Geist', 'OFL-Geist.txt'],
-    ['EB Garamond', 'OFL-EBGaramond.txt']
-  ]) {
+  assert.deepEqual(fs.readdirSync(FONT_DIR).sort(), [...Object.values(FACES).flat(), 'OFL-Geist.txt'].sort());
+  assert.ok(!notice.includes('EB Garamond'), 'NOTICE names only fonts that ship');
+  for (const [family, licence] of [['Geist', 'OFL-Geist.txt']]) {
     const text = fs.readFileSync(path.join(FONT_DIR, licence), 'utf8');
     assert.match(text, /SIL Open Font License, Version 1\.1/, licence);
     assert.match(text, new RegExp(family.replace(' ', '\\s*')), licence);

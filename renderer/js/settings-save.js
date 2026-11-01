@@ -65,6 +65,8 @@ async function saveSettings() {
     $('#whisper-threads').value = String(state.settings.localWhisper.threads);
   }
   // Slides (opt-in, memory-only)
+  const checkUpdatesEl = $('#check-updates');
+  if (checkUpdatesEl) state.settings.checkForUpdates = !!checkUpdatesEl.checked;
   if (!state.settings.slides) state.settings.slides = {};
   const slidesEnabledEl = $('#slides-enabled');
   const slidesIntervalEl = $('#slides-interval');

@@ -107,6 +107,8 @@ const DEFAULTS = {
   // How many meetings to keep (0 = don't save meeting history). Changed through the
   // meetings:set-retention IPC, which confirms before deleting anything.
   meetingHistory: { keep: 50 },
+  // Once per launch, ask GitHub's releases page whether a newer version exists (Settings › Your data).
+  checkForUpdates: true,
   // Global shortcuts the user changed (action -> Electron accelerator); the rest use the defaults in
   // src/platform/shortcuts.js. Written through the shortcuts:set IPC, which validates them.
   shortcuts: {},
