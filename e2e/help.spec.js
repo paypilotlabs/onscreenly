@@ -23,6 +23,34 @@ async function releaseServer(tag, { delayMs = 0 } = {}) {
   };
 }
 
+// Some machines show a launch message of their own (Windows on a virtual machine: screen-share hiding
+// is off). The update notice waits behind it, so these helpers dismiss any other message first.
+const banner = (page) => page.locator('#onscreenly-status');
+async function bannerText(page) {
+  const b = banner(page);
+  return (await b.count()) && (await b.isVisible()) ? await b.textContent() : '';
+}
+async function dismissOthers(page) {
+  const text = await bannerText(page);
+  if (text && !text.includes('is available')) await banner(page).locator('.banner-close').click();
+}
+async function expectNotice(page, text) {
+  await expect
+    .poll(
+      async () => {
+        await dismissOthers(page);
+        return bannerText(page);
+      },
+      { timeout: 20000 }
+    )
+    .toContain(text);
+}
+async function expectNoNotice(page) {
+  await dismissOthers(page);
+  await page.waitForTimeout(800);
+  expect(await bannerText(page)).not.toContain('is available');
+}
+
 const recordOpened = (app) =>
   app.evaluate(({ shell }) => {
     globalThis.__opened = [];
@@ -53,13 +81,12 @@ test('a newer release is announced with Download, which opens the releases page'
   try {
     const { app, page } = await launch({ env: { ONSCREENLY_UPDATE_URL: server.url } });
     await recordOpened(app);
-    const banner = page.locator('#onscreenly-status');
-    await expect(banner).toContainText('Onscreenly 99.0.0 is available.');
-    await banner.locator('.banner-action', { hasText: 'Download' }).click();
+    await expectNotice(page, 'Onscreenly 99.0.0 is available.');
+    await banner(page).locator('.banner-action', { hasText: 'Download' }).click();
     await expect
       .poll(() => app.evaluate(() => globalThis.__opened))
       .toEqual(['https://github.com/paypilotlabs/onscreenly/releases/latest']);
-    await expect(banner).toBeHidden();
+    await expect(banner(page)).toBeHidden();
     expect(server.hits()).toBe(1);
   } finally {
     await server.close();
@@ -72,12 +99,12 @@ test('no notice for the version already installed, and no request at all when th
   try {
     const first = await launch({ env: { ONSCREENLY_UPDATE_URL: same.url } });
     await expect.poll(() => same.hits()).toBe(1);
-    await expect(first.page.locator('#onscreenly-status')).toHaveCount(0);
+    await expectNoNotice(first.page);
 
     const second = await launch({ settings: { checkForUpdates: false }, env: { ONSCREENLY_UPDATE_URL: off.url } });
     await second.page.waitForTimeout(1500);
     expect(off.hits()).toBe(0);
-    await expect(second.page.locator('#onscreenly-status')).toHaveCount(0);
+    await expectNoNotice(second.page);
   } finally {
     await same.close();
     await off.close();
@@ -104,15 +131,15 @@ test('the notice waits for a launch warning to be read, and never replaces it', 
   const server = await releaseServer('v99.0.0', { delayMs: 300 });
   try {
     const { page } = await launch({ profile, env: { ONSCREENLY_UPDATE_URL: server.url } });
-    const banner = page.locator('#onscreenly-status');
-    await expect(banner).toContainText('could not be read');
+    const status = banner(page);
+    await expect(status).toContainText('could not be read');
     await expect.poll(() => server.hits()).toBe(1);
     await page.waitForTimeout(800);
-    await expect(banner).toContainText('could not be read');
-    await expect(banner.locator('.banner-action')).toHaveText('Open Your data');
-    await banner.locator('.banner-close').click();
-    await expect(banner).toContainText('Onscreenly 99.0.0 is available.');
-    await expect(banner.locator('.banner-action')).toHaveText('Download');
+    await expect(status).toContainText('could not be read');
+    await expect(status.locator('.banner-action')).toHaveText('Open Your data');
+    await status.locator('.banner-close').click();
+    await expectNotice(page, 'Onscreenly 99.0.0 is available.');
+    await expect(status.locator('.banner-action')).toHaveText('Download');
   } finally {
     await server.close();
   }
