@@ -94,6 +94,8 @@ Use a release build (from the Releases page or the release workflow's artifacts)
 
 - [ ] Opacity at 100%, 60% and 20% over a video call, a white document and a dark code editor: answers stay readable and the toolbar stays findable.
 - [ ] The light dialogs (Settings, consent, permissions) over a dark desktop and over a bright one.
+- [ ] Help › Report a problem opens a new GitHub issue in the browser with only the version and system filled in (not shown on the first-run guide).
+- [ ] With an older build installed, launching shows "Onscreenly X is available." with Download, which opens the releases page; with New versions unticked in Your data, it never shows.
 - [ ] Help opens the guide dark, in the answer panel's place under the toolbar; the area around it clicks through to the app below, and a toolbar button (or Help again) closes it.
 - [ ] Text and borders look sharp on a Retina display, on a 1x display, and on Windows at 150% scaling.
 - [ ] Keyboard only: Tab reaches every control with a visible focus ring, dialogs keep focus inside, and Escape closes one layer per press (the composer text, then Opacity, then the transcript).

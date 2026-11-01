@@ -12,17 +12,13 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..');
 const FONT_DIR = path.join(ROOT, 'renderer', 'fonts');
 
-// Latin and Latin Extended Geist, Latin EB Garamond; upright only, no italics.
+// Latin and Latin Extended Geist; upright only, no italics. (EB Garamond left with the light
+// onboarding hero in 0.2.5: nothing in the app sets it.)
 const FONTS = [
   {
     pkg: '@fontsource-variable/geist',
     files: ['geist-latin-wght-normal.woff2', 'geist-latin-ext-wght-normal.woff2'],
     license: 'OFL-Geist.txt'
-  },
-  {
-    pkg: '@fontsource-variable/eb-garamond',
-    files: ['eb-garamond-latin-wght-normal.woff2'],
-    license: 'OFL-EBGaramond.txt'
   }
 ];
 

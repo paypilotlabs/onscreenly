@@ -35,6 +35,7 @@ const {
   registerPermissionsIpc
 } = require('./permissions');
 const { registerShortcuts, registerShortcutsIpc } = require('./shortcuts');
+const { registerHelpIpc, checkForUpdateWhenLoaded } = require('./help');
 const { installMediaHandlers } = require('./media');
 const { registerAppIpc } = require('./ipc');
 const { configure: configureKnowledge, registerKnowledgeIpc, stopKnowledge } = require('./knowledge');
@@ -72,6 +73,7 @@ registerAppIpc();
 registerKnowledgeIpc();
 registerMeetingHistoryIpc();
 registerShortcutsIpc();
+registerHelpIpc();
 registerPublikIpc();
 registerCaptureIpc();
 registerWhisperIpc();
@@ -157,6 +159,7 @@ function launchApp() {
   });
 
   createWindow();
+  if (getWin()) checkForUpdateWhenLoaded(getWin());
   reportMeetingHistoryStatus(meetingStore.status());
   registerShortcuts();
   // Index the Obsidian vault in the background when Knowledge is on.

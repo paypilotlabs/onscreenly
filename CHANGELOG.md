@@ -4,6 +4,13 @@ All notable changes to Onscreenly. Versions follow [Semantic Versioning](https:/
 
 ## [Unreleased]
 
+### Added
+- **Report a problem** in the guide (Help): opens a new GitHub issue in your browser with only the app version and system filled in.
+- A notice when a newer version is out, with **Download**. The installed app asks GitHub's releases page once per launch; turn it off in Settings › API keys › Your data › New versions.
+
+### Changed
+- The app no longer ships the EB Garamond font, which nothing used after the guide moved into the overlay.
+
 ## [0.2.5] - 2026-10-31
 
 ### Added
