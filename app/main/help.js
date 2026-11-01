@@ -15,7 +15,8 @@ function registerHelpIpc() {
     const url = problemReportUrl({
       version: APP_VERSION,
       platform: process.platform,
-      release: os.release(),
+      // The version people know: macOS 15.1.0 or Windows 10.0.22631, not the Darwin kernel's 24.1.0.
+      release: process.platform === 'linux' ? os.release() : process.getSystemVersion(),
       arch: process.arch,
       electron: process.versions.electron
     });

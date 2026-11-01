@@ -1,13 +1,17 @@
 // Help: Report a problem opens a pre-filled GitHub issue, and a newer release is announced once,
 // unless Settings turns the check off. The release check talks to a local server here.
+const fs = require('node:fs');
 const http = require('node:http');
+const os = require('node:os');
+const path = require('node:path');
 const { test, expect } = require('./fixtures');
 const { version } = require('../package.json');
 
-async function releaseServer(tag) {
+async function releaseServer(tag, { delayMs = 0 } = {}) {
   let hits = 0;
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     hits++;
+    if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({ tag_name: tag, draft: false, prerelease: false }));
   });
@@ -90,4 +94,26 @@ test('Settings › Your data turns the version check off and on', async ({ launc
   await page.click('#s-close');
   await expect(page.locator('#settings-scrim')).toBeHidden();
   expect(await page.evaluate(() => onscreenly.settingsGet().then((s) => s.checkForUpdates))).toBe(false);
+});
+
+test('the notice waits for a launch warning to be read, and never replaces it', async ({ launch }) => {
+  // A damaged history is reported at launch with Open Your data; the release answer comes after it.
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'onscreenly-e2e-help-'));
+  fs.writeFileSync(path.join(profile, 'onscreenly-data.json'), JSON.stringify({ onboarded: true }));
+  fs.writeFileSync(path.join(profile, 'meetings.json'), '[{"id":"m0","transcript":[{"text":"cut off');
+  const server = await releaseServer('v99.0.0', { delayMs: 300 });
+  try {
+    const { page } = await launch({ profile, env: { ONSCREENLY_UPDATE_URL: server.url } });
+    const banner = page.locator('#onscreenly-status');
+    await expect(banner).toContainText('could not be read');
+    await expect.poll(() => server.hits()).toBe(1);
+    await page.waitForTimeout(800);
+    await expect(banner).toContainText('could not be read');
+    await expect(banner.locator('.banner-action')).toHaveText('Open Your data');
+    await banner.locator('.banner-close').click();
+    await expect(banner).toContainText('Onscreenly 99.0.0 is available.');
+    await expect(banner.locator('.banner-action')).toHaveText('Download');
+  } finally {
+    await server.close();
+  }
 });

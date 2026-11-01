@@ -35,8 +35,21 @@ import { markUnread } from './toolbar.js';
 // The banner above the action row: a message, at most one action, and Dismiss. `tone` is 'info',
 // 'warn' or 'error' (read out at once).
 let statusTimer = null;
+// The update notice ('notice' tone) never covers another message: it waits while one shows (a launch
+// warning about screen-share hiding or damaged meeting history arrives first), comes back if a later
+// message replaces it, and shows once the banner is free.
+let waitingNotice = null;
+
+function bannerShowing() {
+  const el = document.getElementById('onscreenly-status');
+  return !!el && el.classList.contains('show');
+}
+
 function showStatus(message, button, tone = 'info') {
   let el = document.getElementById('onscreenly-status');
+  if (tone !== 'notice' && el && el.classList.contains('show') && el.dataset.tone === 'notice' && el.notice) {
+    waitingNotice = el.notice;
+  }
   if (!el) {
     el = document.createElement('div');
     el.id = 'onscreenly-status';
@@ -74,6 +87,17 @@ function hideStatus() {
   clearTimeout(statusTimer);
   const el = document.getElementById('onscreenly-status');
   if (el) el.classList.remove('show');
+  if (waitingNotice) {
+    const show = waitingNotice;
+    waitingNotice = null;
+    show();
+  }
+}
+
+/** Shows `show()` (which calls showStatus with the 'notice' tone) now, or once the banner is free. */
+function showNotice(show) {
+  if (bannerShowing()) waitingNotice = show;
+  else show();
 }
 
 // A warning about listening, with the way to fix it: Settings › Audio.
@@ -272,13 +296,17 @@ export function init() {
   });
   // A newer release is out (main checks once per launch, if Settings allows): say so until dismissed.
   onscreenly.on('update:available', ({ version }) => {
-    const button = document.createElement('button');
-    button.textContent = 'Download';
-    button.addEventListener('click', () => {
-      hideStatus();
-      onscreenly.openReleases();
-    });
-    showStatus(`Onscreenly ${version} is available.`, button, 'notice');
+    const notice = () => {
+      const button = document.createElement('button');
+      button.textContent = 'Download';
+      button.addEventListener('click', () => {
+        hideStatus();
+        onscreenly.openReleases();
+      });
+      showStatus(`Onscreenly ${version} is available.`, button, 'notice');
+      document.getElementById('onscreenly-status').notice = notice;
+    };
+    showNotice(notice);
   });
   // Add screen kept one part of a long coding problem: say how many, and how to solve with them.
   onscreenly.on('problem:screens', ({ count, max, full }) => {
