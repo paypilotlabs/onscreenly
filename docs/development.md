@@ -116,6 +116,6 @@ For release acceptance, inspect the packaged application name, bundle ID, permis
 - `test/`: automated tests using synthetic data and mocked integrations, mirroring the `src/` groups plus `renderer/` and `build/`.
 - `vendor/app-link/`: vendored integration library with its original provenance.
 
-The screenshots directly under `docs/` are historical: they show the upstream Cue interface. Current screenshots are in `docs/design/screens/`.
+Current product screenshots are in `docs/design/screens/`.
 
 Copyright (C) 2026 Lohith Kumar. Based on [Cue by Blueturboguy07](https://github.com/Blueturboguy07/cue); see [NOTICE](../NOTICE). Licensed under GPL-3.0-or-later, see [LICENSE](../LICENSE). See `vendor/app-link/VENDORED.md` / `build-resources/whisper.cpp.LICENSE` for third-party provenance.
